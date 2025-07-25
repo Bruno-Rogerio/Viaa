@@ -1,0 +1,32 @@
+/* src/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  
+  @keyframes expand-line {
+    0% {
+      width: 0;
+    }
+    100% {
+      width: 80px;
+    }
+  }
+  
+  .animate-shimmer {
+    animation: shimmer 3s ease-in-out infinite;
+  }
+  
+  .animate-expand-line {
+    animation: expand-line 2s ease-out 1s forwards;
+  }
+}
