@@ -1,4 +1,3 @@
-// tailwind.config.js
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -9,14 +8,31 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'off-white': '#F9F9F6',
-        'coral': '#FF6B6B',
-        'sage': '#A8C3A0',
-        'dark-blue': '#1E1E2F',
-        'light-gray': '#EFEFEF',
+        warm: {
+          50: '#fdfcfb',
+          100: '#faf8f6',
+          200: '#f5f0ea',
+          300: '#ede4d8',
+          400: '#e2d1c0',
+          500: '#d4bca2',
+          600: '#c4a584',
+          700: '#a6896b',
+          800: '#8b7156',
+          900: '#735d47',
+        },
       },
       animation: {
-        'pulse': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'gradient': 'gradient 8s ease-in-out infinite',
+      },
+      keyframes: {
+        gradient: {
+          '0%, 100%': {
+            'background-position': '0% 50%'
+          },
+          '50%': {
+            'background-position': '100% 50%'
+          },
+        }
       }
     },
   },

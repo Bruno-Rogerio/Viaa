@@ -1,93 +1,128 @@
-// src/components/FeaturesSection.tsx
 'use client'
 
-const features = [
-  {
-    icon: (
-      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-      </svg>
-    ),
-    title: 'Transcrição Inteligente',
-    description: 'Suas sessões são transcritas automaticamente com tecnologia de IA avançada, mantendo total privacidade e segurança.'
-  },
-  {
-    icon: (
-      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    ),
-    title: 'Análise de Humor',
-    description: 'Acompanhe sua evolução emocional através de análises detalhadas do seu humor e progresso terapêutico.'
-  },
-  {
-    icon: (
-      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-      </svg>
-    ),
-    title: 'Insights Terapêuticos',
-    description: 'Receba resumos e insights personalizados que ajudam a aprofundar sua jornada de autoconhecimento.'
-  },
-  {
-    icon: (
-      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-      </svg>
-    ),
-    title: 'Privacidade Total',
-    description: 'Seus dados são protegidos com criptografia de ponta a ponta, garantindo máxima confidencialidade.'
-  },
-  {
-    icon: (
-      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-      </svg>
-    ),
-    title: 'Acesso Multiplataforma',
-    description: 'Acesse sua terapia de qualquer lugar, em qualquer dispositivo, quando você precisar.'
-  },
-  {
-    icon: (
-      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z" />
-      </svg>
-    ),
-    title: 'Interface Intuitiva',
-    description: 'Design pensado para proporcionar uma experiência calma e acolhedora durante sua jornada.'
-  }
-]
+import { useState } from 'react'
 
-export default function FeaturesSection() {
+export default function Features() {
+  const [activeFeature, setActiveFeature] = useState(0)
+
+  const features = [
+    {
+      icon: '🎯',
+      title: 'Matching Inteligente',
+      description: 'Nossa IA conecta pacientes aos profissionais mais adequados baseado em perfil, localização e especialidades.',
+      color: 'rose',
+      gradient: 'from-rose-400 to-rose-600'
+    },
+    {
+      icon: '📅',
+      title: 'Agendamento Simplificado',
+      description: 'Agende consultas em segundos, receba lembretes automáticos e gerencie sua agenda de forma intuitiva.',
+      color: 'sky',
+      gradient: 'from-sky-400 to-sky-600'
+    },
+    {
+      icon: '🔒',
+      title: 'Segurança Total',
+      description: 'Seus dados estão protegidos com criptografia de ponta e seguimos rigorosamente a LGPD.',
+      color: 'emerald',
+      gradient: 'from-emerald-400 to-emerald-600'
+    },
+    {
+      icon: '💬',
+      title: 'Chat Integrado',
+      description: 'Comunicação direta e segura entre pacientes e profissionais através de nossa plataforma.',
+      color: 'violet',
+      gradient: 'from-violet-400 to-violet-600'
+    },
+    {
+      icon: '📊',
+      title: 'Dashboard Completo',
+      description: 'Acompanhe seu progresso, histórico de sessões e evolução através de relatórios detalhados.',
+      color: 'orange',
+      gradient: 'from-orange-400 to-orange-600'
+    },
+    {
+      icon: '🌙',
+      title: 'Disponibilidade 24/7',
+      description: 'Acesse a plataforma quando precisar, com suporte para emergências e crises.',
+      color: 'indigo',
+      gradient: 'from-indigo-400 to-indigo-600'
+    }
+  ]
+
   return (
-    <section className="py-16 bg-[#F9F9F6]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-[#1E1E2F] mb-4 leading-tight">
-            Funcionalidades que <span className="text-[#FF6B6B]">transformam</span>
+    <section className="py-24 bg-gradient-to-br from-warm-50 via-white to-slate-50 relative overflow-hidden" id="features">
+      {/* Background Elements */}
+      <div className="absolute top-20 right-10 w-72 h-72 bg-gradient-to-br from-rose-100/30 to-sky-100/30 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 left-10 w-80 h-80 bg-gradient-to-tr from-emerald-100/20 to-violet-100/20 rounded-full blur-3xl"></div>
+
+      <div className="container mx-auto px-6 relative z-10">
+        {/* Header */}
+        <div className="text-center mb-20">
+          <div className="inline-flex items-center bg-gradient-to-r from-rose-100 via-sky-100 to-emerald-100 rounded-full px-6 py-3 mb-6">
+            <span className="text-slate-600 font-medium">✨ Recursos Incríveis</span>
+          </div>
+          <h2 className="text-4xl md:text-6xl font-bold text-slate-800 mb-6">
+            Tudo que você precisa em
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-rose-500 via-sky-500 to-emerald-500">
+              um só lugar
+            </span>
           </h2>
-          <p className="text-base md:text-lg text-[#1E1E2F]/70 max-w-3xl mx-auto font-light">
-            Tecnologia avançada a serviço do seu bem-estar emocional
+          <p className="text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
+            Desenvolvemos uma plataforma completa para conectar pessoas e transformar vidas através do cuidado mental.
           </p>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        {/* Features Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
           {features.map((feature, index) => (
             <div
               key={index}
-              className="group bg-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-[#A8C3A0]/20 hover:border-[#A8C3A0]/40"
+              className={`group relative bg-white/80 backdrop-blur-sm rounded-3xl p-8 border transition-all duration-500 cursor-pointer transform hover:-translate-y-3 ${
+                activeFeature === index
+                  ? `border-${feature.color}-200 shadow-2xl shadow-${feature.color}-500/20`
+                  : 'border-slate-200/50 hover:border-slate-300 shadow-lg hover:shadow-xl'
+              }`}
+              onMouseEnter={() => setActiveFeature(index)}
             >
-              <div className="text-[#A8C3A0] mb-4 group-hover:text-[#FF6B6B] group-hover:scale-110 transition-all duration-300">
-                {feature.icon}
+              {/* Icon Container */}
+              <div className={`relative w-20 h-20 bg-gradient-to-br ${feature.gradient} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                <span className="text-3xl">{feature.icon}</span>
+                <div className="absolute inset-0 bg-white/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </div>
-              <h3 className="text-lg font-semibold text-[#1E1E2F] mb-3 group-hover:text-[#FF6B6B] transition-colors">
+
+              {/* Content */}
+              <h3 className="text-2xl font-bold text-slate-800 mb-4 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-slate-800 group-hover:to-slate-600 transition-all duration-300">
                 {feature.title}
               </h3>
-              <p className="text-sm text-[#1E1E2F]/70 leading-relaxed font-light">
+              <p className="text-slate-600 leading-relaxed group-hover:text-slate-700 transition-colors duration-300">
                 {feature.description}
               </p>
+
+              {/* Hover Effect */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-5 rounded-3xl transition-opacity duration-300`}></div>
             </div>
           ))}
+        </div>
+
+        {/* CTA Section */}
+        <div className="text-center">
+          <div className="bg-gradient-to-r from-slate-50 to-white rounded-3xl p-12 border border-slate-200/50 shadow-xl">
+            <h3 className="text-3xl font-bold text-slate-800 mb-4">
+              Pronto para começar?
+            </h3>
+            <p className="text-lg text-slate-600 mb-8 max-w-2xl mx-auto">
+              Junte-se a milhares de pessoas que já transformaram suas vidas com nossa plataforma.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button className="bg-gradient-to-r from-rose-400 via-sky-400 to-emerald-400 hover:from-rose-500 hover:via-sky-500 hover:to-emerald-500 text-white px-8 py-4 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
+                Começar Gratuitamente
+              </button>
+              <button className="border-2 border-slate-300 hover:border-rose-300 text-slate-700 hover:text-rose-600 px-8 py-4 rounded-full font-semibold transition-all duration-300 hover:bg-rose-50">
+                Agendar Demo
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </section>

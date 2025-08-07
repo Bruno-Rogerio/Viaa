@@ -1,32 +1,87 @@
-/* src/app/globals.css */
+/* app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  @keyframes shimmer {
-    0% {
-      background-position: -200% 0;
-    }
-    100% {
-      background-position: 200% 0;
-    }
+/* Reset e configurações base */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px; /* Base font size */
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  line-height: 1.6;
+  color: #334155;
+  background-color: #fefefe;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Container padrão mais controlado */
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* Media queries para melhor controle responsivo */
+@media (min-width: 640px) {
+  .container {
+    padding: 0 1.5rem;
   }
-  
-  @keyframes expand-line {
-    0% {
-      width: 0;
-    }
-    100% {
-      width: 80px;
-    }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    padding: 0 2rem;
   }
-  
-  .animate-shimmer {
-    animation: shimmer 3s ease-in-out infinite;
+}
+
+@media (min-width: 1280px) {
+  .container {
+    max-width: 1280px;
   }
-  
-  .animate-expand-line {
-    animation: expand-line 2s ease-out 1s forwards;
-  }
+}
+
+/* Ajuste para textos muito grandes */
+.text-responsive {
+  font-size: clamp(1rem, 4vw, 2rem);
+}
+
+.text-responsive-lg {
+  font-size: clamp(1.5rem, 5vw, 3rem);
+}
+
+.text-responsive-xl {
+  font-size: clamp(2rem, 6vw, 4rem);
+}
+
+/* Smooth scroll para âncoras */
+[id] {
+  scroll-margin-top: 120px;
+}
+
+/* Ajuste para elementos muito largos */
+img, video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Remove zoom em inputs no iOS */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea {
+  font-size: 16px;
 }
