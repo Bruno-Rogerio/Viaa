@@ -1,14 +1,21 @@
-// components/ClinicasSection.tsx
+// viaa\src\components\sections\home\ClinicasSection.tsx
 export default function ClinicasSection() {
   return (
-    <section id="clinicas" className="py-16 lg:py-20 bg-gradient-to-br from-sky-50 to-blue-50">
+    <section
+      id="clinicas"
+      className="py-16 lg:py-20 bg-gradient-to-br from-sky-50 to-blue-50"
+    >
       <div className="container mx-auto">
         <div className="text-center mb-12 lg:mb-16">
           <h2 className="text-3xl lg:text-4xl xl:text-5xl font-bold text-slate-800 mb-4 lg:mb-6">
-            Para <span className="bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">Clínicas</span>
+            Para{" "}
+            <span className="bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">
+              Clínicas
+            </span>
           </h2>
           <p className="text-lg lg:text-xl text-slate-600 max-w-3xl mx-auto">
-            Gestão inteligente, dashboard de produtividade e criação de conteúdo para sua clínica
+            Gestão inteligente, dashboard de produtividade e criação de conteúdo
+            para sua clínica
           </p>
         </div>
 
@@ -18,8 +25,13 @@ export default function ClinicasSection() {
             <div className="bg-gradient-to-br from-sky-400/20 to-blue-500/20 rounded-3xl p-8 backdrop-blur-sm border border-sky-200/30">
               <div className="text-center space-y-6">
                 <div className="text-6xl mb-6">🏥📊</div>
-                <h3 className="text-2xl font-bold text-slate-800">Gestão Inteligente</h3>
-                <p className="text-slate-600">Dashboard completo com IA e ferramentas de produtividade para sua equipe</p>
+                <h3 className="text-2xl font-bold text-slate-800">
+                  Gestão Inteligente
+                </h3>
+                <p className="text-slate-600">
+                  Dashboard completo com IA e ferramentas de produtividade para
+                  sua equipe
+                </p>
               </div>
             </div>
           </div>
@@ -33,8 +45,13 @@ export default function ClinicasSection() {
                   <span className="text-2xl">👥</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-800 mb-2">Gestão Personalizada</h3>
-                  <p className="text-slate-600">Gerencie toda sua equipe de profissionais com ferramentas dedicadas</p>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">
+                    Gestão Personalizada
+                  </h3>
+                  <p className="text-slate-600">
+                    Gerencie toda sua equipe de profissionais com ferramentas
+                    dedicadas
+                  </p>
                 </div>
               </div>
             </div>
@@ -46,8 +63,12 @@ export default function ClinicasSection() {
                   <span className="text-2xl">📊</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-800 mb-2">Dashboard de Produtividade</h3>
-                  <p className="text-slate-600">Analytics avançados e métricas de performance da clínica</p>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">
+                    Dashboard de Produtividade
+                  </h3>
+                  <p className="text-slate-600">
+                    Analytics avançados e métricas de performance da clínica
+                  </p>
                 </div>
               </div>
             </div>
@@ -59,8 +80,12 @@ export default function ClinicasSection() {
                   <span className="text-2xl">🎯</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-800 mb-2">Marketing Terapêutico</h3>
-                  <p className="text-slate-600">Crie conteúdos publicitários e terapêuticos para sua clínica</p>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">
+                    Marketing Terapêutico
+                  </h3>
+                  <p className="text-slate-600">
+                    Crie conteúdos publicitários e terapêuticos para sua clínica
+                  </p>
                 </div>
               </div>
             </div>
@@ -72,8 +97,13 @@ export default function ClinicasSection() {
                   <span className="text-2xl">🌐</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-800 mb-2">Rede Profissional</h3>
-                  <p className="text-slate-600">Todos os recursos de rede social para conectar com outros profissionais</p>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">
+                    Rede Profissional
+                  </h3>
+                  <p className="text-slate-600">
+                    Todos os recursos de rede social para conectar com outros
+                    profissionais
+                  </p>
                 </div>
               </div>
             </div>
@@ -87,5 +117,5 @@ export default function ClinicasSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }

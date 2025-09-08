@@ -1,3 +1,5 @@
+// viaa\src\components\sections\home\HomePage.tsx
+
 import Header from "../../layout/Header";
 import HeroSection from "./HeroSection";
 import FeaturesSection from "./FeaturesSection";

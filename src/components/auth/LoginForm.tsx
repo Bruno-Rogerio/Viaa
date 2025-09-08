@@ -1,7 +1,6 @@
-//src\components\auth\LoginForm.tsx
+// viaa\src\components\auth\LoginForm.tsx
 
 "use client";
-
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -24,19 +23,107 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
     setError("");
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error: authError } = await supabase.auth.signInWithPassword(
+        {
+          email,
+          password,
+        }
+      );
 
-      if (error) throw error;
+      if (authError) {
+        throw authError; // Lançar erros de autenticação
+      }
 
       if (data.user) {
+        const tipoUsuario = data.user.user_metadata?.tipo_usuario;
+        console.log("=== LOGIN - VERIFICAÇÃO ONBOARDING ===");
+        console.log("Tipo usuário:", tipoUsuario);
+
+        if (!tipoUsuario) {
+          console.log("Redirecionando para onboarding - sem tipo");
+          onSuccess?.();
+          router.push("/onboarding");
+          return;
+        }
+
+        let temPerfil = false;
+        let perfilCheckError: any = null; // Para armazenar erros da verificação de perfil
+
+        try {
+          switch (tipoUsuario) {
+            case "paciente":
+              const { data: perfilPaciente, error: pacienteError } =
+                await supabase
+                  .from("perfis_pacientes")
+                  .select("id")
+                  .eq("id", data.user.id)
+                  .single();
+              perfilCheckError = pacienteError;
+              temPerfil = !!perfilPaciente;
+              break;
+            case "profissional":
+              const { data: perfilProfissional, error: profissionalError } =
+                await supabase
+                  .from("perfis_profissionais")
+                  .select("id")
+                  .eq("id", data.user.id)
+                  .single();
+              perfilCheckError = profissionalError;
+              temPerfil = !!perfilProfissional;
+              break;
+            case "clinica":
+              const { data: perfilClinica, error: clinicaError } =
+                await supabase
+                  .from("perfis_clinicas")
+                  .select("id")
+                  .eq("id", data.user.id)
+                  .single();
+              perfilCheckError = clinicaError;
+              temPerfil = !!perfilClinica;
+              break;
+            case "empresa":
+              const { data: perfilEmpresa, error: empresaError } =
+                await supabase
+                  .from("perfis_empresas")
+                  .select("id")
+                  .eq("id", data.user.id)
+                  .single();
+              perfilCheckError = empresaError;
+              temPerfil = !!perfilEmpresa;
+              break;
+          }
+        } catch (e: any) {
+          // Este catch pegará erros lançados por .single() (como o 406)
+          perfilCheckError = e;
+          console.error("Erro inesperado durante a verificação do perfil:", e);
+          temPerfil = false; // Se houve um erro, consideramos que o perfil não está completo
+        }
+
+        // Se houver um erro na verificação do perfil (ex: 406 ou PGRST116), registre-o
+        if (perfilCheckError) {
+          console.error(
+            "Detalhes do erro na verificação de perfil:",
+            perfilCheckError
+          );
+          // Se o erro for 'PGRST116' (no rows found), temPerfil já será false, o que é o esperado.
+          // Se for um 406, também significa que o perfil não foi encontrado ou acessível.
+        }
+
+        console.log("Tem perfil completo:", temPerfil);
+        if (!temPerfil) {
+          console.log("Redirecionando para onboarding - sem perfil");
+          onSuccess?.();
+          router.push("/onboarding");
+          return;
+        }
+
+        console.log("Redirecionando para dashboard - tudo completo");
         onSuccess?.();
         router.push("/dashboard");
       }
     } catch (error: any) {
-      setError(error.message || "Erro ao fazer login");
+      console.error("Erro no login ou verificação de perfil:", error);
+      setError(error.message || "Erro ao fazer login ou verificar perfil.");
     } finally {
       setLoading(false);
     }
@@ -62,7 +149,6 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
             placeholder="seu@email.com"
           />
         </div>
-
         <div>
           <label
             htmlFor="password"
@@ -80,13 +166,11 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
             placeholder="••••••••"
           />
         </div>
-
         {error && (
           <div className="text-red-600 text-sm bg-red-50 p-3 rounded-md">
             {error}
           </div>
         )}
-
         <button
           type="submit"
           disabled={loading}
@@ -95,7 +179,6 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
           {loading ? "Entrando..." : "Entrar"}
         </button>
       </form>
-
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
           Não tem uma conta?{" "}

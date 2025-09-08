@@ -1,4 +1,4 @@
-// components/Hero.tsx
+// viaa\src\components\sections\home\HeroSection.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -127,7 +127,7 @@ export default function Hero() {
 
                   <div className="space-y-4">
                     <Link
-                      href="/cadastro-profissional"
+                      href="/signup"
                       className="group w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-6 py-4 rounded-2xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center"
                     >
                       <span className="text-2xl mr-3 group-hover:animate-bounce">
@@ -136,7 +136,7 @@ export default function Hero() {
                       Sou Profissional
                     </Link>
                     <Link
-                      href="/cadastro-paciente"
+                      href="/signup"
                       className="group w-full bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white px-6 py-4 rounded-2xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center"
                     >
                       <span className="text-2xl mr-3 group-hover:animate-bounce">
@@ -145,7 +145,7 @@ export default function Hero() {
                       Sou Paciente
                     </Link>
                     <Link
-                      href="/cadastro-clinica"
+                      href="/signup"
                       className="group w-full bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white px-6 py-4 rounded-2xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center"
                     >
                       <span className="text-2xl mr-3 group-hover:animate-bounce">
@@ -154,7 +154,7 @@ export default function Hero() {
                       Sou Clínica
                     </Link>
                     <Link
-                      href="/cadastro-empresa"
+                      href="/signup"
                       className="group w-full bg-gradient-to-r from-sky-500 to-blue-500 hover:from-sky-600 hover:to-blue-600 text-white px-6 py-4 rounded-2xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center"
                     >
                       <span className="text-2xl mr-3 group-hover:animate-bounce">

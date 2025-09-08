@@ -1,4 +1,5 @@
-// src/components/sections/onboarding/TipoUsuarioStep.tsx
+// viaa\src\components\sections\onboarding\TipoUsuarioStep.tsx
+
 "use client";
 
 type TipoUsuario = "paciente" | "profissional" | "clinica" | "empresa";

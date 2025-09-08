@@ -1,14 +1,22 @@
-// components/PacientesSection.tsx
+// viaa\src\components\sections\home\PacientesSection.tsx
+
 export default function PacientesSection() {
   return (
-    <section id="pacientes" className="py-16 lg:py-20 bg-gradient-to-br from-rose-50 to-pink-50">
+    <section
+      id="pacientes"
+      className="py-16 lg:py-20 bg-gradient-to-br from-rose-50 to-pink-50"
+    >
       <div className="container mx-auto">
         <div className="text-center mb-12 lg:mb-16">
           <h2 className="text-3xl lg:text-4xl xl:text-5xl font-bold text-slate-800 mb-4 lg:mb-6">
-            Para <span className="bg-gradient-to-r from-rose-400 to-pink-500 bg-clip-text text-transparent">Pacientes</span>
+            Para{" "}
+            <span className="bg-gradient-to-r from-rose-400 to-pink-500 bg-clip-text text-transparent">
+              Pacientes
+            </span>
           </h2>
           <p className="text-lg lg:text-xl text-slate-600 max-w-3xl mx-auto">
-            Conteúdo terapêutico personalizado, acompanhamento com IA e evolução inteligente
+            Conteúdo terapêutico personalizado, acompanhamento com IA e evolução
+            inteligente
           </p>
         </div>
 
@@ -22,8 +30,13 @@ export default function PacientesSection() {
                   <span className="text-2xl">📱</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-800 mb-2">Feed Terapêutico</h3>
-                  <p className="text-slate-600">Conteúdos de profissionais que você segue: vídeos, artigos e dicas</p>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">
+                    Feed Terapêutico
+                  </h3>
+                  <p className="text-slate-600">
+                    Conteúdos de profissionais que você segue: vídeos, artigos e
+                    dicas
+                  </p>
                 </div>
               </div>
             </div>
@@ -35,8 +48,13 @@ export default function PacientesSection() {
                   <span className="text-2xl">🎯</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-800 mb-2">Sugestões Inteligentes</h3>
-                  <p className="text-slate-600">IA sugere conteúdos terapêuticos personalizados para seu momento</p>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">
+                    Sugestões Inteligentes
+                  </h3>
+                  <p className="text-slate-600">
+                    IA sugere conteúdos terapêuticos personalizados para seu
+                    momento
+                  </p>
                 </div>
               </div>
             </div>
@@ -48,8 +66,13 @@ export default function PacientesSection() {
                   <span className="text-2xl">📈</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-800 mb-2">Evolução Terapêutica</h3>
-                  <p className="text-slate-600">Acompanhe seu progresso com insights de IA sobre seu bem-estar</p>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">
+                    Evolução Terapêutica
+                  </h3>
+                  <p className="text-slate-600">
+                    Acompanhe seu progresso com insights de IA sobre seu
+                    bem-estar
+                  </p>
                 </div>
               </div>
             </div>
@@ -61,8 +84,13 @@ export default function PacientesSection() {
                   <span className="text-2xl">🔒</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-800 mb-2">Ambiente Seguro</h3>
-                  <p className="text-slate-600">Apenas conteúdo profissional, sem contato direto entre usuários</p>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">
+                    Ambiente Seguro
+                  </h3>
+                  <p className="text-slate-600">
+                    Apenas conteúdo profissional, sem contato direto entre
+                    usuários
+                  </p>
                 </div>
               </div>
             </div>
@@ -79,13 +107,18 @@ export default function PacientesSection() {
             <div className="bg-gradient-to-br from-rose-400/20 to-pink-500/20 rounded-3xl p-8 backdrop-blur-sm border border-rose-200/30">
               <div className="text-center space-y-6">
                 <div className="text-6xl mb-6">🧠💚📱</div>
-                <h3 className="text-2xl font-bold text-slate-800">Evolução Inteligente</h3>
-                <p className="text-slate-600">Sua jornada de bem-estar guiada por IA e conteúdo profissional de qualidade</p>
+                <h3 className="text-2xl font-bold text-slate-800">
+                  Evolução Inteligente
+                </h3>
+                <p className="text-slate-600">
+                  Sua jornada de bem-estar guiada por IA e conteúdo profissional
+                  de qualidade
+                </p>
               </div>
             </div>
           </div>
         </div>
       </div>
     </section>
-  )
+  );
 }
