@@ -6,7 +6,8 @@ export type StatusConsulta =
   | "em_andamento"
   | "concluida"
   | "cancelada"
-  | "nao_compareceu";
+  | "nao_compareceu"
+  | "solicitada";
 
 export type TipoConsulta = "presencial" | "online" | "telefone";
 
