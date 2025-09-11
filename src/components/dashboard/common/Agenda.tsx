@@ -1,120 +1,169 @@
-// src/components/dashboard/common/Agenda.tsx - COMPONENTE COMPLETO CORRIGIDO
+// viaa/src/components/dashboard/common/Agenda.tsx
 
 "use client";
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useMemo } from "react";
 import {
-  CalendarDaysIcon,
-  ClockIcon,
-  UserIcon,
-  VideoCameraIcon,
-  PhoneIcon,
-  MapPinIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  PlusIcon,
+  CalendarIcon as CalendarSolid,
+  VideoCameraIcon,
+  MapPinIcon,
+  PhoneIcon,
   FunnelIcon,
-  Squares2X2Icon,
-  ListBulletIcon,
-  MagnifyingGlassIcon,
+  ClockIcon,
+  CheckIcon,
+  XMarkIcon,
   ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
-import {
-  CalendarDaysIcon as CalendarSolid,
-  ClockIcon as ClockSolid,
+  UserIcon,
 } from "@heroicons/react/24/solid";
-import { useAgenda } from "@/hooks/dashboard/useAgenda";
-import { LoadingSpinner, Avatar } from "./";
+import {
+  CalendarDaysIcon,
+  ListBulletIcon,
+  Squares2X2Icon,
+} from "@heroicons/react/24/outline";
 import type {
   AgendaProps,
   Consulta,
-  ModoVisualizacao,
   StatusConsulta,
+  ModoVisualizacao,
 } from "@/types/agenda";
 
-const Agenda: React.FC<AgendaProps> = ({
+interface AgendaSmartProps extends Omit<AgendaProps, "profissionalId"> {
+  // ID do profissional cuja agenda está sendo visualizada
+  profissionalId: string;
+
+  // Informações do profissional (quando visualizando agenda de outro)
+  profissionalInfo?: {
+    nome: string;
+    sobrenome: string;
+    especialidades: string;
+    foto_perfil_url?: string;
+    valor_sessao?: number;
+    crp?: string;
+    verificado?: boolean;
+  };
+}
+
+export default function Agenda({
   tipoUsuario,
   usuarioId,
-  modoVisualizacao: modoInicial = "mes",
-  altura = "h-[800px]",
+  profissionalId,
+  profissionalInfo,
+  modoVisualizacao = "mes",
+  altura = "h-[600px]",
   onConsultaClick,
-  onNovaConsulta,
   onEditarConsulta,
   onCancelarConsulta,
   onConfirmarConsulta,
-  podeAgendar = true,
-  podeCancelar = true,
-  podeEditar = true,
-  podeVerDetalhes = true,
+  onRejeitarConsulta,
+  onIniciarConsulta,
+  onFinalizarConsulta,
+  onSolicitarConsulta,
   className = "",
-  temaDark = false,
-}) => {
-  const {
-    consultas,
-    estatisticas,
-    loading,
-    error,
-    dataAtual,
-    modoVisualizacao,
-    setModoVisualizacao,
-    proximaSemana,
-    semanaAnterior,
-    proximoMes,
-    mesAnterior,
-    hoje,
-    consultasNaData,
-    proximaConsulta,
-    setFiltros,
-    filtros,
-  } = useAgenda({
-    tipoUsuario,
-    usuarioId,
-    modoInicial,
-  });
-
-  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  desabilitado = false,
+}: AgendaSmartProps) {
+  // Estados locais
+  const [dataAtual, setDataAtual] = useState(new Date());
   const [consultaSelecionada, setConsultaSelecionada] =
     useState<Consulta | null>(null);
-  const [autoScrollExecuted, setAutoScrollExecuted] = useState(false);
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [modalAgendamento, setModalAgendamento] = useState<{
+    aberto: boolean;
+    data?: Date;
+    horario?: string;
+  }>({ aberto: false });
+  const [carregando, setCarregando] = useState(false);
 
-  // Cores para status (incluindo status de solicitação)
+  // Lógica inteligente de contexto
+  const ehMinhaAgenda = useMemo(() => {
+    return tipoUsuario === "profissional" && usuarioId === profissionalId;
+  }, [tipoUsuario, usuarioId, profissionalId]);
+
+  const comportarComoPaciente = useMemo(() => {
+    return !ehMinhaAgenda; // Paciente OU profissional vendo outro profissional
+  }, [ehMinhaAgenda]);
+
+  // Permissões baseadas no contexto
+  const permissoes = useMemo(
+    () => ({
+      // Solicitar consultas - apenas quando não é minha agenda
+      podeSolicitarConsulta: comportarComoPaciente,
+
+      // Gerenciar consultas - apenas na minha agenda
+      podeConfirmar: ehMinhaAgenda,
+      podeRejeitar: ehMinhaAgenda,
+      podeIniciar: ehMinhaAgenda,
+      podeFinalizar: ehMinhaAgenda,
+      podeConfigurarHorarios: ehMinhaAgenda,
+
+      // Editar/cancelar - todos podem (com regras específicas)
+      podeEditar: ehMinhaAgenda, // Apenas profissional edita suas consultas
+      podeCancelar: true, // Todos podem cancelar suas consultas
+
+      // Visualizar detalhes - todos podem
+      podeVerDetalhes: true,
+    }),
+    [ehMinhaAgenda, comportarComoPaciente]
+  );
+
+  // Estado mock - em produção virá do hook useAgenda
+  const [consultas] = useState<Consulta[]>([
+    // Dados mock para demonstração
+  ]);
+
+  const [estatisticas] = useState({
+    consultas_hoje: 3,
+    consultas_semana: 12,
+    consultas_pendentes_confirmacao: ehMinhaAgenda ? 2 : 0,
+  });
+
+  // Cores para status de consulta
   const coresStatus: Record<
-    StatusConsulta | "solicitada",
-    { bg: string; text: string; border: string }
+    StatusConsulta,
+    { bg: string; text: string; border: string; dot: string }
   > = {
     agendada: {
       bg: "bg-blue-50",
       text: "text-blue-700",
       border: "border-blue-200",
+      dot: "bg-blue-400",
     },
     confirmada: {
       bg: "bg-emerald-50",
       text: "text-emerald-700",
       border: "border-emerald-200",
+      dot: "bg-emerald-400",
     },
     em_andamento: {
-      bg: "bg-amber-50",
-      text: "text-amber-700",
-      border: "border-amber-200",
+      bg: "bg-purple-50",
+      text: "text-purple-700",
+      border: "border-purple-200",
+      dot: "bg-purple-400",
     },
     concluida: {
-      bg: "bg-gray-50",
-      text: "text-gray-700",
-      border: "border-gray-200",
+      bg: "bg-green-50",
+      text: "text-green-700",
+      border: "border-green-200",
+      dot: "bg-green-400",
     },
     cancelada: {
       bg: "bg-red-50",
       text: "text-red-700",
       border: "border-red-200",
+      dot: "bg-red-400",
     },
-    nao_compareceu: {
+    rejeitada: {
       bg: "bg-orange-50",
       text: "text-orange-700",
       border: "border-orange-200",
+      dot: "bg-orange-400",
     },
-    solicitada: {
-      bg: "bg-purple-50",
-      text: "text-purple-700",
-      border: "border-purple-200",
+    nao_compareceu: {
+      bg: "bg-gray-50",
+      text: "text-gray-700",
+      border: "border-gray-200",
+      dot: "bg-gray-400",
     },
   };
 
@@ -125,9 +174,107 @@ const Agenda: React.FC<AgendaProps> = ({
     telefone: PhoneIcon,
   };
 
-  // Renderizar cabeçalho com navegação (AJUSTADO)
+  // Handler para solicitar consulta (comportamento de paciente)
+  const handleSolicitarConsulta = (data: Date, horario: string) => {
+    if (!permissoes.podeSolicitarConsulta) return;
+
+    setModalAgendamento({
+      aberto: true,
+      data,
+      horario,
+    });
+  };
+
+  // Handler para confirmar agendamento
+  const handleConfirmarAgendamento = async (dadosConsulta: {
+    tipo: "online" | "presencial" | "telefone";
+    observacoes?: string;
+  }) => {
+    console.log("Solicitar consulta:", {
+      profissional_id: profissionalId,
+      solicitante_id: usuarioId,
+      tipo_solicitante: tipoUsuario,
+      data: modalAgendamento.data,
+      horario: modalAgendamento.horario,
+      ...dadosConsulta,
+    });
+
+    // TODO: Implementar API call para criar consulta
+    // Status inicial será 'agendada' (aguardando confirmação do profissional)
+
+    setModalAgendamento({ aberto: false });
+  };
+
+  // Renderizar cabeçalho - ajustado para contexto
   const renderCabecalho = () => (
     <div className="bg-white border-b border-gray-200 p-6">
+      {/* Cabeçalho do profissional quando não é minha agenda */}
+      {comportarComoPaciente && profissionalInfo && (
+        <div className="mb-6 pb-6 border-b border-gray-100">
+          <div className="flex items-start space-x-4">
+            {/* Foto do profissional */}
+            <div className="flex-shrink-0">
+              {profissionalInfo.foto_perfil_url ? (
+                <img
+                  src={profissionalInfo.foto_perfil_url}
+                  alt={`${profissionalInfo.nome} ${profissionalInfo.sobrenome}`}
+                  className="w-16 h-16 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
+                  <UserIcon className="w-8 h-8 text-gray-600" />
+                </div>
+              )}
+            </div>
+
+            {/* Informações do profissional */}
+            <div className="flex-1">
+              <div className="flex items-center space-x-2 mb-1">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {profissionalInfo.nome} {profissionalInfo.sobrenome}
+                </h2>
+                {profissionalInfo.verificado && (
+                  <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium">
+                    Verificado
+                  </span>
+                )}
+              </div>
+
+              <p className="text-gray-600 mb-2">
+                {profissionalInfo.especialidades}
+              </p>
+
+              <div className="flex items-center space-x-4">
+                {profissionalInfo.crp && (
+                  <span className="text-sm text-gray-500">
+                    CRP: {profissionalInfo.crp}
+                  </span>
+                )}
+                {profissionalInfo.valor_sessao && (
+                  <span className="bg-emerald-50 text-emerald-800 px-2 py-1 rounded text-sm font-medium">
+                    R${" "}
+                    {profissionalInfo.valor_sessao.toFixed(2).replace(".", ",")}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Instruções quando comporta como paciente */}
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              <strong>
+                {tipoUsuario === "profissional"
+                  ? "Agendando como paciente:"
+                  : "Como agendar:"}
+              </strong>{" "}
+              Clique em um horário disponível no calendário para solicitar uma
+              consulta.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Linha superior - Título e ações */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
@@ -136,26 +283,42 @@ const Agenda: React.FC<AgendaProps> = ({
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {tipoUsuario === "profissional"
+              {ehMinhaAgenda
                 ? "Minha Agenda"
-                : "Minhas Consultas"}
+                : comportarComoPaciente && profissionalInfo
+                ? `Agenda - ${profissionalInfo.nome}`
+                : "Agenda do Profissional"}
             </h1>
             <p className="text-gray-600 text-sm">
-              {estatisticas &&
-                `${estatisticas.consultas_hoje} consultas hoje • ${estatisticas.consultas_semana} esta semana`}
+              {ehMinhaAgenda && estatisticas && (
+                <>
+                  {estatisticas.consultas_hoje} consultas hoje •
+                  {estatisticas.consultas_pendentes_confirmacao} pendentes
+                  confirmação
+                </>
+              )}
+              {comportarComoPaciente && (
+                <>
+                  {tipoUsuario === "profissional"
+                    ? "Visualizando como paciente"
+                    : "Clique nos horários disponíveis para agendar"}
+                </>
+              )}
             </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-3">
-          {/* Botão Nova Consulta - APENAS para profissionais */}
-          {podeAgendar && tipoUsuario === "profissional" && (
+          {/* Botão de Configurar Horários (apenas minha agenda) */}
+          {permissoes.podeConfigurarHorarios && (
             <button
-              onClick={() => onNovaConsulta?.()}
-              className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl"
+              onClick={() => {
+                console.log("Configurar horários disponíveis");
+              }}
+              className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-600 transition-colors flex items-center space-x-2"
             >
-              <PlusIcon className="w-5 h-5" />
-              <span>Consulta com Profissional</span>
+              <ClockIcon className="w-5 h-5" />
+              <span>Horários</span>
             </button>
           )}
 
@@ -173,76 +336,44 @@ const Agenda: React.FC<AgendaProps> = ({
         </div>
       </div>
 
-      {/* Aviso para pacientes sobre agendamento */}
-      {tipoUsuario === "paciente" && (
-        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              <CalendarDaysIcon className="w-5 h-5 text-blue-600 mt-0.5" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-blue-800 mb-1">
-                Como agendar uma nova consulta
-              </h3>
-              <p className="text-blue-700 text-sm mb-3">
-                Para agendar uma consulta, visite o perfil do profissional
-                desejado na seção "Buscar Profissionais". Aqui você visualiza
-                apenas suas consultas já agendadas.
-              </p>
-              <button
-                onClick={() =>
-                  (window.location.href = "/dashboard/profissionais")
-                }
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <PlusIcon className="w-4 h-4 mr-2" />
-                Buscar Profissionais
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Navegação de data e modos de visualização */}
       <div className="flex items-center justify-between">
         {/* Navegação de data */}
         <div className="flex items-center space-x-4">
           <div className="flex items-center bg-gray-50 rounded-lg p-1">
             <button
-              onClick={
-                modoVisualizacao === "mes" ? mesAnterior : semanaAnterior
-              }
-              className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-white transition-colors"
+              onClick={() => {
+                const nova = new Date(dataAtual);
+                nova.setMonth(nova.getMonth() - 1);
+                setDataAtual(nova);
+              }}
+              className="p-2 hover:bg-white rounded-md transition-colors"
             >
-              <ChevronLeftIcon className="w-5 h-5" />
+              <ChevronLeftIcon className="w-4 h-4" />
             </button>
 
-            <button
-              onClick={hoje}
-              className="px-4 py-2 text-gray-900 font-medium hover:text-blue-600 transition-colors"
-            >
-              {modoVisualizacao === "mes"
-                ? dataAtual.toLocaleDateString("pt-BR", {
-                    month: "long",
-                    year: "numeric",
-                  })
-                : `Semana de ${dataAtual.toLocaleDateString("pt-BR", {
-                    day: "2-digit",
-                    month: "short",
-                  })}`}
-            </button>
+            <span className="px-4 py-2 font-semibold text-gray-900 min-w-[200px] text-center">
+              {dataAtual.toLocaleDateString("pt-BR", {
+                month: "long",
+                year: "numeric",
+              })}
+            </span>
 
             <button
-              onClick={modoVisualizacao === "mes" ? proximoMes : proximaSemana}
-              className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-white transition-colors"
+              onClick={() => {
+                const nova = new Date(dataAtual);
+                nova.setMonth(nova.getMonth() + 1);
+                setDataAtual(nova);
+              }}
+              className="p-2 hover:bg-white rounded-md transition-colors"
             >
-              <ChevronRightIcon className="w-5 h-5" />
+              <ChevronRightIcon className="w-4 h-4" />
             </button>
           </div>
 
           <button
-            onClick={hoje}
-            className="px-3 py-1 text-sm text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+            onClick={() => setDataAtual(new Date())}
+            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
           >
             Hoje
           </button>
@@ -250,328 +381,134 @@ const Agenda: React.FC<AgendaProps> = ({
 
         {/* Modos de visualização */}
         <div className="flex items-center bg-gray-50 rounded-lg p-1">
-          {[
-            { mode: "mes", icon: Squares2X2Icon, label: "Mês" },
-            { mode: "semana", icon: CalendarDaysIcon, label: "Semana" },
-            { mode: "lista", icon: ListBulletIcon, label: "Lista" },
-          ].map(({ mode, icon: Icone, label }) => (
-            <button
-              key={mode}
-              onClick={() => setModoVisualizacao(mode as ModoVisualizacao)}
-              className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                modoVisualizacao === mode
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              <Icone className="w-4 h-4" />
-              <span>{label}</span>
-            </button>
-          ))}
+          <button
+            onClick={() => {}}
+            className={`p-2 rounded-md transition-colors ${
+              modoVisualizacao === "mes"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            <Squares2X2Icon className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => {}}
+            className={`p-2 rounded-md transition-colors ${
+              modoVisualizacao === "semana"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            <CalendarDaysIcon className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => {}}
+            className={`p-2 rounded-md transition-colors ${
+              modoVisualizacao === "lista"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            <ListBulletIcon className="w-5 h-5" />
+          </button>
         </div>
       </div>
     </div>
   );
 
-  // Renderizar filtros (AJUSTADO)
-  const renderFiltros = () => {
-    if (!mostrarFiltros) return null;
-
-    return (
-      <div className="bg-gray-50 border-b border-gray-200 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Busca */}
-          <div className="relative">
-            <MagnifyingGlassIcon className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Buscar consultas..."
-              value={filtros.busca || ""}
-              onChange={(e) => setFiltros({ busca: e.target.value })}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Status */}
-          <select
-            value={filtros.status?.[0] || ""}
-            onChange={(e) =>
-              setFiltros({
-                status: e.target.value
-                  ? [e.target.value as StatusConsulta]
-                  : undefined,
-              })
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Todos os status</option>
-            <option value="solicitada">Solicitada</option>
-            <option value="agendada">Agendada</option>
-            <option value="confirmada">Confirmada</option>
-            <option value="em_andamento">Em andamento</option>
-            <option value="concluida">Concluída</option>
-            <option value="cancelada">Cancelada</option>
-          </select>
-
-          {/* Tipo */}
-          <select
-            value={filtros.tipo?.[0] || ""}
-            onChange={(e) =>
-              setFiltros({
-                tipo: e.target.value ? [e.target.value as any] : undefined,
-              })
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Todos os tipos</option>
-            <option value="presencial">Presencial</option>
-            <option value="online">Online</option>
-            <option value="telefone">Telefone</option>
-          </select>
-
-          {/* Limpar filtros */}
-          <button
-            onClick={() => setFiltros({})}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Limpar Filtros
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // Renderizar card de consulta (AJUSTADO)
-  const renderCardConsulta = (consulta: Consulta, className: string = "") => {
-    const StatusIcon = iconesTopo[consulta.tipo];
-    const cores = coresStatus[consulta.status as keyof typeof coresStatus];
-    const dataInicio = new Date(consulta.data_inicio);
-    const dataFim = new Date(consulta.data_fim);
-
-    const participante =
-      tipoUsuario === "profissional"
-        ? consulta.paciente
-        : consulta.profissional;
-
-    return (
-      <div
-        key={consulta.id}
-        onClick={() => {
-          setConsultaSelecionada(consulta);
-          onConsultaClick?.(consulta);
-        }}
-        className={`group ${cores.bg} ${cores.border} border rounded-lg p-3 mb-2 cursor-pointer hover:shadow-md transition-all duration-200 ${className}`}
-      >
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center space-x-2 mb-1">
-              <h4 className={`font-medium ${cores.text} truncate`}>
-                {consulta.titulo}
-              </h4>
-              {consulta.status === "solicitada" && (
-                <ExclamationTriangleIcon className="w-4 h-4 text-purple-500 flex-shrink-0" />
-              )}
-            </div>
-            <p className="text-xs text-gray-600 flex items-center mt-1">
-              <ClockIcon className="w-3 h-3 mr-1" />
-              {dataInicio.toLocaleTimeString("pt-BR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-              {" - "}
-              {dataFim.toLocaleTimeString("pt-BR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </p>
-            <p className="text-xs text-gray-600 flex items-center mt-1">
-              <UserIcon className="w-3 h-3 mr-1" />
-              {participante.nome} {participante.sobrenome}
-            </p>
-            {StatusIcon && (
-              <div className="flex items-center mt-1">
-                <StatusIcon className="w-3 h-3 text-gray-500 mr-1" />
-                <span className="text-xs text-gray-500 capitalize">
-                  {consulta.tipo}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Ações (AJUSTADAS baseadas no tipo de usuário e status) */}
-        <div className="flex space-x-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-          {/* Ações para profissionais */}
-          {tipoUsuario === "profissional" && (
-            <>
-              {consulta.status === "solicitada" && (
-                <>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onConfirmarConsulta?.(consulta);
-                    }}
-                    className="px-3 py-1 text-xs bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
-                  >
-                    Confirmar
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCancelarConsulta?.(consulta);
-                    }}
-                    className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
-                  >
-                    Rejeitar
-                  </button>
-                </>
-              )}
-
-              {podeEditar &&
-                ["agendada", "confirmada"].includes(consulta.status) && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditarConsulta?.(consulta);
-                    }}
-                    className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-                  >
-                    Editar
-                  </button>
-                )}
-
-              {podeCancelar &&
-                ["agendada", "confirmada"].includes(consulta.status) && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCancelarConsulta?.(consulta);
-                    }}
-                    className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                )}
-            </>
-          )}
-
-          {/* Ações para pacientes */}
-          {tipoUsuario === "paciente" && (
-            <>
-              {podeVerDetalhes && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onConsultaClick?.(consulta);
-                  }}
-                  className="px-3 py-1 text-xs bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  Ver Detalhes
-                </button>
-              )}
-
-              {consulta.status === "solicitada" && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCancelarConsulta?.(consulta);
-                  }}
-                  className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
-                >
-                  Cancelar Solicitação
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Renderizar vista de mês (mantida igual)
-  const renderVistaMes = () => {
-    const hoje = new Date();
-    const primeiroDiaMes = new Date(
+  // Renderizar calendário mensal
+  const renderCalendarioMensal = () => {
+    const primeiroDiaDoMes = new Date(
       dataAtual.getFullYear(),
       dataAtual.getMonth(),
       1
     );
-
-    // Ajustar para começar na segunda-feira
-    const inicioCalendario = new Date(primeiroDiaMes);
-    inicioCalendario.setDate(
-      inicioCalendario.getDate() - (primeiroDiaMes.getDay() || 7) + 1
+    const ultimoDiaDoMes = new Date(
+      dataAtual.getFullYear(),
+      dataAtual.getMonth() + 1,
+      0
     );
+    const primeiroDiaSemana = primeiroDiaDoMes.getDay();
 
-    // Garantir sempre 6 semanas completas (42 dias)
-    const fimCalendario = new Date(inicioCalendario);
-    fimCalendario.setDate(inicioCalendario.getDate() + 41);
+    const dias: Date[] = [];
 
-    const dias = [];
-    const dataAtualLoop = new Date(inicioCalendario);
-
-    while (dataAtualLoop <= fimCalendario) {
-      dias.push(new Date(dataAtualLoop));
-      dataAtualLoop.setDate(dataAtualLoop.getDate() + 1);
+    // Dias do mês anterior
+    for (let i = primeiroDiaSemana - 1; i >= 0; i--) {
+      const dia = new Date(primeiroDiaDoMes);
+      dia.setDate(dia.getDate() - i - 1);
+      dias.push(dia);
     }
 
-    const diasSemana = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+    // Dias do mês atual
+    for (let dia = 1; dia <= ultimoDiaDoMes.getDate(); dia++) {
+      dias.push(new Date(dataAtual.getFullYear(), dataAtual.getMonth(), dia));
+    }
+
+    // Dias do próximo mês para completar a grade
+    const diasRestantes = 42 - dias.length;
+    for (let i = 1; i <= diasRestantes; i++) {
+      const dia = new Date(ultimoDiaDoMes);
+      dia.setDate(dia.getDate() + i);
+      dias.push(dia);
+    }
 
     return (
-      <div className="bg-white h-full flex flex-col">
-        {/* Cabeçalho dos dias da semana */}
-        <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
-          {diasSemana.map((dia) => (
+      <div className="bg-white">
+        {/* Cabeçalho da semana */}
+        <div className="grid grid-cols-7 border-b border-gray-200">
+          {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((dia) => (
             <div
               key={dia}
-              className="p-3 text-center text-sm font-bold text-gray-700 bg-gray-50"
+              className="px-4 py-3 text-sm font-semibold text-gray-600 text-center"
             >
               {dia}
             </div>
           ))}
         </div>
 
-        {/* Grid com altura fixa e 6 linhas exatas */}
-        <div
-          className="grid grid-cols-7 flex-1 gap-0"
-          style={{
-            gridTemplateRows: "repeat(6, 1fr)",
-            minHeight: "480px",
-          }}
-        >
+        {/* Grade do calendário */}
+        <div className="grid grid-cols-7">
           {dias.map((dia, index) => {
-            const consultasDoDia = consultasNaData(dia);
+            const consultasDoDia = consultas.filter((consulta) => {
+              const dataConsulta = new Date(consulta.data_inicio);
+              return (
+                dataConsulta.getDate() === dia.getDate() &&
+                dataConsulta.getMonth() === dia.getMonth() &&
+                dataConsulta.getFullYear() === dia.getFullYear()
+              );
+            });
+
             const mesAtual = dia.getMonth() === dataAtual.getMonth();
-            const hojeFlag = dia.toDateString() === hoje.toDateString();
+            const hoje =
+              dia.getDate() === new Date().getDate() &&
+              dia.getMonth() === new Date().getMonth() &&
+              dia.getFullYear() === new Date().getFullYear();
+
+            const podeClicarParaAgendar =
+              permissoes.podeSolicitarConsulta && mesAtual && dia >= new Date();
 
             return (
               <div
                 key={index}
-                className={`border-r border-b border-gray-200 p-2 overflow-y-auto flex flex-col ${
-                  !mesAtual
-                    ? "bg-gray-50/50 text-gray-400"
-                    : hojeFlag
-                    ? "bg-blue-50/80"
-                    : "bg-white hover:bg-gray-50/50"
-                } transition-colors ${
-                  // Só clicável para profissionais
-                  tipoUsuario === "profissional" && podeAgendar && mesAtual
-                    ? "cursor-pointer group"
+                onClick={() => {
+                  if (podeClicarParaAgendar) {
+                    handleSolicitarConsulta(dia, "09:00");
+                  }
+                }}
+                className={`min-h-[120px] p-3 border-r border-b border-gray-100 ${
+                  mesAtual ? "bg-white" : "bg-gray-50"
+                } ${
+                  podeClicarParaAgendar
+                    ? "cursor-pointer hover:bg-blue-50 transition-colors"
                     : ""
-                }`}
-                onClick={() =>
-                  tipoUsuario === "profissional" &&
-                  podeAgendar &&
-                  mesAtual &&
-                  onNovaConsulta?.(dia)
-                }
+                } ${podeClicarParaAgendar ? "group" : ""}`}
               >
-                {/* Cabeçalho do dia */}
-                <div className="flex items-center justify-between mb-2 flex-shrink-0">
+                {/* Número do dia */}
+                <div className="flex justify-between items-center mb-2">
                   <span
-                    className={`text-sm font-semibold ${
-                      hojeFlag
-                        ? "bg-blue-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs shadow-md"
+                    className={`text-sm font-medium ${
+                      hoje
+                        ? "bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center"
                         : mesAtual
                         ? "text-gray-900"
                         : "text-gray-400"
@@ -579,38 +516,58 @@ const Agenda: React.FC<AgendaProps> = ({
                   >
                     {dia.getDate()}
                   </span>
-                  {consultasDoDia.length > 0 && mesAtual && (
-                    <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium shadow-sm">
+
+                  {consultasDoDia.length > 0 && (
+                    <span className="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded-full">
                       {consultasDoDia.length}
                     </span>
                   )}
                 </div>
 
                 {/* Consultas do dia */}
-                <div className="space-y-1 flex-1 min-h-0">
-                  {consultasDoDia
-                    .slice(0, 4)
-                    .map((consulta) =>
-                      renderCardConsulta(consulta, "text-xs p-2 shadow-sm")
-                    )}
-                  {consultasDoDia.length > 4 && (
-                    <div className="text-xs text-gray-500 text-center p-1 bg-gray-100 rounded">
-                      +{consultasDoDia.length - 4} mais
+                <div className="space-y-1">
+                  {consultasDoDia.slice(0, 2).map((consulta) => {
+                    const cores = coresStatus[consulta.status];
+                    return (
+                      <div
+                        key={consulta.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConsultaSelecionada(consulta);
+                          onConsultaClick?.(consulta);
+                        }}
+                        className={`text-xs p-1 rounded cursor-pointer hover:shadow-sm transition-shadow ${cores.bg} ${cores.text}`}
+                      >
+                        <div className="font-medium truncate">
+                          {consulta.titulo}
+                        </div>
+                        <div className="opacity-75">
+                          {new Date(consulta.data_inicio).toLocaleTimeString(
+                            "pt-BR",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {consultasDoDia.length > 2 && (
+                    <div className="text-xs text-gray-500 font-medium">
+                      +{consultasDoDia.length - 2} mais
                     </div>
                   )}
                 </div>
 
-                {/* Botão adicionar (APENAS para profissionais) */}
-                {tipoUsuario === "profissional" && podeAgendar && mesAtual && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onNovaConsulta?.(dia);
-                    }}
-                    className="w-full mt-1 py-1 text-xs text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-                  >
-                    + Adicionar
-                  </button>
+                {/* Indicador para solicitar consulta */}
+                {podeClicarParaAgendar && consultasDoDia.length === 0 && (
+                  <div className="mt-2 text-center">
+                    <div className="text-xs text-blue-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                      Clique para agendar
+                    </div>
+                  </div>
                 )}
               </div>
             );
@@ -620,490 +577,141 @@ const Agenda: React.FC<AgendaProps> = ({
     );
   };
 
-  // Renderizar vista de semana (CORRIGIDA)
-  const renderVistaSemana = () => {
+  // Renderizar visualização semanal
+  const renderCalendarioSemanal = () => {
+    // Calcular início e fim da semana
     const inicioSemana = new Date(dataAtual);
-    inicioSemana.setDate(dataAtual.getDate() - (dataAtual.getDay() || 7) + 1);
+    const diaSemana = inicioSemana.getDay();
+    inicioSemana.setDate(inicioSemana.getDate() - diaSemana);
 
-    const diasSemana = Array.from({ length: 7 }, (_, i) => {
+    const diasSemana: Date[] = [];
+    for (let i = 0; i < 7; i++) {
       const dia = new Date(inicioSemana);
-      dia.setDate(inicioSemana.getDate() + i);
-      return dia;
-    });
+      dia.setDate(dia.getDate() + i);
+      diasSemana.push(dia);
+    }
 
-    const horasTrabalho = Array.from({ length: 18 }, (_, i) => i + 6);
-
-    const consultasForaHorario = consultas.some((consulta) => {
-      const hora = new Date(consulta.data_inicio).getHours();
-      return hora < 8 || hora > 18;
-    });
-
-    const scrollToCurrentTime = () => {
-      const agora = new Date();
-      const horaAtual = agora.getHours();
-      if (horaAtual >= 6 && horaAtual <= 23) {
-        const elemento = document.getElementById(`hora-${horaAtual}`);
-        if (elemento) {
-          elemento.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }
-    };
-
-    return (
-      <div className="bg-white h-full flex flex-col">
-        {/* Cabeçalho e controles */}
-        <div className="flex-shrink-0">
-          <div className="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={scrollToCurrentTime}
-                className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center space-x-1"
-              >
-                <ClockIcon className="w-4 h-4" />
-                <span>Agora</span>
-              </button>
-
-              {consultasForaHorario && (
-                <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded flex items-center">
-                  <span>⚠️ Consultas fora do horário comum detectadas</span>
-                </div>
-              )}
-            </div>
-
-            <div className="text-sm text-gray-600">
-              {diasSemana[0].toLocaleDateString("pt-BR", {
-                day: "2-digit",
-                month: "short",
-              })}{" "}
-              -{" "}
-              {diasSemana[6].toLocaleDateString("pt-BR", {
-                day: "2-digit",
-                month: "short",
-              })}
-            </div>
-          </div>
-
-          {/* Cabeçalho dos dias */}
-          <div className="grid grid-cols-8 border-b border-gray-200 bg-white sticky top-0 z-10">
-            <div className="p-3 border-r border-gray-200 bg-gray-50">
-              <span className="text-xs text-gray-500 font-medium">Horário</span>
-            </div>
-
-            {diasSemana.map((dia) => {
-              const hoje = new Date();
-              const hojeFlag = dia.toDateString() === hoje.toDateString();
-              const consultasDoDia = consultasNaData(dia);
-
-              return (
-                <div
-                  key={dia.toISOString()}
-                  className={`p-3 text-center border-r border-gray-200 transition-colors ${
-                    hojeFlag ? "bg-blue-50 border-blue-200" : "bg-white"
-                  }`}
-                >
-                  <div className="text-xs text-gray-600 mb-1">
-                    {dia.toLocaleDateString("pt-BR", { weekday: "short" })}
-                  </div>
-                  <div
-                    className={`text-lg font-bold ${
-                      hojeFlag ? "text-blue-600" : "text-gray-900"
-                    }`}
-                  >
-                    {dia.getDate()}
-                  </div>
-                  {consultasDoDia.length > 0 && (
-                    <div className="text-xs text-blue-600 mt-1">
-                      {consultasDoDia.length}{" "}
-                      {consultasDoDia.length === 1 ? "consulta" : "consultas"}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Grid de horas */}
-        <div
-          className="flex-1 overflow-y-auto overflow-x-hidden"
-          style={{ maxHeight: "calc(100vh - 320px)" }}
-        >
-          <div className="min-w-full">
-            {horasTrabalho.map((hora) => {
-              const agora = new Date();
-              const horaAtual = agora.getHours();
-              const minutoAtual = agora.getMinutes();
-              const isHoraAtual = hora === horaAtual;
-              // ✅ CORREÇÃO: Declarar isHorarioComum aqui
-              const isHorarioComum = hora >= 8 && hora <= 18;
-
-              return (
-                <div
-                  key={hora}
-                  id={`hora-${hora}`}
-                  className={`grid grid-cols-8 border-b transition-colors ${
-                    isHoraAtual
-                      ? "bg-blue-50/50 border-blue-200"
-                      : isHorarioComum
-                      ? "border-gray-100"
-                      : "border-gray-50 bg-gray-50/30"
-                  }`}
-                  style={{ minHeight: "80px" }}
-                >
-                  {/* Coluna de hora */}
-                  <div
-                    className={`p-3 text-center border-r border-gray-200 flex flex-col justify-center ${
-                      isHorarioComum ? "bg-white" : "bg-gray-50"
-                    }`}
-                  >
-                    <div
-                      className={`text-sm font-semibold ${
-                        isHoraAtual
-                          ? "text-blue-600"
-                          : isHorarioComum
-                          ? "text-gray-700"
-                          : "text-gray-500"
-                      }`}
-                    >
-                      {hora.toString().padStart(2, "0")}:00
-                    </div>
-                    {isHoraAtual && (
-                      <div className="text-xs text-blue-500 mt-1">
-                        {minutoAtual.toString().padStart(2, "0")} min
-                      </div>
-                    )}
-                    {!isHorarioComum && (
-                      <div className="text-xs text-gray-400 mt-1">
-                        {hora < 8 ? "Cedo" : "Tarde"}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Colunas dos dias */}
-                  {diasSemana.map((dia, diaIndex) => {
-                    const consultasNaHora = consultasNaData(dia).filter(
-                      (consulta) => {
-                        const horaConsulta = new Date(
-                          consulta.data_inicio
-                        ).getHours();
-                        return horaConsulta === hora;
-                      }
-                    );
-
-                    const isHoje = dia.toDateString() === agora.toDateString();
-                    const podeAdicionarHora =
-                      tipoUsuario === "profissional" &&
-                      podeAgendar &&
-                      hora >= 7 &&
-                      hora <= 22;
-
-                    return (
-                      <div
-                        key={`${dia.toISOString()}-${hora}`}
-                        className={`p-2 border-r border-gray-200 transition-colors relative group ${
-                          isHoje && isHoraAtual
-                            ? "bg-blue-50"
-                            : isHoje
-                            ? "bg-blue-50/20"
-                            : isHorarioComum
-                            ? "hover:bg-gray-50"
-                            : "hover:bg-gray-50/50"
-                        }`}
-                        onClick={() =>
-                          podeAdicionarHora &&
-                          onNovaConsulta?.(
-                            new Date(
-                              dia.getFullYear(),
-                              dia.getMonth(),
-                              dia.getDate(),
-                              hora,
-                              0
-                            )
-                          )
-                        }
-                        style={{
-                          cursor: podeAdicionarHora ? "pointer" : "default",
-                        }}
-                      >
-                        {/* Indicador de hora atual */}
-                        {isHoje && isHoraAtual && (
-                          <div
-                            className="absolute left-0 w-full h-0.5 bg-red-500 z-10"
-                            style={{
-                              top: `${(minutoAtual / 60) * 100}%`,
-                              boxShadow: "0 0 4px rgba(239, 68, 68, 0.5)",
-                            }}
-                          />
-                        )}
-
-                        {/* Consultas */}
-                        <div className="space-y-1 relative z-20">
-                          {consultasNaHora.map((consulta) => (
-                            <div
-                              key={consulta.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onConsultaClick?.(consulta);
-                              }}
-                              className="group/consulta"
-                            >
-                              {renderCardConsulta(
-                                consulta,
-                                "text-xs p-2 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                              )}
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Botão adicionar (APENAS para profissionais) */}
-                        {podeAdicionarHora && consultasNaHora.length === 0 && (
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onNovaConsulta?.(
-                                  new Date(
-                                    dia.getFullYear(),
-                                    dia.getMonth(),
-                                    dia.getDate(),
-                                    hora,
-                                    0
-                                  )
-                                );
-                              }}
-                              className="text-xs text-gray-400 hover:text-blue-500 bg-white/80 hover:bg-blue-50 px-2 py-1 rounded border border-gray-200 hover:border-blue-300 transition-all"
-                            >
-                              + Adicionar
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Slot vazio para múltiplas consultas */}
-                        {consultasNaHora.length > 0 && podeAdicionarHora && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onNovaConsulta?.(
-                                new Date(
-                                  dia.getFullYear(),
-                                  dia.getMonth(),
-                                  dia.getDate(),
-                                  hora,
-                                  30
-                                )
-                              );
-                            }}
-                            className="w-full text-xs text-gray-400 hover:text-blue-500 hover:bg-blue-50 py-1 rounded transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            + Mais
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Rodapé com legenda */}
-        <div className="flex-shrink-0 p-3 bg-gray-50 border-t border-gray-200">
-          <div className="flex items-center justify-between text-xs text-gray-600">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 bg-blue-50 border border-blue-200 rounded"></div>
-                <span>Horário atual</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 bg-white border border-gray-200 rounded"></div>
-                <span>Horário comercial</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 bg-gray-50 border border-gray-200 rounded"></div>
-                <span>Horário estendido</span>
-              </div>
-            </div>
-
-            <div className="text-right">Visualizando: 6h às 23h</div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Renderizar vista de lista (AJUSTADA)
-  const renderVistaLista = () => {
-    const consultasOrdenadas = [...consultas].sort(
-      (a, b) =>
-        new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime()
-    );
-
-    if (consultasOrdenadas.length === 0) {
-      return (
-        <div className="bg-white p-12 text-center">
-          <CalendarDaysIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Nenhuma consulta encontrada
-          </h3>
-          <p className="text-gray-600 mb-6">
-            {tipoUsuario === "profissional"
-              ? "Sua agenda está vazia. Você pode agendar consultas com outros profissionais."
-              : "Você ainda não tem consultas agendadas."}
-          </p>
-          {tipoUsuario === "profissional" && podeAgendar && (
-            <button
-              onClick={() => onNovaConsulta?.()}
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              Agendar com Profissional
-            </button>
-          )}
-          {tipoUsuario === "paciente" && (
-            <button
-              onClick={() =>
-                (window.location.href = "/dashboard/profissionais")
-              }
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              Buscar Profissionais
-            </button>
-          )}
-        </div>
-      );
+    // Horários (das 6h às 22h)
+    const horarios: string[] = [];
+    for (let h = 6; h <= 22; h++) {
+      horarios.push(`${h.toString().padStart(2, "0")}:00`);
     }
 
     return (
-      <div className="bg-white p-6">
-        <div className="space-y-4">
-          {consultasOrdenadas.map((consulta) => (
-            <div
-              key={consulta.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="font-semibold text-gray-900">
-                      {consulta.titulo}
-                    </h3>
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full ${
-                        coresStatus[consulta.status as keyof typeof coresStatus]
-                          .bg
-                      } ${
-                        coresStatus[consulta.status as keyof typeof coresStatus]
-                          .text
-                      }`}
-                    >
-                      {consulta.status === "solicitada"
-                        ? "Aguardando confirmação"
-                        : consulta.status.replace("_", " ")}
-                    </span>
-                    {consulta.status === "solicitada" && (
-                      <ExclamationTriangleIcon className="w-4 h-4 text-purple-500" />
-                    )}
-                  </div>
+      <div className="bg-white">
+        {/* Cabeçalho da semana */}
+        <div className="grid grid-cols-8 border-b border-gray-200">
+          <div className="p-4 text-sm font-semibold text-gray-600">Horário</div>
+          {diasSemana.map((dia, index) => {
+            const hoje =
+              dia.getDate() === new Date().getDate() &&
+              dia.getMonth() === new Date().getMonth() &&
+              dia.getFullYear() === new Date().getFullYear();
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                    <div className="flex items-center">
-                      <CalendarDaysIcon className="w-4 h-4 mr-2" />
-                      {new Date(consulta.data_inicio).toLocaleDateString(
-                        "pt-BR"
-                      )}
-                    </div>
-                    <div className="flex items-center">
-                      <ClockIcon className="w-4 h-4 mr-2" />
-                      {new Date(consulta.data_inicio).toLocaleTimeString(
-                        "pt-BR",
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        }
-                      )}
-                      {" - "}
-                      {new Date(consulta.data_fim).toLocaleTimeString("pt-BR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </div>
-                    <div className="flex items-center">
-                      <UserIcon className="w-4 h-4 mr-2" />
-                      {tipoUsuario === "profissional"
-                        ? `${consulta.paciente.nome} ${consulta.paciente.sobrenome}`
-                        : `${consulta.profissional.nome} ${consulta.profissional.sobrenome}`}
-                    </div>
-                  </div>
-
-                  {consulta.descricao && (
-                    <p className="text-sm text-gray-600 mt-2">
-                      {consulta.descricao}
-                    </p>
-                  )}
+            return (
+              <div
+                key={index}
+                className={`p-4 text-center border-r border-gray-100 ${
+                  hoje ? "bg-blue-50" : ""
+                }`}
+              >
+                <div className="text-xs text-gray-600 mb-1">
+                  {dia.toLocaleDateString("pt-BR", { weekday: "short" })}
                 </div>
-
-                <div className="flex space-x-2 ml-4">
-                  {/* Ações baseadas no tipo de usuário */}
-                  {tipoUsuario === "profissional" ? (
-                    <>
-                      {consulta.status === "solicitada" && (
-                        <>
-                          <button
-                            onClick={() => onConfirmarConsulta?.(consulta)}
-                            className="px-3 py-1 text-xs bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
-                          >
-                            Confirmar
-                          </button>
-                          <button
-                            onClick={() => onCancelarConsulta?.(consulta)}
-                            className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
-                          >
-                            Rejeitar
-                          </button>
-                        </>
-                      )}
-                      {podeVerDetalhes && (
-                        <button
-                          onClick={() => onConsultaClick?.(consulta)}
-                          className="px-3 py-1 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                          Ver Detalhes
-                        </button>
-                      )}
-                      {podeEditar &&
-                        ["agendada", "confirmada"].includes(
-                          consulta.status
-                        ) && (
-                          <button
-                            onClick={() => onEditarConsulta?.(consulta)}
-                            className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-                          >
-                            Editar
-                          </button>
-                        )}
-                    </>
-                  ) : (
-                    <>
-                      {podeVerDetalhes && (
-                        <button
-                          onClick={() => onConsultaClick?.(consulta)}
-                          className="px-3 py-1 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                          Ver Detalhes
-                        </button>
-                      )}
-                      {consulta.status === "solicitada" && (
-                        <button
-                          onClick={() => onCancelarConsulta?.(consulta)}
-                          className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
-                        >
-                          Cancelar Solicitação
-                        </button>
-                      )}
-                    </>
-                  )}
+                <div
+                  className={`text-lg font-semibold ${
+                    hoje ? "text-blue-600" : "text-gray-900"
+                  }`}
+                >
+                  {dia.getDate()}
                 </div>
               </div>
+            );
+          })}
+        </div>
+
+        {/* Grade de horários */}
+        <div className="max-h-96 overflow-y-auto">
+          {horarios.map((horario) => (
+            <div
+              key={horario}
+              className="grid grid-cols-8 border-b border-gray-100"
+            >
+              {/* Coluna do horário */}
+              <div className="p-3 text-sm text-gray-600 border-r border-gray-100 bg-gray-50">
+                {horario}
+              </div>
+
+              {/* Colunas dos dias */}
+              {diasSemana.map((dia, indexDia) => {
+                const dataHora = new Date(dia);
+                const [hora] = horario.split(":");
+                dataHora.setHours(parseInt(hora), 0, 0, 0);
+
+                const consultasNoHorario = consultas.filter((consulta) => {
+                  const dataConsulta = new Date(consulta.data_inicio);
+                  return (
+                    dataConsulta.getDate() === dia.getDate() &&
+                    dataConsulta.getMonth() === dia.getMonth() &&
+                    dataConsulta.getFullYear() === dia.getFullYear() &&
+                    dataConsulta.getHours() === parseInt(hora)
+                  );
+                });
+
+                const podeClicarParaAgendar =
+                  permissoes.podeSolicitarConsulta &&
+                  dataHora >= new Date() &&
+                  consultasNoHorario.length === 0;
+
+                return (
+                  <div
+                    key={indexDia}
+                    onClick={() => {
+                      if (podeClicarParaAgendar) {
+                        handleSolicitarConsulta(dia, horario);
+                      }
+                    }}
+                    className={`p-2 border-r border-gray-100 min-h-[60px] ${
+                      podeClicarParaAgendar
+                        ? "cursor-pointer hover:bg-blue-50 transition-colors"
+                        : ""
+                    }`}
+                  >
+                    {consultasNoHorario.map((consulta) => {
+                      const cores = coresStatus[consulta.status];
+                      return (
+                        <div
+                          key={consulta.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConsultaSelecionada(consulta);
+                            onConsultaClick?.(consulta);
+                          }}
+                          className={`text-xs p-1 rounded cursor-pointer mb-1 ${cores.bg} ${cores.text}`}
+                        >
+                          <div className="font-medium truncate">
+                            {consulta.titulo}
+                          </div>
+                          <div className="opacity-75">
+                            {ehMinhaAgenda
+                              ? `${consulta.paciente.nome} ${consulta.paciente.sobrenome}`
+                              : `${consulta.profissional.nome} ${consulta.profissional.sobrenome}`}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Indicador de horário disponível */}
+                    {podeClicarParaAgendar && (
+                      <div className="text-center">
+                        <div className="text-xs text-blue-600 opacity-0 hover:opacity-100 transition-opacity">
+                          Disponível
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -1111,84 +719,684 @@ const Agenda: React.FC<AgendaProps> = ({
     );
   };
 
-  // useEffect para autoscroll na vista semana
-  useEffect(() => {
-    if (modoVisualizacao === "semana" && !autoScrollExecuted) {
-      const timer = setTimeout(() => {
-        const agora = new Date();
-        const horaAtual = agora.getHours();
-        if (horaAtual >= 6 && horaAtual <= 23) {
-          const elemento = document.getElementById(`hora-${horaAtual}`);
-          if (elemento) {
-            elemento.scrollIntoView({ behavior: "smooth", block: "center" });
-            setAutoScrollExecuted(true);
-          }
-        }
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [modoVisualizacao, autoScrollExecuted]);
+  // Renderizar visualização em lista
+  const renderVisualizacaoLista = () => {
+    // Filtrar e ordenar consultas
+    const consultasOrdenadas = consultas.sort(
+      (a, b) =>
+        new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime()
+    );
 
-  // Reset autoscroll quando muda o modo
-  useEffect(() => {
-    if (modoVisualizacao !== "semana") {
-      setAutoScrollExecuted(false);
-    }
-  }, [modoVisualizacao]);
+    // Agrupar por data
+    const consultasPorData = consultasOrdenadas.reduce((grupos, consulta) => {
+      const data = new Date(consulta.data_inicio).toDateString();
+      if (!grupos[data]) {
+        grupos[data] = [];
+      }
+      grupos[data].push(consulta);
+      return grupos;
+    }, {} as Record<string, Consulta[]>);
 
-  // Loading
-  if (loading) {
     return (
-      <div
-        className={`${altura} ${className} bg-white rounded-xl border border-gray-200 shadow-sm flex items-center justify-center`}
-      >
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="mt-4 text-gray-600">Carregando agenda...</p>
-        </div>
+      <div className="bg-white">
+        {Object.entries(consultasPorData).length === 0 ? (
+          <div className="text-center py-12">
+            <CalendarSolid className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {ehMinhaAgenda
+                ? "Nenhuma consulta agendada"
+                : "Nenhuma consulta encontrada"}
+            </h3>
+            <p className="text-gray-600">
+              {ehMinhaAgenda
+                ? "Suas consultas aparecerão aqui quando pacientes agendarem."
+                : comportarComoPaciente
+                ? "Clique na visualização mensal ou semanal para agendar consultas."
+                : "Nenhuma consulta encontrada para o período selecionado."}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6 p-6">
+            {Object.entries(consultasPorData).map(
+              ([dataStr, consultasDoDia]) => {
+                const data = new Date(dataStr);
+                const hoje =
+                  data.getDate() === new Date().getDate() &&
+                  data.getMonth() === new Date().getMonth() &&
+                  data.getFullYear() === new Date().getFullYear();
+
+                return (
+                  <div key={dataStr} className="space-y-3">
+                    {/* Cabeçalho da data */}
+                    <div
+                      className={`flex items-center space-x-3 pb-2 border-b ${
+                        hoje ? "border-blue-200" : "border-gray-200"
+                      }`}
+                    >
+                      <div
+                        className={`w-3 h-3 rounded-full ${
+                          hoje ? "bg-blue-500" : "bg-gray-300"
+                        }`}
+                      ></div>
+                      <h3
+                        className={`text-lg font-semibold ${
+                          hoje ? "text-blue-900" : "text-gray-900"
+                        }`}
+                      >
+                        {data.toLocaleDateString("pt-BR", {
+                          weekday: "long",
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                        {hoje && (
+                          <span className="ml-2 text-sm font-normal text-blue-600">
+                            (Hoje)
+                          </span>
+                        )}
+                      </h3>
+                      <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                        {consultasDoDia.length} consulta
+                        {consultasDoDia.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+
+                    {/* Lista de consultas do dia */}
+                    <div className="space-y-2">
+                      {consultasDoDia.map((consulta) => {
+                        const cores = coresStatus[consulta.status];
+                        const IconeTipo = iconesTopo[consulta.tipo];
+                        const participante = ehMinhaAgenda
+                          ? consulta.paciente
+                          : consulta.profissional;
+
+                        return (
+                          <div
+                            key={consulta.id}
+                            onClick={() => {
+                              setConsultaSelecionada(consulta);
+                              onConsultaClick?.(consulta);
+                            }}
+                            className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                          >
+                            <div className="flex items-start space-x-4">
+                              {/* Ícone do tipo de consulta */}
+                              <div
+                                className={`p-2 rounded-lg ${cores.bg} flex-shrink-0`}
+                              >
+                                <IconeTipo
+                                  className={`w-5 h-5 ${cores.text}`}
+                                />
+                              </div>
+
+                              {/* Informações principais */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <h4 className="text-lg font-semibold text-gray-900 truncate">
+                                      {consulta.titulo}
+                                    </h4>
+                                    <p className="text-sm text-gray-600">
+                                      {new Date(
+                                        consulta.data_inicio
+                                      ).toLocaleTimeString("pt-BR", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}{" "}
+                                      -{" "}
+                                      {new Date(
+                                        consulta.data_fim
+                                      ).toLocaleTimeString("pt-BR", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </p>
+                                  </div>
+
+                                  <span
+                                    className={`px-3 py-1 rounded-full text-xs font-medium ${cores.bg} ${cores.text} flex-shrink-0`}
+                                  >
+                                    {consulta.status === "agendada" &&
+                                      "Aguardando"}
+                                    {consulta.status === "confirmada" &&
+                                      "Confirmada"}
+                                    {consulta.status === "em_andamento" &&
+                                      "Em Andamento"}
+                                    {consulta.status === "concluida" &&
+                                      "Concluída"}
+                                    {consulta.status === "cancelada" &&
+                                      "Cancelada"}
+                                    {consulta.status === "rejeitada" &&
+                                      "Rejeitada"}
+                                    {consulta.status === "nao_compareceu" &&
+                                      "Não Compareceu"}
+                                  </span>
+                                </div>
+
+                                {/* Informações do participante */}
+                                <div className="flex items-center space-x-2 mt-2">
+                                  {participante.foto_perfil_url ? (
+                                    <img
+                                      src={participante.foto_perfil_url}
+                                      alt={`${participante.nome} ${participante.sobrenome}`}
+                                      className="w-6 h-6 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+                                      <UserIcon className="w-3 h-3 text-gray-600" />
+                                    </div>
+                                  )}
+                                  <span className="text-sm text-gray-600">
+                                    {ehMinhaAgenda
+                                      ? "Paciente: "
+                                      : "Profissional: "}
+                                    {participante.nome} {participante.sobrenome}
+                                  </span>
+                                </div>
+
+                                {/* Observações (se houver) */}
+                                {consulta.observacoes && (
+                                  <p className="text-sm text-gray-600 mt-2 truncate">
+                                    "{consulta.observacoes}"
+                                  </p>
+                                )}
+
+                                {/* Valor (se houver) */}
+                                {consulta.valor && (
+                                  <p className="text-sm font-medium text-emerald-600 mt-1">
+                                    R${" "}
+                                    {consulta.valor
+                                      .toFixed(2)
+                                      .replace(".", ",")}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+            )}
+          </div>
+        )}
       </div>
     );
-  }
+  };
 
-  // Error
-  if (error) {
+  // Renderizar detalhes da consulta selecionada
+  const renderDetalhesConsulta = () => {
+    if (!consultaSelecionada) return null;
+
+    const cores = coresStatus[consultaSelecionada.status];
+    const IconeTipo = iconesTopo[consultaSelecionada.tipo];
+    const participante = ehMinhaAgenda
+      ? consultaSelecionada.paciente
+      : consultaSelecionada.profissional;
+
     return (
-      <div
-        className={`${altura} ${className} bg-white rounded-xl border border-gray-200 flex items-center justify-center`}
-      >
-        <div className="text-center">
-          <div className="text-red-500 mb-4">
-            <CalendarDaysIcon className="w-16 h-16 mx-auto" />
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-start space-x-3">
+            <div className={`p-2 rounded-lg ${cores.bg}`}>
+              <IconeTipo className={`w-5 h-5 ${cores.text}`} />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {consultaSelecionada.titulo}
+              </h3>
+              <p className="text-sm text-gray-600">
+                {new Date(consultaSelecionada.data_inicio).toLocaleDateString(
+                  "pt-BR",
+                  {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  }
+                )}
+              </p>
+              <p className="text-sm text-gray-600">
+                {new Date(consultaSelecionada.data_inicio).toLocaleTimeString(
+                  "pt-BR",
+                  {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }
+                )}{" "}
+                -{" "}
+                {new Date(consultaSelecionada.data_fim).toLocaleTimeString(
+                  "pt-BR",
+                  {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }
+                )}
+              </p>
+            </div>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Erro ao carregar agenda
-          </h3>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
+
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-medium ${cores.bg} ${cores.text}`}
           >
-            Tentar Novamente
+            {consultaSelecionada.status === "agendada" &&
+              "Aguardando Confirmação"}
+            {consultaSelecionada.status === "confirmada" && "Confirmada"}
+            {consultaSelecionada.status === "em_andamento" && "Em Andamento"}
+            {consultaSelecionada.status === "concluida" && "Concluída"}
+            {consultaSelecionada.status === "cancelada" && "Cancelada"}
+            {consultaSelecionada.status === "rejeitada" && "Rejeitada"}
+            {consultaSelecionada.status === "nao_compareceu" &&
+              "Não Compareceu"}
+          </span>
+        </div>
+
+        {/* Informações do participante */}
+        <div className="mb-4">
+          <h4 className="text-sm font-medium text-gray-900 mb-2">
+            {ehMinhaAgenda ? "Paciente" : "Profissional"}
+          </h4>
+          <div className="flex items-center space-x-3">
+            {participante.foto_perfil_url ? (
+              <img
+                src={participante.foto_perfil_url}
+                alt={`${participante.nome} ${participante.sobrenome}`}
+                className="w-10 h-10 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                <UserIcon className="w-5 h-5 text-gray-600" />
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-medium text-gray-900">
+                {participante.nome} {participante.sobrenome}
+              </p>
+              {!ehMinhaAgenda &&
+                "especialidades" in consultaSelecionada.profissional && (
+                  <p className="text-xs text-gray-600">
+                    {consultaSelecionada.profissional.especialidades}
+                  </p>
+                )}
+            </div>
+          </div>
+        </div>
+
+        {/* Observações */}
+        {consultaSelecionada.observacoes && (
+          <div className="mb-4">
+            <h4 className="text-sm font-medium text-gray-900 mb-2">
+              Observações
+            </h4>
+            <p className="text-sm text-gray-600">
+              {consultaSelecionada.observacoes}
+            </p>
+          </div>
+        )}
+
+        {/* Valor */}
+        {consultaSelecionada.valor && (
+          <div className="mb-4">
+            <h4 className="text-sm font-medium text-gray-900 mb-2">Valor</h4>
+            <p className="text-sm text-gray-600">
+              R$ {consultaSelecionada.valor.toFixed(2).replace(".", ",")}
+            </p>
+          </div>
+        )}
+
+        {/* Ações baseadas no contexto e permissões */}
+        <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200">
+          {/* Ações para PROFISSIONAIS na SUA agenda */}
+          {permissoes.podeConfirmar && (
+            <>
+              {/* Confirmar consulta agendada */}
+              {consultaSelecionada.status === "agendada" && (
+                <button
+                  onClick={() => onConfirmarConsulta?.(consultaSelecionada)}
+                  className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors flex items-center space-x-1"
+                >
+                  <CheckIcon className="w-4 h-4" />
+                  <span>Confirmar</span>
+                </button>
+              )}
+
+              {/* Rejeitar consulta agendada */}
+              {consultaSelecionada.status === "agendada" &&
+                permissoes.podeRejeitar && (
+                  <button
+                    onClick={() => onRejeitarConsulta?.(consultaSelecionada)}
+                    className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-600 transition-colors flex items-center space-x-1"
+                  >
+                    <XMarkIcon className="w-4 h-4" />
+                    <span>Rejeitar</span>
+                  </button>
+                )}
+
+              {/* Iniciar consulta confirmada */}
+              {consultaSelecionada.status === "confirmada" &&
+                permissoes.podeIniciar && (
+                  <button
+                    onClick={() => onIniciarConsulta?.(consultaSelecionada)}
+                    className="bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center space-x-1"
+                  >
+                    <VideoCameraIcon className="w-4 h-4" />
+                    <span>Iniciar</span>
+                  </button>
+                )}
+
+              {/* Finalizar consulta em andamento */}
+              {consultaSelecionada.status === "em_andamento" &&
+                permissoes.podeFinalizar && (
+                  <button
+                    onClick={() => onFinalizarConsulta?.(consultaSelecionada)}
+                    className="bg-purple-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors"
+                  >
+                    Finalizar
+                  </button>
+                )}
+            </>
+          )}
+
+          {/* Ações para comportamento de PACIENTE */}
+          {comportarComoPaciente && (
+            <>
+              {/* Cancelar consulta */}
+              {(consultaSelecionada.status === "agendada" ||
+                consultaSelecionada.status === "confirmada") &&
+                permissoes.podeCancelar && (
+                  <button
+                    onClick={() => onCancelarConsulta?.(consultaSelecionada)}
+                    className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-600 transition-colors flex items-center space-x-1"
+                  >
+                    <XMarkIcon className="w-4 h-4" />
+                    <span>Cancelar</span>
+                  </button>
+                )}
+
+              {/* Entrar na consulta (se online) */}
+              {consultaSelecionada.status === "confirmada" &&
+                consultaSelecionada.tipo === "online" &&
+                consultaSelecionada.link_videochamada && (
+                  <a
+                    href={consultaSelecionada.link_videochamada}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center space-x-1"
+                  >
+                    <VideoCameraIcon className="w-4 h-4" />
+                    <span>Entrar</span>
+                  </a>
+                )}
+            </>
+          )}
+
+          {/* Ações comuns */}
+          {permissoes.podeEditar &&
+            (consultaSelecionada.status === "agendada" ||
+              consultaSelecionada.status === "confirmada") && (
+              <button
+                onClick={() => onEditarConsulta?.(consultaSelecionada)}
+                className="bg-gray-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-600 transition-colors"
+              >
+                Editar
+              </button>
+            )}
+
+          <button
+            onClick={() => setConsultaSelecionada(null)}
+            className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors"
+          >
+            Fechar
           </button>
         </div>
       </div>
     );
-  }
+  };
+
+  // Renderizar painel de filtros
+  const renderFiltros = () => {
+    if (!mostrarFiltros) return null;
+
+    return (
+      <div className="bg-gray-50 border-b border-gray-200 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Filtro por status */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Status
+            </label>
+            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="">Todos</option>
+              <option value="agendada">Agendada</option>
+              <option value="confirmada">Confirmada</option>
+              <option value="concluida">Concluída</option>
+              <option value="cancelada">Cancelada</option>
+              {ehMinhaAgenda && <option value="rejeitada">Rejeitada</option>}
+            </select>
+          </div>
+
+          {/* Filtro por tipo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tipo
+            </label>
+            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="">Todos</option>
+              <option value="online">Online</option>
+              <option value="presencial">Presencial</option>
+              <option value="telefone">Telefone</option>
+            </select>
+          </div>
+
+          {/* Filtro por período */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Período
+            </label>
+            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="">Todos</option>
+              <option value="hoje">Hoje</option>
+              <option value="semana">Esta semana</option>
+              <option value="mes">Este mês</option>
+            </select>
+          </div>
+
+          {/* Busca */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Buscar
+            </label>
+            <input
+              type="text"
+              placeholder={
+                ehMinhaAgenda ? "Nome do paciente..." : "Buscar consultas..."
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Modal de agendamento (quando comporta como paciente)
+  const renderModalAgendamento = () => {
+    if (!modalAgendamento.aberto || !permissoes.podeSolicitarConsulta)
+      return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            {tipoUsuario === "profissional"
+              ? "Agendar como Paciente"
+              : "Agendar Consulta"}
+          </h3>
+
+          {/* Informações da consulta */}
+          <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <p className="text-sm text-gray-600 mb-1">Data e horário</p>
+            <p className="font-medium text-gray-900">
+              {modalAgendamento.data?.toLocaleDateString("pt-BR", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}{" "}
+              às {modalAgendamento.horario}
+            </p>
+
+            <p className="text-sm text-gray-600 mt-2 mb-1">
+              {tipoUsuario === "profissional"
+                ? "Solicitando consulta com"
+                : "Profissional"}
+            </p>
+            <p className="font-medium text-gray-900">
+              {profissionalInfo
+                ? `${profissionalInfo.nome} ${profissionalInfo.sobrenome}`
+                : "Profissional"}
+            </p>
+
+            {profissionalInfo?.valor_sessao && (
+              <>
+                <p className="text-sm text-gray-600 mt-2 mb-1">Valor</p>
+                <p className="font-medium text-gray-900">
+                  R${" "}
+                  {profissionalInfo.valor_sessao.toFixed(2).replace(".", ",")}
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* Formulário de agendamento */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              handleConfirmarAgendamento({
+                tipo: formData.get("tipo") as
+                  | "online"
+                  | "presencial"
+                  | "telefone",
+                observacoes: formData.get("observacoes") as string,
+              });
+            }}
+            className="space-y-4"
+          >
+            {/* Tipo de consulta */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tipo de consulta
+              </label>
+              <select
+                name="tipo"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Selecione o tipo</option>
+                <option value="online">Online (Videochamada)</option>
+                <option value="presencial">Presencial</option>
+                <option value="telefone">Telefone</option>
+              </select>
+            </div>
+
+            {/* Observações */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Observações (opcional)
+              </label>
+              <textarea
+                name="observacoes"
+                rows={3}
+                placeholder={
+                  tipoUsuario === "profissional"
+                    ? "Motivo da consulta como paciente..."
+                    : "Conte um pouco sobre o que gostaria de trabalhar na consulta..."
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              />
+            </div>
+
+            {/* Aviso */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <p className="text-sm text-yellow-800">
+                <strong>Importante:</strong> Esta é uma solicitação de consulta.
+                O profissional precisará confirmar sua disponibilidade. Você
+                receberá uma notificação com a resposta.
+              </p>
+            </div>
+
+            {/* Botões */}
+            <div className="flex space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={() => setModalAgendamento({ aberto: false })}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Solicitar Consulta
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div
-      className={`${altura} ${className} bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col`}
+      className={`bg-white rounded-xl border border-gray-200 shadow-sm ${altura} ${className}`}
     >
       {renderCabecalho()}
       {renderFiltros()}
 
       <div className="flex-1 overflow-hidden">
-        {modoVisualizacao === "mes" && renderVistaMes()}
-        {modoVisualizacao === "semana" && renderVistaSemana()}
-        {modoVisualizacao === "lista" && renderVistaLista()}
+        <div className="flex h-full">
+          {/* Área principal do calendário */}
+          <div className="flex-1 overflow-auto">
+            {/* Debug - indicador do modo atual */}
+            <div className="p-2 bg-yellow-100 text-yellow-800 text-xs font-mono">
+              DEBUG: Modo atual = {modoVisualizacao}
+            </div>
+
+            {modoVisualizacao === "mes" && renderCalendarioMensal()}
+            {modoVisualizacao === "semana" && renderCalendarioSemanal()}
+            {modoVisualizacao === "lista" && renderVisualizacaoLista()}
+          </div>
+
+          {/* Painel lateral com detalhes da consulta */}
+          {consultaSelecionada && (
+            <div className="w-80 border-l border-gray-200 overflow-auto">
+              {renderDetalhesConsulta()}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Indicadores na parte inferior */}
+      {ehMinhaAgenda &&
+        estatisticas?.consultas_pendentes_confirmacao &&
+        estatisticas.consultas_pendentes_confirmacao > 0 && (
+          <div className="bg-yellow-50 border-t border-yellow-200 p-3">
+            <div className="flex items-center space-x-2 text-yellow-800">
+              <ExclamationTriangleIcon className="w-5 h-5" />
+              <span className="text-sm font-medium">
+                Você tem {estatisticas.consultas_pendentes_confirmacao}{" "}
+                consulta(s) aguardando confirmação
+              </span>
+            </div>
+          </div>
+        )}
+
+      {/* Modal de agendamento */}
+      {renderModalAgendamento()}
     </div>
   );
-};
-
-export default Agenda;
+}

@@ -1,13 +1,13 @@
 // viaa/src/types/agenda.ts
 
 export type StatusConsulta =
-  | "agendada"
-  | "confirmada"
-  | "em_andamento"
-  | "concluida"
-  | "cancelada"
-  | "nao_compareceu"
-  | "solicitada";
+  | "agendada" // Paciente agendou, aguardando confirmação do profissional
+  | "confirmada" // Profissional confirmou a consulta
+  | "em_andamento" // Consulta iniciada
+  | "concluida" // Consulta finalizada
+  | "cancelada" // Cancelada por qualquer parte
+  | "rejeitada" // Profissional rejeitou a solicitação
+  | "nao_compareceu"; // Paciente não compareceu
 
 export type TipoConsulta = "presencial" | "online" | "telefone";
 
@@ -67,7 +67,7 @@ export interface Consulta {
   updated_at: string;
 }
 
-// Para criar nova consulta
+// Para criar nova consulta (apenas pacientes fazem isso)
 export interface CriarConsulta {
   titulo: string;
   descricao?: string;
@@ -180,9 +180,11 @@ export interface EstatisticasAgenda {
   consultas_por_status: Record<StatusConsulta, number>;
   horarios_livres_hoje: number;
   consultas_canceladas_mes: number;
+  // Específico para profissionais
+  consultas_pendentes_confirmacao?: number;
 }
 
-// Props do componente de agenda
+// Props do componente de agenda ATUALIZADAS PARA COMPONENTE INTELIGENTE
 export interface AgendaProps {
   // Tipo de usuário (muda comportamento)
   tipoUsuario: TipoUsuarioAgenda;
@@ -190,66 +192,61 @@ export interface AgendaProps {
   // ID do usuário logado
   usuarioId: string;
 
+  // ID do profissional cuja agenda está sendo visualizada (OBRIGATÓRIO)
+  profissionalId: string;
+
+  // Informações do profissional (quando visualizando agenda de outro)
+  profissionalInfo?: {
+    nome: string;
+    sobrenome: string;
+    especialidades: string;
+    foto_perfil_url?: string;
+    valor_sessao?: number;
+    crp?: string;
+    verificado?: boolean;
+  };
+
   // Configurações visuais
   modoVisualizacao?: ModoVisualizacao;
   altura?: string;
 
   // Callbacks personalizáveis
   onConsultaClick?: (consulta: Consulta) => void;
-  onNovaConsulta?: (data?: Date) => void;
   onEditarConsulta?: (consulta: Consulta) => void;
   onCancelarConsulta?: (consulta: Consulta) => void;
   onConfirmarConsulta?: (consulta: Consulta) => void;
+  onRejeitarConsulta?: (consulta: Consulta) => void;
   onIniciarConsulta?: (consulta: Consulta) => void;
   onFinalizarConsulta?: (consulta: Consulta) => void;
+  onSolicitarConsulta?: (data: Date, horario: string) => void;
 
-  // Permissões (muda baseado no tipo de usuário)
-  podeAgendar?: boolean;
-  podeCancelar?: boolean;
-  podeEditar?: boolean;
-  podeVerDetalhes?: boolean;
-  podeConfirmar?: boolean;
-  podeIniciar?: boolean;
-  podeFinalizar?: boolean;
-
-  // Estilos customizáveis
+  // Configurações adicionais
   className?: string;
-  temaDark?: boolean;
-
-  // Configurações avançadas
-  exibirValores?: boolean;
-  exibirEstatisticas?: boolean;
-  intervaloMinimo?: number; // em minutos
-  horaInicial?: string; // HH:mm
-  horaFinal?: string; // HH:mm
+  desabilitado?: boolean;
 }
 
-// Resultado de operações
+// Interface para resultado de operações
 export interface ResultadoOperacao {
   sucesso: boolean;
   mensagem: string;
   dados?: any;
-  erro?: string;
 }
 
-// Hook return
+// Interface para hook da agenda
 export interface UseAgendaReturn {
   // Estado
   consultas: Consulta[];
-  estatisticas: EstatisticasAgenda | null;
-  loading: boolean;
-  error: string | null;
-
-  // Filtros e visualização
-  filtros: FiltrosAgenda;
-  modoVisualizacao: ModoVisualizacao;
+  carregando: boolean;
+  erro: string | null;
   dataAtual: Date;
+  modoVisualizacao: ModoVisualizacao;
+  filtros: FiltrosAgenda;
+  estatisticas: EstatisticasAgenda | null;
 
-  // Actions - Consultas
-  criarConsulta: (dados: CriarConsulta) => Promise<ResultadoOperacao>;
-  atualizarConsulta: (dados: AtualizarConsulta) => Promise<ResultadoOperacao>;
-  cancelarConsulta: (id: string, motivo?: string) => Promise<ResultadoOperacao>;
+  // Actions - Consultas (profissionais apenas confirmam/rejeitam)
   confirmarConsulta: (id: string) => Promise<ResultadoOperacao>;
+  rejeitarConsulta: (id: string, motivo?: string) => Promise<ResultadoOperacao>;
+  cancelarConsulta: (id: string, motivo?: string) => Promise<ResultadoOperacao>;
   iniciarConsulta: (id: string) => Promise<ResultadoOperacao>;
   finalizarConsulta: (
     id: string,
@@ -257,7 +254,7 @@ export interface UseAgendaReturn {
   ) => Promise<ResultadoOperacao>;
   marcarNaoCompareceu: (id: string) => Promise<ResultadoOperacao>;
 
-  // Actions - Horários e Bloqueios
+  // Actions - Horários e Bloqueios (profissionais)
   criarHorarioDisponivel: (
     dados: CriarHorarioDisponivel
   ) => Promise<ResultadoOperacao>;

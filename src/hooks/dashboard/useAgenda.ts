@@ -1,441 +1,451 @@
-// src/hooks/dashboard/useAgenda.ts - VERSÃO FINAL CORRIGIDA
+// viaa/src/hooks/dashboard/useAgenda.ts
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "@/lib/supabase/client";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import type {
   Consulta,
-  CriarConsulta,
-  AtualizarConsulta,
+  EstatisticasAgenda,
+  FiltrosAgenda,
+  ModoVisualizacao,
+  ResultadoOperacao,
   CriarHorarioDisponivel,
   CriarBloqueioHorario,
-  FiltrosAgenda,
-  EstatisticasAgenda,
-  ModoVisualizacao,
-  TipoUsuarioAgenda,
   UseAgendaReturn,
-  ResultadoOperacao,
 } from "@/types/agenda";
 
-interface UseAgendaOptions {
-  tipoUsuario: TipoUsuarioAgenda;
-  usuarioId: string;
-  autoLoad?: boolean;
-  modoInicial?: ModoVisualizacao;
+interface UseAgendaProps {
+  tipoUsuario: "profissional" | "paciente";
+  profissionalId: string; // ID do profissional cuja agenda está sendo visualizada
 }
 
-export const useAgenda = (options: UseAgendaOptions): UseAgendaReturn => {
+export function useAgenda({
+  tipoUsuario,
+  profissionalId,
+}: UseAgendaProps): UseAgendaReturn {
   const { user } = useAuth();
-  const {
-    tipoUsuario,
-    usuarioId,
-    autoLoad = true,
-    modoInicial = "mes",
-  } = options;
 
-  // Estados principais
+  // Estados
   const [consultas, setConsultas] = useState<Consulta[]>([]);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [dataAtual, setDataAtual] = useState(new Date());
+  const [modoVisualizacao, setModoVisualizacao] =
+    useState<ModoVisualizacao>("mes");
+  const [filtros, setFiltros] = useState<FiltrosAgenda>({});
   const [estatisticas, setEstatisticas] = useState<EstatisticasAgenda | null>(
     null
   );
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Estados de navegação e filtros
-  const [dataAtual, setDataAtual] = useState(new Date());
-  const [modoVisualizacao, setModoVisualizacao] =
-    useState<ModoVisualizacao>(modoInicial);
-  const [filtros, setFiltrosState] = useState<FiltrosAgenda>({});
+  // Lógica inteligente de contexto
+  const ehMinhaAgenda =
+    tipoUsuario === "profissional" && user?.id === profissionalId;
+  const comportarComoPaciente = !ehMinhaAgenda;
 
-  // Ref para prevenir múltiplas chamadas
-  const isLoadingRef = useRef(false);
-
-  // Função para limpar erros
-  const clearError = useCallback(() => setError(null), []);
-
-  // Carregar consultas sem JOIN (mais seguro)
+  // Carregar consultas baseado no contexto
   const carregarConsultas = useCallback(async () => {
-    // Prevenir múltiplas chamadas simultâneas
-    if (isLoadingRef.current) {
-      console.log("⏭️ Pulando carregamento - já em andamento");
-      return;
-    }
+    if (!user) return;
+
+    setCarregando(true);
+    setErro(null);
 
     try {
-      isLoadingRef.current = true;
-      setLoading(true);
-      setError(null);
+      let endpoint = "";
+      let params = new URLSearchParams();
 
-      console.log(
-        "🔍 Carregando consultas para usuário:",
-        usuarioId,
-        "tipo:",
-        tipoUsuario
-      );
-
-      // Query simples sem JOINs
-      let query = supabase.from("consultas").select(`
-          id,
-          titulo,
-          descricao,
-          data_inicio,
-          data_fim,
-          status,
-          tipo,
-          profissional_id,
-          paciente_id,
-          valor,
-          observacoes,
-          link_videochamada,
-          lembretes_enviados,
-          created_at,
-          updated_at
-        `);
-
-      // Filtrar por tipo de usuário
-      if (tipoUsuario === "profissional") {
-        query = query.eq("profissional_id", usuarioId);
+      if (ehMinhaAgenda) {
+        // Profissional vendo SUA própria agenda - vê TODAS as consultas
+        endpoint = `/api/consultas/profissional/${profissionalId}`;
       } else {
-        query = query.eq("paciente_id", usuarioId);
+        // Comportamento de paciente - vê apenas:
+        // 1. Horários disponíveis do profissional
+        // 2. Suas próprias consultas com esse profissional
+        endpoint = `/api/consultas/profissional/${profissionalId}/publicas`;
+        params.append("solicitante_id", user.id);
+        params.append("incluir_disponiveis", "true");
       }
 
-      // Aplicar filtros se existirem
-      if (filtros.data_inicio) {
-        query = query.gte("data_inicio", filtros.data_inicio);
-      }
-      if (filtros.data_fim) {
-        query = query.lte("data_inicio", filtros.data_fim);
-      }
-      if (filtros.status?.length) {
-        query = query.in("status", filtros.status);
-      }
-      if (filtros.tipo?.length) {
-        query = query.in("tipo", filtros.tipo);
-      }
+      // Adicionar filtros
+      if (filtros.data_inicio)
+        params.append("data_inicio", filtros.data_inicio);
+      if (filtros.data_fim) params.append("data_fim", filtros.data_fim);
+      if (filtros.status)
+        filtros.status.forEach((s) => params.append("status", s));
+      if (filtros.tipo) filtros.tipo.forEach((t) => params.append("tipo", t));
+      if (filtros.busca) params.append("busca", filtros.busca);
 
-      query = query.order("data_inicio", { ascending: true });
+      const url = `${endpoint}?${params.toString()}`;
+      const response = await fetch(url);
 
-      const { data, error: queryError } = await query;
-
-      if (queryError) {
-        console.error("❌ Erro na query:", queryError);
-        throw queryError;
+      if (!response.ok) {
+        throw new Error("Erro ao carregar consultas");
       }
 
-      console.log("✅ Consultas carregadas:", data?.length || 0);
-
-      // Buscar relacionamentos separadamente
-      const consultasComRelacionamentos: Consulta[] = [];
-
-      for (const item of data || []) {
-        // Buscar dados do profissional
-        const { data: profissionalData } = await supabase
-          .from("perfis_profissionais")
-          .select(
-            "id, nome, sobrenome, foto_perfil_url, especialidades, crp, verificado"
-          )
-          .eq("id", item.profissional_id)
-          .single();
-
-        // Buscar dados do paciente
-        const { data: pacienteData } = await supabase
-          .from("perfis_pacientes")
-          .select("id, nome, sobrenome, foto_perfil_url, telefone, email")
-          .eq("id", item.paciente_id)
-          .single();
-
-        const consulta: Consulta = {
-          id: item.id,
-          titulo: item.titulo,
-          descricao: item.descricao,
-          data_inicio: item.data_inicio,
-          data_fim: item.data_fim,
-          status: item.status,
-          tipo: item.tipo,
-          profissional_id: item.profissional_id,
-          paciente_id: item.paciente_id,
-          valor: item.valor,
-          observacoes: item.observacoes,
-          link_videochamada: item.link_videochamada,
-          lembretes_enviados: item.lembretes_enviados,
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-          profissional: profissionalData || {
-            id: item.profissional_id,
-            nome: "Profissional",
-            sobrenome: "Não encontrado",
-            especialidades: "N/A",
-            verificado: false,
-          },
-          paciente: pacienteData || {
-            id: item.paciente_id,
-            nome: "Paciente",
-            sobrenome: "Não encontrado",
-            telefone: "N/A",
-            email: "N/A",
-          },
-        };
-
-        consultasComRelacionamentos.push(consulta);
-      }
-
-      setConsultas(consultasComRelacionamentos);
-    } catch (err: any) {
-      console.error("❌ Erro ao carregar consultas:", err);
-      setError(err.message || "Erro ao carregar consultas");
-      setConsultas([]);
+      const data = await response.json();
+      setConsultas(data.consultas || []);
+      setEstatisticas(data.estatisticas || null);
+    } catch (error) {
+      console.error("Erro ao carregar consultas:", error);
+      setErro("Erro ao carregar consultas. Tente novamente.");
     } finally {
-      setLoading(false);
-      isLoadingRef.current = false;
+      setCarregando(false);
     }
-  }, [tipoUsuario, usuarioId]); // APENAS dependencies que não mudam
+  }, [user, ehMinhaAgenda, profissionalId, comportarComoPaciente, filtros]);
 
-  // Carregar estatísticas
-  const carregarEstatisticas = useCallback(async () => {
-    try {
-      const hoje = new Date();
-      const inicioHoje = new Date(hoje);
-      inicioHoje.setHours(0, 0, 0, 0);
-      const fimHoje = new Date(hoje);
-      fimHoje.setHours(23, 59, 59, 999);
+  // Carregar consultas quando componente monta ou dependências mudam
+  useEffect(() => {
+    carregarConsultas();
+  }, [carregarConsultas]);
 
-      const inicioSemana = new Date(hoje);
-      inicioSemana.setDate(hoje.getDate() - hoje.getDay());
-
-      const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-      const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-
-      // Usar consultas atuais do state
-      const consultasHoje = consultas.filter((c) => {
-        const data = new Date(c.data_inicio);
-        return data >= inicioHoje && data <= fimHoje;
-      }).length;
-
-      const consultasSemana = consultas.filter((c) => {
-        const data = new Date(c.data_inicio);
-        return data >= inicioSemana && data <= fimHoje;
-      }).length;
-
-      const consultasMes = consultas.filter((c) => {
-        const data = new Date(c.data_inicio);
-        return data >= inicioMes && data <= fimMes;
-      }).length;
-
-      const estatisticasCalculadas: EstatisticasAgenda = {
-        total_consultas: consultas.length,
-        consultas_hoje: consultasHoje,
-        consultas_semana: consultasSemana,
-        consultas_mes: consultasMes,
-        proxima_consulta:
-          consultas
-            .filter((c) => new Date(c.data_inicio) > hoje)
-            .sort(
-              (a, b) =>
-                new Date(a.data_inicio).getTime() -
-                new Date(b.data_inicio).getTime()
-            )[0] || undefined,
-        taxa_comparecimento: 0,
-        receita_mes: consultas
-          .filter((c) => {
-            const data = new Date(c.data_inicio);
-            return (
-              data >= inicioMes && data <= fimMes && c.status === "concluida"
-            );
-          })
-          .reduce((total, c) => total + (c.valor || 0), 0),
-        consultas_por_status: {
-          agendada: consultas.filter((c) => c.status === "agendada").length,
-          confirmada: consultas.filter((c) => c.status === "confirmada").length,
-          em_andamento: consultas.filter((c) => c.status === "em_andamento")
-            .length,
-          concluida: consultas.filter((c) => c.status === "concluida").length,
-          cancelada: consultas.filter((c) => c.status === "cancelada").length,
-          nao_compareceu: consultas.filter((c) => c.status === "nao_compareceu")
-            .length,
-        },
-        horarios_livres_hoje: 8,
-        consultas_canceladas_mes: consultas.filter((c) => {
-          const data = new Date(c.data_inicio);
-          return (
-            data >= inicioMes && data <= fimMes && c.status === "cancelada"
-          );
-        }).length,
-      };
-
-      setEstatisticas(estatisticasCalculadas);
-    } catch (err: any) {
-      console.error("❌ Erro ao carregar estatísticas:", err);
-      setError(err.message || "Erro ao carregar estatísticas");
-    }
-  }, []); // SEM dependencies - usa state atual
-
-  // Funções de filtro
-  const setFiltros = useCallback((novosFiltros: Partial<FiltrosAgenda>) => {
-    setFiltrosState((prev) => ({ ...prev, ...novosFiltros }));
-  }, []);
-
-  const limparFiltros = useCallback(() => {
-    setFiltrosState({});
-  }, []);
-
-  // Recarregar tudo
-  const recarregar = useCallback(async () => {
-    await carregarConsultas();
-    setTimeout(() => {
-      carregarEstatisticas();
-    }, 100);
-  }, [carregarConsultas, carregarEstatisticas]);
-
-  // ✅ FUNÇÕES COM ASSINATURAS CORRETAS CONFORME UseAgendaReturn
-  const criarConsulta = useCallback(
-    async (dados: CriarConsulta): Promise<ResultadoOperacao> => {
-      console.log("Criando consulta:", dados);
-      return { sucesso: false, mensagem: "Em desenvolvimento" };
-    },
-    []
-  );
-
-  const atualizarConsulta = useCallback(
-    async (dados: AtualizarConsulta): Promise<ResultadoOperacao> => {
-      console.log("Atualizando consulta ID:", dados.id, dados);
-      return { sucesso: false, mensagem: "Em desenvolvimento" };
-    },
-    []
-  );
-
-  const cancelarConsulta = useCallback(
-    async (id: string, motivo?: string): Promise<ResultadoOperacao> => {
-      console.log("Cancelando consulta:", id, "motivo:", motivo);
-      return { sucesso: false, mensagem: "Em desenvolvimento" };
-    },
-    []
-  );
-
+  // AÇÕES PARA PROFISSIONAIS EM SUA PRÓPRIA AGENDA
   const confirmarConsulta = useCallback(
     async (id: string): Promise<ResultadoOperacao> => {
-      console.log("Confirmando consulta:", id);
-      return { sucesso: false, mensagem: "Em desenvolvimento" };
+      if (!ehMinhaAgenda) {
+        return {
+          sucesso: false,
+          mensagem:
+            "Apenas profissionais podem confirmar consultas em sua agenda",
+        };
+      }
+
+      try {
+        const response = await fetch(`/api/consultas/${id}/confirmar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profissional_id: user?.id }),
+        });
+
+        if (!response.ok) throw new Error("Erro ao confirmar consulta");
+
+        const data = await response.json();
+
+        // Atualizar estado local
+        setConsultas((prev) =>
+          prev.map((consulta) =>
+            consulta.id === id
+              ? { ...consulta, status: "confirmada" as const }
+              : consulta
+          )
+        );
+
+        // TODO: Enviar notificação para o paciente/solicitante
+
+        return {
+          sucesso: true,
+          mensagem: "Consulta confirmada com sucesso",
+          dados: data,
+        };
+      } catch (error) {
+        console.error("Erro ao confirmar consulta:", error);
+        return {
+          sucesso: false,
+          mensagem: "Erro ao confirmar consulta. Tente novamente.",
+        };
+      }
     },
-    []
+    [ehMinhaAgenda, user?.id]
+  );
+
+  const rejeitarConsulta = useCallback(
+    async (id: string, motivo?: string): Promise<ResultadoOperacao> => {
+      if (!ehMinhaAgenda) {
+        return {
+          sucesso: false,
+          mensagem:
+            "Apenas profissionais podem rejeitar consultas em sua agenda",
+        };
+      }
+
+      try {
+        const response = await fetch(`/api/consultas/${id}/rejeitar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profissional_id: user?.id, motivo }),
+        });
+
+        if (!response.ok) throw new Error("Erro ao rejeitar consulta");
+
+        const data = await response.json();
+
+        // Atualizar estado local
+        setConsultas((prev) =>
+          prev.map((consulta) =>
+            consulta.id === id
+              ? { ...consulta, status: "rejeitada" as const }
+              : consulta
+          )
+        );
+
+        return {
+          sucesso: true,
+          mensagem: "Consulta rejeitada",
+          dados: data,
+        };
+      } catch (error) {
+        console.error("Erro ao rejeitar consulta:", error);
+        return {
+          sucesso: false,
+          mensagem: "Erro ao rejeitar consulta. Tente novamente.",
+        };
+      }
+    },
+    [ehMinhaAgenda, user?.id]
   );
 
   const iniciarConsulta = useCallback(
     async (id: string): Promise<ResultadoOperacao> => {
-      console.log("Iniciando consulta:", id);
-      return { sucesso: false, mensagem: "Em desenvolvimento" };
+      if (!ehMinhaAgenda) {
+        return {
+          sucesso: false,
+          mensagem:
+            "Apenas profissionais podem iniciar consultas em sua agenda",
+        };
+      }
+
+      try {
+        const response = await fetch(`/api/consultas/${id}/iniciar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profissional_id: user?.id }),
+        });
+
+        if (!response.ok) throw new Error("Erro ao iniciar consulta");
+
+        const data = await response.json();
+
+        setConsultas((prev) =>
+          prev.map((consulta) =>
+            consulta.id === id
+              ? { ...consulta, status: "em_andamento" as const }
+              : consulta
+          )
+        );
+
+        return {
+          sucesso: true,
+          mensagem: "Consulta iniciada",
+          dados: data,
+        };
+      } catch (error) {
+        console.error("Erro ao iniciar consulta:", error);
+        return {
+          sucesso: false,
+          mensagem: "Erro ao iniciar consulta. Tente novamente.",
+        };
+      }
     },
-    []
+    [ehMinhaAgenda, user?.id]
   );
 
   const finalizarConsulta = useCallback(
     async (id: string, observacoes?: string): Promise<ResultadoOperacao> => {
-      console.log("Finalizando consulta:", id, "observações:", observacoes);
-      return { sucesso: false, mensagem: "Em desenvolvimento" };
+      if (!ehMinhaAgenda) {
+        return {
+          sucesso: false,
+          mensagem:
+            "Apenas profissionais podem finalizar consultas em sua agenda",
+        };
+      }
+
+      try {
+        const response = await fetch(`/api/consultas/${id}/finalizar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profissional_id: user?.id, observacoes }),
+        });
+
+        if (!response.ok) throw new Error("Erro ao finalizar consulta");
+
+        const data = await response.json();
+
+        setConsultas((prev) =>
+          prev.map((consulta) =>
+            consulta.id === id
+              ? {
+                  ...consulta,
+                  status: "concluida" as const,
+                  observacoes: observacoes || consulta.observacoes,
+                }
+              : consulta
+          )
+        );
+
+        return {
+          sucesso: true,
+          mensagem: "Consulta finalizada com sucesso",
+          dados: data,
+        };
+      } catch (error) {
+        console.error("Erro ao finalizar consulta:", error);
+        return {
+          sucesso: false,
+          mensagem: "Erro ao finalizar consulta. Tente novamente.",
+        };
+      }
     },
-    []
+    [ehMinhaAgenda, user?.id]
   );
 
   const marcarNaoCompareceu = useCallback(
     async (id: string): Promise<ResultadoOperacao> => {
-      console.log("Marcando não compareceu:", id);
-      return { sucesso: false, mensagem: "Em desenvolvimento" };
+      if (!ehMinhaAgenda) {
+        return {
+          sucesso: false,
+          mensagem:
+            "Apenas profissionais podem marcar não comparecimento em sua agenda",
+        };
+      }
+
+      try {
+        const response = await fetch(`/api/consultas/${id}/nao-compareceu`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profissional_id: user?.id }),
+        });
+
+        if (!response.ok) throw new Error("Erro ao marcar não comparecimento");
+
+        const data = await response.json();
+
+        setConsultas((prev) =>
+          prev.map((consulta) =>
+            consulta.id === id
+              ? { ...consulta, status: "nao_compareceu" as const }
+              : consulta
+          )
+        );
+
+        return {
+          sucesso: true,
+          mensagem: "Marcado como não compareceu",
+          dados: data,
+        };
+      } catch (error) {
+        console.error("Erro ao marcar não comparecimento:", error);
+        return {
+          sucesso: false,
+          mensagem: "Erro ao marcar não comparecimento. Tente novamente.",
+        };
+      }
     },
-    []
+    [ehMinhaAgenda, user?.id]
   );
 
+  // AÇÕES COMUNS - Cancelar consulta (ambos os tipos de usuário)
+  const cancelarConsulta = useCallback(
+    async (id: string, motivo?: string): Promise<ResultadoOperacao> => {
+      try {
+        const response = await fetch(`/api/consultas/${id}/cancelar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            usuario_id: user?.id,
+            tipo_usuario: tipoUsuario,
+            eh_minha_agenda: ehMinhaAgenda,
+            motivo,
+          }),
+        });
+
+        if (!response.ok) throw new Error("Erro ao cancelar consulta");
+
+        const data = await response.json();
+
+        setConsultas((prev) =>
+          prev.map((consulta) =>
+            consulta.id === id
+              ? { ...consulta, status: "cancelada" as const }
+              : consulta
+          )
+        );
+
+        return {
+          sucesso: true,
+          mensagem: "Consulta cancelada com sucesso",
+          dados: data,
+        };
+      } catch (error) {
+        console.error("Erro ao cancelar consulta:", error);
+        return {
+          sucesso: false,
+          mensagem: "Erro ao cancelar consulta. Tente novamente.",
+        };
+      }
+    },
+    [tipoUsuario, ehMinhaAgenda, user?.id]
+  );
+
+  // AÇÕES PARA GERENCIAR AGENDA (apenas profissionais em sua própria agenda)
   const criarHorarioDisponivel = useCallback(
     async (dados: CriarHorarioDisponivel): Promise<ResultadoOperacao> => {
-      console.log("Criando horário disponível:", dados);
-      return { sucesso: false, mensagem: "Em desenvolvimento" };
+      if (!ehMinhaAgenda) {
+        return {
+          sucesso: false,
+          mensagem:
+            "Apenas profissionais podem configurar horários em sua agenda",
+        };
+      }
+
+      try {
+        const response = await fetch("/api/horarios-disponiveis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dados),
+        });
+
+        if (!response.ok) throw new Error("Erro ao criar horário disponível");
+
+        const data = await response.json();
+
+        return {
+          sucesso: true,
+          mensagem: "Horário disponível criado",
+          dados: data,
+        };
+      } catch (error) {
+        console.error("Erro ao criar horário disponível:", error);
+        return {
+          sucesso: false,
+          mensagem: "Erro ao criar horário disponível. Tente novamente.",
+        };
+      }
     },
-    []
+    [ehMinhaAgenda]
   );
 
   const criarBloqueioHorario = useCallback(
     async (dados: CriarBloqueioHorario): Promise<ResultadoOperacao> => {
-      console.log("Criando bloqueio:", dados);
-      return { sucesso: false, mensagem: "Em desenvolvimento" };
-    },
-    []
-  );
-
-  // useEffect CORRIGIDOS - SEM loops infinitos
-
-  // 1. Carregamento inicial APENAS uma vez
-  useEffect(() => {
-    if (autoLoad && usuarioId && !isLoadingRef.current) {
-      console.log("🚀 Carregamento inicial da agenda");
-      carregarConsultas();
-    }
-  }, [autoLoad, usuarioId, carregarConsultas]);
-
-  // 2. Recarregar APENAS quando filtros mudarem
-  useEffect(() => {
-    if (autoLoad && usuarioId && Object.keys(filtros).length > 0) {
-      console.log("🔄 Recarregando por mudança de filtros");
-      carregarConsultas();
-    }
-  }, [filtros]); // APENAS filtros
-
-  // 3. Calcular estatísticas quando consultas mudarem
-  useEffect(() => {
-    if (consultas.length >= 0) {
-      carregarEstatisticas();
-    }
-  }, [consultas.length]); // APENAS length
-
-  // Funções utilitárias
-  const consultasNaData = useCallback(
-    (data: Date): Consulta[] => {
-      const inicio = new Date(data);
-      inicio.setHours(0, 0, 0, 0);
-      const fim = new Date(data);
-      fim.setHours(23, 59, 59, 999);
-      return consultas.filter((consulta) => {
-        const dataConsulta = new Date(consulta.data_inicio);
-        return dataConsulta >= inicio && dataConsulta <= fim;
-      });
-    },
-    [consultas]
-  );
-
-  const temConsultaNaData = useCallback(
-    (data: Date): boolean => {
-      return consultasNaData(data).length > 0;
-    },
-    [consultasNaData]
-  );
-
-  const proximaConsulta = useCallback((): Consulta | null => {
-    const agora = new Date();
-    const futuras = consultas
-      .filter((consulta) => new Date(consulta.data_inicio) > agora)
-      .sort(
-        (a, b) =>
-          new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime()
-      );
-    return futuras[0] || null;
-  }, [consultas]);
-
-  const verificarDisponibilidade = useCallback(
-    (data: Date, duracao: number): boolean => {
-      return !temConsultaNaData(data);
-    },
-    [temConsultaNaData]
-  );
-
-  const obterHorariosLivres = useCallback(
-    (data: Date): { inicio: string; fim: string }[] => {
-      const horarios = [];
-      for (let hora = 9; hora < 17; hora++) {
-        horarios.push({
-          inicio: `${hora.toString().padStart(2, "0")}:00`,
-          fim: `${(hora + 1).toString().padStart(2, "0")}:00`,
-        });
+      if (!ehMinhaAgenda) {
+        return {
+          sucesso: false,
+          mensagem:
+            "Apenas profissionais podem bloquear horários em sua agenda",
+        };
       }
-      return horarios;
+
+      try {
+        const response = await fetch("/api/bloqueios-horario", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dados),
+        });
+
+        if (!response.ok) throw new Error("Erro ao criar bloqueio de horário");
+
+        const data = await response.json();
+
+        return {
+          sucesso: true,
+          mensagem: "Horário bloqueado",
+          dados: data,
+        };
+      } catch (error) {
+        console.error("Erro ao bloquear horário:", error);
+        return {
+          sucesso: false,
+          mensagem: "Erro ao bloquear horário. Tente novamente.",
+        };
+      }
     },
-    []
+    [ehMinhaAgenda]
   );
 
   // Funções de navegação
@@ -479,23 +489,86 @@ export const useAgenda = (options: UseAgendaOptions): UseAgendaReturn => {
     setDataAtual(new Date());
   }, []);
 
+  // Funções de filtro
+  const aplicarFiltros = useCallback((novosFiltros: Partial<FiltrosAgenda>) => {
+    setFiltros((prev) => ({ ...prev, ...novosFiltros }));
+  }, []);
+
+  const limparFiltros = useCallback(() => {
+    setFiltros({});
+  }, []);
+
+  // Funções utilitárias
+  const consultasNaData = useCallback(
+    (data: Date): Consulta[] => {
+      return consultas.filter((consulta) => {
+        const dataConsulta = new Date(consulta.data_inicio);
+        return (
+          dataConsulta.getDate() === data.getDate() &&
+          dataConsulta.getMonth() === data.getMonth() &&
+          dataConsulta.getFullYear() === data.getFullYear()
+        );
+      });
+    },
+    [consultas]
+  );
+
+  const temConsultaNaData = useCallback(
+    (data: Date): boolean => {
+      return consultasNaData(data).length > 0;
+    },
+    [consultasNaData]
+  );
+
+  const proximaConsulta = useCallback((): Consulta | null => {
+    const agora = new Date();
+    const consultasFuturas = consultas
+      .filter((consulta) => new Date(consulta.data_inicio) > agora)
+      .sort(
+        (a, b) =>
+          new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime()
+      );
+
+    return consultasFuturas[0] || null;
+  }, [consultas]);
+
+  const verificarDisponibilidade = useCallback(
+    (data: Date, duracao: number): boolean => {
+      // TODO: Implementar lógica de verificação de disponibilidade
+      // Verificar horários disponíveis vs consultas agendadas vs bloqueios
+      return true;
+    },
+    []
+  );
+
+  const obterHorariosLivres = useCallback(
+    (data: Date): { inicio: string; fim: string }[] => {
+      // TODO: Implementar lógica para obter horários livres
+      // Baseado nos horários disponíveis configurados pelo profissional
+      // Menos as consultas já agendadas e bloqueios
+      return [];
+    },
+    []
+  );
+
+  const recarregar = useCallback(async () => {
+    await carregarConsultas();
+  }, [carregarConsultas]);
+
   return {
     // Estado
     consultas,
-    estatisticas,
-    loading,
-    error,
-
-    // Filtros e visualização
-    filtros,
-    modoVisualizacao,
+    carregando,
+    erro,
     dataAtual,
+    modoVisualizacao,
+    filtros,
+    estatisticas,
 
     // Actions - Consultas
-    criarConsulta,
-    atualizarConsulta,
-    cancelarConsulta,
     confirmarConsulta,
+    rejeitarConsulta,
+    cancelarConsulta,
     iniciarConsulta,
     finalizarConsulta,
     marcarNaoCompareceu,
@@ -513,7 +586,7 @@ export const useAgenda = (options: UseAgendaOptions): UseAgendaReturn => {
     hoje,
 
     // Filtros
-    setFiltros,
+    setFiltros: aplicarFiltros,
     limparFiltros,
 
     // Visualização
@@ -529,4 +602,4 @@ export const useAgenda = (options: UseAgendaOptions): UseAgendaReturn => {
     // Refresh
     recarregar,
   };
-};
+}

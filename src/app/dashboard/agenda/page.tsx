@@ -24,17 +24,14 @@ export default function AgendaPage() {
   // Verificar se é profissional
   const ehProfissional = profile.tipo === "profissional";
 
+  // Para profissionais, sempre mostrar SUA própria agenda
+  // Para pacientes, seria agenda de profissional específico (implementar depois)
+  const profissionalId = ehProfissional ? user.id : "outro-profissional-id";
+
   // Callbacks para as ações da agenda
   const handleConsultaClick = (consulta: Consulta) => {
     setConsultaSelecionada(consulta);
     console.log("Consulta clicada:", consulta);
-    // TODO: Abrir modal de detalhes da consulta
-  };
-
-  const handleNovaConsulta = (data?: Date) => {
-    console.log("Nova consulta:", data);
-    // TODO: Abrir modal de criação de consulta
-    // Se data foi passada, pré-preencher com essa data
   };
 
   const handleEditarConsulta = (consulta: Consulta) => {
@@ -49,57 +46,120 @@ export default function AgendaPage() {
 
   const handleConfirmarConsulta = (consulta: Consulta) => {
     console.log("Confirmar consulta:", consulta);
-    // TODO: Confirmar consulta (ou abrir modal se necessário)
+    // TODO: Confirmar consulta via API
+  };
+
+  const handleRejeitarConsulta = (consulta: Consulta) => {
+    console.log("Rejeitar consulta:", consulta);
+    // TODO: Rejeitar consulta via API (com modal para motivo)
+  };
+
+  const handleIniciarConsulta = (consulta: Consulta) => {
+    console.log("Iniciar consulta:", consulta);
+    // TODO: Marcar consulta como em andamento e abrir link/modal
+  };
+
+  const handleFinalizarConsulta = (consulta: Consulta) => {
+    console.log("Finalizar consulta:", consulta);
+    // TODO: Finalizar consulta e abrir modal para observações
+  };
+
+  const handleSolicitarConsulta = (data: Date, horario: string) => {
+    console.log("Solicitar consulta:", { data, horario });
+    // TODO: Abrir modal de solicitação (já implementado no componente)
   };
 
   return (
     <div className="space-y-6">
-      {/* Estatísticas rápidas (opcional) */}
+      {/* Estatísticas rápidas - DIFERENTES por tipo de usuário */}
       {ehProfissional && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
             <h3 className="text-lg font-semibold mb-2">Consultas Hoje</h3>
             <p className="text-3xl font-bold">3</p>
           </div>
+
+          {/* Card específico para consultas pendentes de confirmação */}
+          <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl p-6 text-white">
+            <h3 className="text-lg font-semibold mb-2">Pendentes</h3>
+            <p className="text-3xl font-bold">2</p>
+            <p className="text-sm opacity-90">Aguardando confirmação</p>
+          </div>
+
           <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl p-6 text-white">
             <h3 className="text-lg font-semibold mb-2">Esta Semana</h3>
             <p className="text-3xl font-bold">12</p>
           </div>
+
           <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
             <h3 className="text-lg font-semibold mb-2">Receita Mês</h3>
             <p className="text-3xl font-bold">R$ 2.840</p>
           </div>
-          <div className="bg-gradient-to-r from-amber-500 to-amber-600 rounded-xl p-6 text-white">
-            <h3 className="text-lg font-semibold mb-2">Taxa Presença</h3>
-            <p className="text-3xl font-bold">94%</p>
+        </div>
+      )}
+
+      {/* Para pacientes - estatísticas diferentes */}
+      {!ehProfissional && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
+            <h3 className="text-lg font-semibold mb-2">Próxima Consulta</h3>
+            <p className="text-lg font-bold">Hoje às 14:00</p>
+            <p className="text-sm opacity-90">Dr. João Silva</p>
+          </div>
+
+          <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl p-6 text-white">
+            <h3 className="text-lg font-semibold mb-2">Este Mês</h3>
+            <p className="text-3xl font-bold">4</p>
+            <p className="text-sm opacity-90">Consultas realizadas</p>
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
+            <h3 className="text-lg font-semibold mb-2">Investimento</h3>
+            <p className="text-3xl font-bold">R$ 720</p>
+            <p className="text-sm opacity-90">Total do mês</p>
           </div>
         </div>
       )}
 
-      {/* Componente principal da agenda */}
+      {/* Componente principal da agenda - NOVO COMPONENTE INTELIGENTE */}
       <Agenda
         tipoUsuario={ehProfissional ? "profissional" : "paciente"}
         usuarioId={user.id}
+        profissionalId={profissionalId}
+        // Informações do profissional (quando necessário)
+        profissionalInfo={
+          !ehProfissional
+            ? {
+                nome: "João",
+                sobrenome: "Silva",
+                especialidades:
+                  "Psicologia Clínica, Terapia Cognitivo-Comportamental",
+                foto_perfil_url: undefined,
+                valor_sessao: 180,
+                crp: "06/123456",
+                verificado: true,
+              }
+            : undefined
+        }
         modoVisualizacao="mes"
         altura="h-[700px]"
         onConsultaClick={handleConsultaClick}
-        onNovaConsulta={handleNovaConsulta}
         onEditarConsulta={handleEditarConsulta}
         onCancelarConsulta={handleCancelarConsulta}
         onConfirmarConsulta={handleConfirmarConsulta}
-        // Permissões baseadas no tipo de usuário
-        podeAgendar={ehProfissional} // Profissionais podem agendar, pacientes só veem
-        podeCancelar={true}
-        podeEditar={ehProfissional}
-        podeVerDetalhes={true}
+        onRejeitarConsulta={handleRejeitarConsulta}
+        onIniciarConsulta={handleIniciarConsulta}
+        onFinalizarConsulta={handleFinalizarConsulta}
+        onSolicitarConsulta={handleSolicitarConsulta}
         className="shadow-lg"
       />
 
-      {/* TODO: Modais */}
+      {/* TODO: Modais específicos para o novo fluxo */}
       {/* Modal de detalhes da consulta */}
-      {/* Modal de nova consulta */}
-      {/* Modal de edição de consulta */}
-      {/* Modal de cancelamento */}
+      {/* Modal de edição de consulta (profissionais) */}
+      {/* Modal de confirmação de cancelamento */}
+      {/* Modal de motivo de rejeição (profissionais) */}
+      {/* Modal de observações finais (profissionais) */}
     </div>
   );
 }
