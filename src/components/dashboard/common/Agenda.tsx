@@ -1,5 +1,3 @@
-// viaa/src/components/dashboard/common/Agenda.tsx
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -50,7 +48,7 @@ export default function Agenda({
   usuarioId,
   profissionalId,
   profissionalInfo,
-  modoVisualizacao = "mes",
+  modoVisualizacao: modoInicial = "mes",
   altura = "h-[600px]",
   onConsultaClick,
   onEditarConsulta,
@@ -65,6 +63,8 @@ export default function Agenda({
 }: AgendaSmartProps) {
   // Estados locais
   const [dataAtual, setDataAtual] = useState(new Date());
+  const [modoVisualizacao, setModoVisualizacao] =
+    useState<ModoVisualizacao>(modoInicial);
   const [consultaSelecionada, setConsultaSelecionada] =
     useState<Consulta | null>(null);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
@@ -205,6 +205,76 @@ export default function Agenda({
     setModalAgendamento({ aberto: false });
   };
 
+  // Funções de navegação corrigidas
+  const navegarData = (direcao: "anterior" | "proximo") => {
+    setDataAtual((prev) => {
+      const nova = new Date(prev);
+
+      switch (modoVisualizacao) {
+        case "mes":
+          nova.setMonth(nova.getMonth() + (direcao === "proximo" ? 1 : -1));
+          break;
+        case "semana":
+          nova.setDate(nova.getDate() + (direcao === "proximo" ? 7 : -7));
+          break;
+        case "dia":
+          nova.setDate(nova.getDate() + (direcao === "proximo" ? 1 : -1));
+          break;
+        default:
+          nova.setMonth(nova.getMonth() + (direcao === "proximo" ? 1 : -1));
+      }
+
+      return nova;
+    });
+  };
+
+  // Função para obter texto da data baseado no modo
+  const obterTextoData = () => {
+    switch (modoVisualizacao) {
+      case "mes":
+        return dataAtual.toLocaleDateString("pt-BR", {
+          month: "long",
+          year: "numeric",
+        });
+      case "semana":
+        // Calcular início e fim da semana
+        const inicioSemana = new Date(dataAtual);
+        const diaSemana = inicioSemana.getDay();
+        inicioSemana.setDate(inicioSemana.getDate() - diaSemana);
+
+        const fimSemana = new Date(inicioSemana);
+        fimSemana.setDate(fimSemana.getDate() + 6);
+
+        if (inicioSemana.getMonth() === fimSemana.getMonth()) {
+          return `${inicioSemana.getDate()} - ${fimSemana.getDate()} de ${fimSemana.toLocaleDateString(
+            "pt-BR",
+            { month: "long", year: "numeric" }
+          )}`;
+        } else {
+          return `${inicioSemana.toLocaleDateString("pt-BR", {
+            day: "numeric",
+            month: "short",
+          })} - ${fimSemana.toLocaleDateString("pt-BR", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}`;
+        }
+      case "dia":
+        return dataAtual.toLocaleDateString("pt-BR", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+      default:
+        return dataAtual.toLocaleDateString("pt-BR", {
+          month: "long",
+          year: "numeric",
+        });
+    }
+  };
+
   // Renderizar cabeçalho - ajustado para contexto
   const renderCabecalho = () => (
     <div className="bg-white border-b border-gray-200 p-6">
@@ -292,7 +362,7 @@ export default function Agenda({
             <p className="text-gray-600 text-sm">
               {ehMinhaAgenda && estatisticas && (
                 <>
-                  {estatisticas.consultas_hoje} consultas hoje •
+                  {estatisticas.consultas_hoje} consultas hoje •{" "}
                   {estatisticas.consultas_pendentes_confirmacao} pendentes
                   confirmação
                 </>
@@ -342,29 +412,18 @@ export default function Agenda({
         <div className="flex items-center space-x-4">
           <div className="flex items-center bg-gray-50 rounded-lg p-1">
             <button
-              onClick={() => {
-                const nova = new Date(dataAtual);
-                nova.setMonth(nova.getMonth() - 1);
-                setDataAtual(nova);
-              }}
+              onClick={() => navegarData("anterior")}
               className="p-2 hover:bg-white rounded-md transition-colors"
             >
               <ChevronLeftIcon className="w-4 h-4" />
             </button>
 
             <span className="px-4 py-2 font-semibold text-gray-900 min-w-[200px] text-center">
-              {dataAtual.toLocaleDateString("pt-BR", {
-                month: "long",
-                year: "numeric",
-              })}
+              {obterTextoData()}
             </span>
 
             <button
-              onClick={() => {
-                const nova = new Date(dataAtual);
-                nova.setMonth(nova.getMonth() + 1);
-                setDataAtual(nova);
-              }}
+              onClick={() => navegarData("proximo")}
               className="p-2 hover:bg-white rounded-md transition-colors"
             >
               <ChevronRightIcon className="w-4 h-4" />
@@ -379,35 +438,38 @@ export default function Agenda({
           </button>
         </div>
 
-        {/* Modos de visualização */}
+        {/* Modos de visualização - CORRIGIDO */}
         <div className="flex items-center bg-gray-50 rounded-lg p-1">
           <button
-            onClick={() => {}}
+            onClick={() => setModoVisualizacao("mes")}
             className={`p-2 rounded-md transition-colors ${
               modoVisualizacao === "mes"
                 ? "bg-white text-blue-600 shadow-sm"
                 : "text-gray-600 hover:text-gray-900"
             }`}
+            title="Visualização Mensal"
           >
             <Squares2X2Icon className="w-5 h-5" />
           </button>
           <button
-            onClick={() => {}}
+            onClick={() => setModoVisualizacao("semana")}
             className={`p-2 rounded-md transition-colors ${
               modoVisualizacao === "semana"
                 ? "bg-white text-blue-600 shadow-sm"
                 : "text-gray-600 hover:text-gray-900"
             }`}
+            title="Visualização Semanal"
           >
             <CalendarDaysIcon className="w-5 h-5" />
           </button>
           <button
-            onClick={() => {}}
+            onClick={() => setModoVisualizacao("lista")}
             className={`p-2 rounded-md transition-colors ${
               modoVisualizacao === "lista"
                 ? "bg-white text-blue-600 shadow-sm"
                 : "text-gray-600 hover:text-gray-900"
             }`}
+            title="Visualização em Lista"
           >
             <ListBulletIcon className="w-5 h-5" />
           </button>
@@ -1361,11 +1423,6 @@ export default function Agenda({
         <div className="flex h-full">
           {/* Área principal do calendário */}
           <div className="flex-1 overflow-auto">
-            {/* Debug - indicador do modo atual */}
-            <div className="p-2 bg-yellow-100 text-yellow-800 text-xs font-mono">
-              DEBUG: Modo atual = {modoVisualizacao}
-            </div>
-
             {modoVisualizacao === "mes" && renderCalendarioMensal()}
             {modoVisualizacao === "semana" && renderCalendarioSemanal()}
             {modoVisualizacao === "lista" && renderVisualizacaoLista()}
