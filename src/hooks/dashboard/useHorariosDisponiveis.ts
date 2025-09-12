@@ -1,4 +1,5 @@
 // src/hooks/dashboard/useHorariosDisponiveis.ts
+// VERSÃO CORRIGIDA: Usando UPSERT para evitar conflitos de constraint
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
@@ -51,7 +52,7 @@ export const useHorariosDisponiveis = (
   // Limpar erro
   const clearError = useCallback(() => setError(null), []);
 
-  // Carregar horários do banco
+  // Carregar horários do Supabase
   const carregarHorarios = useCallback(async () => {
     if (!profissionalId) return;
 
@@ -61,41 +62,43 @@ export const useHorariosDisponiveis = (
 
       console.log("🔍 Carregando horários para profissional:", profissionalId);
 
+      // Buscar TODOS os horários (ativos e inativos) para montarmos a configuração completa
       const { data: horariosData, error: queryError } = await supabase
         .from("horarios_disponiveis")
         .select("*")
         .eq("profissional_id", profissionalId)
-        .eq("ativo", true);
+        .order("dia_semana", { ascending: true });
 
       if (queryError) {
         console.error("❌ Erro ao carregar horários:", queryError);
-        throw queryError;
+        throw new Error(`Erro no banco: ${queryError.message}`);
       }
 
       console.log("✅ Horários carregados:", horariosData?.length || 0);
 
-      // Converter dados do banco para formato do componente
-      if (horariosData && horariosData.length > 0) {
-        const novaConfiguracao: ConfiguracaoSemanal = {
-          0: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
-          1: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
-          2: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
-          3: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
-          4: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
-          5: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
-          6: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
-        };
+      // Resetar configuração
+      const novaConfiguracao: ConfiguracaoSemanal = {
+        0: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
+        1: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
+        2: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
+        3: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
+        4: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
+        5: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
+        6: { ativo: false, hora_inicio: "09:00", hora_fim: "17:00" },
+      };
 
+      // Aplicar horários salvos
+      if (horariosData && horariosData.length > 0) {
         horariosData.forEach((horario: HorarioDisponivel) => {
           novaConfiguracao[horario.dia_semana] = {
-            ativo: true,
+            ativo: horario.ativo,
             hora_inicio: horario.hora_inicio,
             hora_fim: horario.hora_fim,
           };
         });
-
-        setConfiguracao(novaConfiguracao);
       }
+
+      setConfiguracao(novaConfiguracao);
     } catch (err: any) {
       const mensagem = err.message || "Erro ao carregar horários disponíveis";
       setError(mensagem);
@@ -126,18 +129,27 @@ export const useHorariosDisponiveis = (
             parseInt(dia.hora_fim.split(":")[0]) * 60 +
             parseInt(dia.hora_fim.split(":")[1]);
 
+          const nomeDia =
+            {
+              "0": "Domingo",
+              "1": "Segunda-feira",
+              "2": "Terça-feira",
+              "3": "Quarta-feira",
+              "4": "Quinta-feira",
+              "5": "Sexta-feira",
+              "6": "Sábado",
+            }[diaId] || `Dia ${diaId}`;
+
           if (fimMinutos <= inicioMinutos) {
-            erros.push(`Dia ${diaId}: Horário de fim deve ser após o início`);
+            erros.push(`${nomeDia}: Horário de fim deve ser após o início`);
           }
 
           if (fimMinutos - inicioMinutos < 60) {
-            erros.push(`Dia ${diaId}: Mínimo de 1 hora de trabalho`);
+            erros.push(`${nomeDia}: Mínimo de 1 hora de trabalho`);
           }
 
           if (inicioMinutos < 6 * 60 || fimMinutos > 23 * 60) {
-            erros.push(
-              `Dia ${diaId}: Horários devem estar entre 06:00 e 23:00`
-            );
+            erros.push(`${nomeDia}: Horários devem estar entre 06:00 e 23:00`);
           }
         }
       });
@@ -147,7 +159,7 @@ export const useHorariosDisponiveis = (
     []
   );
 
-  // Salvar horários no banco
+  // Salvar horários usando UPSERT
   const salvarHorarios = useCallback(
     async (config: ConfiguracaoSemanal): Promise<boolean> => {
       if (!profissionalId) {
@@ -168,45 +180,34 @@ export const useHorariosDisponiveis = (
 
         console.log("💾 Salvando horários para profissional:", profissionalId);
 
-        // Primeiro, desativar todos os horários existentes
-        const { error: updateError } = await supabase
+        // Preparar TODOS os horários (ativos e inativos) para UPSERT
+        const horariosParaUpsert = Object.entries(config).map(
+          ([diaId, dia]) => ({
+            profissional_id: profissionalId,
+            dia_semana: parseInt(diaId),
+            hora_inicio: dia.hora_inicio,
+            hora_fim: dia.hora_fim,
+            ativo: dia.ativo,
+          })
+        );
+
+        console.log(
+          "📤 Fazendo UPSERT de",
+          horariosParaUpsert.length,
+          "horários"
+        );
+
+        // UPSERT: Insere se não existe, atualiza se existe
+        const { error: upsertError } = await supabase
           .from("horarios_disponiveis")
-          .update({ ativo: false })
-          .eq("profissional_id", profissionalId);
+          .upsert(horariosParaUpsert, {
+            onConflict: "profissional_id,dia_semana,hora_inicio,hora_fim",
+            ignoreDuplicates: false,
+          });
 
-        if (updateError) {
-          console.error(
-            "❌ Erro ao desativar horários existentes:",
-            updateError
-          );
-          throw updateError;
-        }
-
-        // Preparar dados para inserção
-        const horariosParaInserir: CriarHorarioDisponivel[] = [];
-
-        Object.entries(config).forEach(([diaId, dia]) => {
-          if (dia.ativo) {
-            horariosParaInserir.push({
-              profissional_id: profissionalId,
-              dia_semana: parseInt(diaId),
-              hora_inicio: dia.hora_inicio,
-              hora_fim: dia.hora_fim,
-              ativo: true,
-            });
-          }
-        });
-
-        // Inserir novos horários
-        if (horariosParaInserir.length > 0) {
-          const { error: insertError } = await supabase
-            .from("horarios_disponiveis")
-            .insert(horariosParaInserir);
-
-          if (insertError) {
-            console.error("❌ Erro ao inserir novos horários:", insertError);
-            throw insertError;
-          }
+        if (upsertError) {
+          console.error("❌ Erro no UPSERT:", upsertError);
+          throw new Error(`Erro ao salvar: ${upsertError.message}`);
         }
 
         console.log("✅ Horários salvos com sucesso!");
