@@ -1,12 +1,12 @@
-// src/components/public/agenda/PublicAgenda.tsx
-// Container para agendamento público (pacientes e outros profissionais)
+// src/components/dashboard/patient/agenda/PatientAgenda.tsx
+// Container para agendamento (pacientes e outros profissionais)
 
 "use client";
 
 import { useState } from "react";
 import { useHorariosDisponiveis } from "@/hooks/dashboard/useHorariosDisponiveis";
-import AgendaCalendar from "@/components/common/agenda/AgendaCalendar";
-import PublicAgendaHeader from "./PublicAgendaHeader";
+import AgendaCalendar from "../../common/agenda/AgendaCalendar";
+import PatientAgendaHeader from "./PatientAgendaHeader";
 import type { Consulta, ModoVisualizacao } from "@/types/agenda";
 
 interface ProfissionalInfo {
@@ -19,7 +19,7 @@ interface ProfissionalInfo {
   verificado?: boolean;
 }
 
-interface PublicAgendaProps {
+interface PatientAgendaProps {
   profissionalId: string;
   profissionalInfo: ProfissionalInfo;
   usuarioId: string;
@@ -27,13 +27,13 @@ interface PublicAgendaProps {
   className?: string;
 }
 
-export default function PublicAgenda({
+export default function PatientAgenda({
   profissionalId,
   profissionalInfo,
   usuarioId,
   tipoUsuario,
   className = "",
-}: PublicAgendaProps) {
+}: PatientAgendaProps) {
   // Estados locais
   const [dataAtual, setDataAtual] = useState(new Date());
   const [modoVisualizacao, setModoVisualizacao] =
@@ -75,7 +75,7 @@ export default function PublicAgenda({
       updated_at: new Date().toISOString(),
     }));
 
-  // Handlers específicos para agendamento público
+  // Handlers específicos para agendamento
   const handleDiaClick = (data: Date) => {
     // Verificar se o dia tem horários disponíveis
     const diaSemana = data.getDay();
@@ -128,8 +128,8 @@ export default function PublicAgenda({
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Header específico para agendamento público */}
-      <PublicAgendaHeader
+      {/* Header específico para agendamento */}
+      <PatientAgendaHeader
         profissionalInfo={profissionalInfo}
         temHorariosConfigurados={temHorariosConfigurados()}
         tipoUsuario={tipoUsuario}
@@ -147,7 +147,7 @@ export default function PublicAgenda({
         mostrarIndicadores={{
           horariosDisponiveis: true,
           consultas: true,
-          diasInativos: false, // Não mostrar dias inativos para agendamento público
+          diasInativos: false, // Não mostrar dias inativos para agendamento
         }}
         onDiaClick={handleDiaClick}
         onConsultaClick={handleConsultaClick}

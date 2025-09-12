@@ -1,5 +1,5 @@
 // src/app/dashboard/agenda/page.tsx
-// VERSÃO ATUALIZADA: Usando o novo container ProfessionalAgenda
+// VERSÃO FINAL: Usando o novo container ProfessionalAgenda
 
 "use client";
 import { useState } from "react";

@@ -1,5 +1,5 @@
 // src/components/dashboard/professional/agenda/ProfessionalAgendaHeader.tsx
-// Header específico para agenda de profissionais
+// Header específico para agenda de profissionais - CARDS CORRIGIDOS
 
 "use client";
 
@@ -153,29 +153,29 @@ export default function ProfessionalAgendaHeader({
         )}
       </div>
 
-      {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
+      {/* Estatísticas - CARDS MENORES */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold mb-2">Consultas Hoje</h3>
-              <p className="text-3xl font-bold">{consultasHoje}</p>
+              <h3 className="text-sm font-semibold mb-1">Consultas Hoje</h3>
+              <p className="text-2xl font-bold">{consultasHoje}</p>
             </div>
-            <div className="bg-white/20 p-3 rounded-lg">
-              <CalendarIcon className="w-6 h-6" />
+            <div className="bg-white/20 p-2 rounded-lg">
+              <CalendarIcon className="w-5 h-5" />
             </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl p-6 text-white">
+        <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg p-4 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold mb-2">Pendentes</h3>
-              <p className="text-3xl font-bold">{consultasPendentes}</p>
+              <h3 className="text-sm font-semibold mb-1">Pendentes</h3>
+              <p className="text-2xl font-bold">{consultasPendentes}</p>
             </div>
-            <div className="bg-white/20 p-3 rounded-lg">
+            <div className="bg-white/20 p-2 rounded-lg">
               <svg
-                className="w-6 h-6"
+                className="w-5 h-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -191,15 +191,15 @@ export default function ProfessionalAgendaHeader({
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-rose-500 to-rose-600 rounded-xl p-6 text-white">
+        <div className="bg-gradient-to-r from-rose-500 to-rose-600 rounded-lg p-4 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold mb-2">Receita Mês</h3>
-              <p className="text-3xl font-bold">R$ 2.840</p>
+              <h3 className="text-sm font-semibold mb-1">Receita Mês</h3>
+              <p className="text-2xl font-bold">R$ 2.840</p>
             </div>
-            <div className="bg-white/20 p-3 rounded-lg">
+            <div className="bg-white/20 p-2 rounded-lg">
               <svg
-                className="w-6 h-6"
+                className="w-5 h-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -215,15 +215,15 @@ export default function ProfessionalAgendaHeader({
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-amber-500 to-amber-600 rounded-xl p-6 text-white">
+        <div className="bg-gradient-to-r from-amber-500 to-amber-600 rounded-lg p-4 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold mb-2">Taxa Presença</h3>
-              <p className="text-3xl font-bold">94%</p>
+              <h3 className="text-sm font-semibold mb-1">Taxa Presença</h3>
+              <p className="text-2xl font-bold">94%</p>
             </div>
-            <div className="bg-white/20 p-3 rounded-lg">
+            <div className="bg-white/20 p-2 rounded-lg">
               <svg
-                className="w-6 h-6"
+                className="w-5 h-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

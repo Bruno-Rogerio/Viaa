@@ -1,5 +1,5 @@
-// src/components/public/agenda/PublicAgendaHeader.tsx
-// Header específico para agendamento público
+// src/components/dashboard/patient/agenda/PatientAgendaHeader.tsx
+// Header específico para agendamento (pacientes e profissionais agendando com outros)
 
 "use client";
 
@@ -20,19 +20,19 @@ interface ProfissionalInfo {
   verificado?: boolean;
 }
 
-interface PublicAgendaHeaderProps {
+interface PatientAgendaHeaderProps {
   profissionalInfo: ProfissionalInfo;
   temHorariosConfigurados: boolean;
   tipoUsuario: "paciente" | "profissional";
   loadingHorarios: boolean;
 }
 
-export default function PublicAgendaHeader({
+export default function PatientAgendaHeader({
   profissionalInfo,
   temHorariosConfigurados,
   tipoUsuario,
   loadingHorarios,
-}: PublicAgendaHeaderProps) {
+}: PatientAgendaHeaderProps) {
   return (
     <>
       {/* Header principal com informações do profissional */}

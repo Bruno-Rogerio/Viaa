@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import { useHorariosDisponiveis } from "@/hooks/dashboard/useHorariosDisponiveis";
-import AgendaCalendar from "@/components/common/agenda/AgendaCalendar";
+import AgendaCalendar from "../../common/agenda/AgendaCalendar";
 import ProfessionalAgendaHeader from "./ProfessionalAgendaHeader";
 import type { Consulta, ModoVisualizacao } from "@/types/agenda";
 

@@ -1,10 +1,10 @@
 // src/app/dashboard/profissionais/[id]/agendar/page.tsx
-// VERSÃO ATUALIZADA: Usando o novo container PublicAgenda
+// VERSÃO FINAL: Usando o novo container PatientAgenda
 
 "use client";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import PublicAgenda from "@/components/public/agenda/PublicAgenda";
+import PatientAgenda from "@/components/dashboard/patient/agenda/PatientAgenda";
 
 interface AgendarProfissionalProps {
   params: {
@@ -124,8 +124,8 @@ export default function AgendarProfissional({
         </span>
       </div>
 
-      {/* Container específico para agendamento público */}
-      <PublicAgenda
+      {/* Container específico para agendamento */}
+      <PatientAgenda
         profissionalId={params.id}
         profissionalInfo={profissionalInfo}
         usuarioId={user.id}
