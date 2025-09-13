@@ -83,11 +83,9 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     }
 
     try {
-      // CORRIGIDO: URL hardcoded para produção
-      const isProduction = process.env.NODE_ENV === "production";
-      const baseUrl = isProduction
-        ? "https://viaa-git-main-brunos-projects-6a73c557.vercel.app"
-        : window.location.origin;
+      // CORRIGIDO: Usar variável de ambiente
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
 
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -96,8 +94,8 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
           data: {
             tipo_usuario: tipoUsuario,
           },
-          // CORREÇÃO: URL sempre apontando para produção quando necessário
-          emailRedirectTo: `${baseUrl}/auth/callback?type=${tipoUsuario}`,
+          // CORREÇÃO: URL sempre correta
+          emailRedirectTo: `${siteUrl}/auth/callback?type=${tipoUsuario}`,
         },
       });
 
@@ -105,9 +103,10 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
 
       console.log("=== DEBUG CADASTRO ===");
       console.log("Tipo selecionado:", tipoUsuario);
+      console.log("Site URL:", siteUrl);
       console.log(
         "Email redirect URL:",
-        `${window.location.origin}/auth/callback?type=${tipoUsuario}`
+        `${siteUrl}/auth/callback?type=${tipoUsuario}`
       );
       console.log("Data retornada:", authData);
       console.log("User metadata:", authData.user?.user_metadata);
@@ -118,7 +117,6 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
       );
       onSuccess?.();
 
-      // Salvar dados para recuperação posterior
       localStorage.setItem("signup_user_type", tipoUsuario || "");
       localStorage.setItem("signup_email", email);
     } catch (error: unknown) {
