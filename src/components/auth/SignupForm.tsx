@@ -1,9 +1,8 @@
-// viaa\src\components\auth\SignupForm.tsx
+// src/components/auth/SignupForm.tsx - VERSÃO COMPLETA CORRIGIDA
 
 "use client";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface SignupFormProps {
@@ -20,7 +19,6 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const router = useRouter();
 
   const userTypes = [
     {
@@ -85,17 +83,21 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     }
 
     try {
-      // 1. Cadastrar usuário no Supabase Auth
+      // CORRIGIDO: URL hardcoded para produção
+      const isProduction = process.env.NODE_ENV === "production";
+      const baseUrl = isProduction
+        ? "https://viaa-git-main-brunos-projects-6a73c557.vercel.app"
+        : window.location.origin;
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            tipo_usuario: tipoUsuario, // Armazena o tipo de usuário nos metadados do Auth
+            tipo_usuario: tipoUsuario,
           },
-          // ESSENCIAL: URL para onde o usuário será redirecionado após clicar no link de confirmação do email.
-          // A página /auth/confirm usará o 'type' para saber qual perfil criar.
-          emailRedirectTo: `${window.location.origin}/auth/confirm?type=${tipoUsuario}`,
+          // CORREÇÃO: URL sempre apontando para produção quando necessário
+          emailRedirectTo: `${baseUrl}/auth/callback?type=${tipoUsuario}`,
         },
       });
 
@@ -103,24 +105,27 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
 
       console.log("=== DEBUG CADASTRO ===");
       console.log("Tipo selecionado:", tipoUsuario);
+      console.log(
+        "Email redirect URL:",
+        `${window.location.origin}/auth/callback?type=${tipoUsuario}`
+      );
       console.log("Data retornada:", authData);
       console.log("User metadata:", authData.user?.user_metadata);
       console.log("====================");
 
-      // Após o cadastro, o usuário SEMPRE precisa verificar o e-mail.
-      // Não há redirecionamento imediato para onboarding a partir deste formulário.
       setSuccess(
         "🎉 Conta criada com sucesso! Verifique seu email e clique no link de confirmação para ativar sua conta."
       );
-      onSuccess?.(); // Chama o callback se fornecido, útil para fechar modais, etc.
+      onSuccess?.();
 
-      // Armazenar o tipo de usuário e email em localStorage pode ser útil para a página /auth/confirm
-      // caso ela precise dessas informações logo de cara (embora a URL já passe o tipo).
+      // Salvar dados para recuperação posterior
       localStorage.setItem("signup_user_type", tipoUsuario || "");
       localStorage.setItem("signup_email", email);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro no signup:", error);
-      setError(error.message || "Erro ao criar conta.");
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro ao criar conta.";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
