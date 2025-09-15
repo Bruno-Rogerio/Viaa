@@ -1,4 +1,5 @@
-// viaa\src\hooks\dashboard\useFeed.ts
+// src/hooks/dashboard/useFeed.ts
+// 🔧 CORREÇÃO CRÍTICA: Validação de author null
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
@@ -82,12 +83,60 @@ export const useFeed = (
     [filters, user]
   );
 
+  // 🔧 FUNÇÃO DE VALIDAÇÃO DE DADOS
+  const validateAndTransformPost = (item: any): Post | null => {
+    try {
+      // 🔥 VALIDAÇÃO CRÍTICA: Verificar se author existe
+      if (!item.author) {
+        console.warn(`⚠️ Post ${item.id} sem author - ignorando`);
+        return null;
+      }
+
+      // 🔥 VALIDAÇÃO: Verificar campos obrigatórios do author
+      if (!item.author.id || !item.author.nome) {
+        console.warn(`⚠️ Post ${item.id} com author inválido:`, item.author);
+        return null;
+      }
+
+      // ✅ TRANSFORMAÇÃO SEGURA
+      return {
+        id: item.id,
+        profissional_id: item.profissional_id,
+        content: item.content || "",
+        image_url: item.image_url,
+        video_url: item.video_url,
+        type: item.type || "text",
+        likes_count: item.likes_count || 0,
+        comments_count: item.comments_count || 0,
+        shares_count: item.shares_count || 0,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        is_active: item.is_active,
+        author: {
+          id: item.author.id,
+          nome: item.author.nome,
+          sobrenome: item.author.sobrenome || "",
+          especialidades: item.author.especialidades || "Profissional",
+          foto_perfil_url: item.author.foto_perfil_url,
+          verificado: item.author.verificado || false,
+        },
+        is_liked: item.user_like && item.user_like.length > 0,
+        user_like_id: item.user_like?.[0]?.id,
+      };
+    } catch (err) {
+      console.error(`❌ Erro ao transformar post ${item.id}:`, err);
+      return null;
+    }
+  };
+
   // Carregar posts
   const loadPosts = useCallback(
     async (page: number = 1, reset: boolean = true) => {
       try {
         setLoading(true);
         setError(null);
+
+        console.log(`🔍 Carregando posts - Página ${page}`);
 
         const query = buildPostsQuery(page, pagination.limit);
         const { data, error: queryError, count } = await query;
@@ -101,31 +150,25 @@ export const useFeed = (
           return;
         }
 
-        // Transformar dados para o formato esperado
-        const transformedPosts: Post[] = data.map((item: any) => ({
-          id: item.id,
-          profissional_id: item.profissional_id,
-          content: item.content,
-          image_url: item.image_url,
-          video_url: item.video_url,
-          type: item.type,
-          likes_count: item.likes_count,
-          comments_count: item.comments_count,
-          shares_count: item.shares_count,
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-          is_active: item.is_active,
-          author: {
-            id: item.author.id,
-            nome: item.author.nome,
-            sobrenome: item.author.sobrenome,
-            especialidades: item.author.especialidades,
-            foto_perfil_url: item.author.foto_perfil_url,
-            verificado: item.author.verificado,
-          },
-          is_liked: item.user_like && item.user_like.length > 0,
-          user_like_id: item.user_like?.[0]?.id,
-        }));
+        console.log(`📊 Posts recebidos do Supabase: ${data.length}`);
+
+        // 🔧 TRANSFORMAÇÃO SEGURA COM FILTRO
+        const transformedPosts: Post[] = data
+          .map(validateAndTransformPost)
+          .filter((post): post is Post => post !== null); // Remove posts null
+
+        console.log(
+          `✅ Posts válidos transformados: ${transformedPosts.length}`
+        );
+
+        // Log de posts inválidos para debug
+        if (data.length !== transformedPosts.length) {
+          console.warn(
+            `⚠️ ${
+              data.length - transformedPosts.length
+            } posts foram ignorados por dados inválidos`
+          );
+        }
 
         if (reset) {
           setPosts(transformedPosts);
@@ -140,7 +183,7 @@ export const useFeed = (
           has_more: transformedPosts.length === pagination.limit,
         }));
       } catch (err: any) {
-        console.error("Erro ao carregar posts:", err);
+        console.error("❌ Erro ao carregar posts:", err);
         setError(err.message || "Erro ao carregar posts");
       } finally {
         setLoading(false);
@@ -194,41 +237,23 @@ export const useFeed = (
           throw new Error("Erro ao criar post");
         }
 
-        // Adicionar o novo post no início da lista
-        const transformedPost: Post = {
-          id: newPost.id,
-          profissional_id: newPost.profissional_id,
-          content: newPost.content,
-          image_url: newPost.image_url,
-          video_url: newPost.video_url,
-          type: newPost.type,
-          likes_count: 0,
-          comments_count: 0,
-          shares_count: 0,
-          created_at: newPost.created_at,
-          updated_at: newPost.updated_at,
-          is_active: newPost.is_active,
-          author: {
-            id: newPost.author.id,
-            nome: newPost.author.nome,
-            sobrenome: newPost.author.sobrenome,
-            especialidades: newPost.author.especialidades,
-            foto_perfil_url: newPost.author.foto_perfil_url,
-            verificado: newPost.author.verificado,
-          },
-          is_liked: false,
-          user_like_id: undefined,
-        };
+        // 🔧 VALIDAÇÃO SEGURA PARA NOVO POST
+        const transformedPost = validateAndTransformPost(newPost);
 
+        if (!transformedPost) {
+          throw new Error("Post criado com dados inválidos");
+        }
+
+        console.log("✅ Novo post criado e adicionado ao feed");
         setPosts((prev) => [transformedPost, ...prev]);
         return true;
       } catch (err: any) {
-        console.error("Erro ao criar post:", err);
+        console.error("❌ Erro ao criar post:", err);
         setError(err.message || "Erro ao criar post");
         return false;
       }
     },
-    [user]
+    [user, validateAndTransformPost]
   );
 
   // Curtir post
@@ -273,7 +298,7 @@ export const useFeed = (
 
         return true;
       } catch (err: any) {
-        console.error("Erro ao curtir post:", err);
+        console.error("❌ Erro ao curtir post:", err);
         setError(err.message || "Erro ao curtir post");
         return false;
       }
@@ -318,7 +343,7 @@ export const useFeed = (
 
         return true;
       } catch (err: any) {
-        console.error("Erro ao descurtir post:", err);
+        console.error("❌ Erro ao descurtir post:", err);
         setError(err.message || "Erro ao descurtir post");
         return false;
       }
