@@ -1,5 +1,5 @@
 // src/app/dashboard/perfil/page.tsx
-// 🔧 VERSÃO ATUALIZADA - Usando ProfileHeader mobile-friendly
+// 🔧 CORREÇÃO SIMPLES - Apenas converter os dados na hora de passar para o componente
 
 "use client";
 
@@ -33,7 +33,7 @@ export default function PerfilPage() {
     const success = await saveProfile();
     if (success) {
       setShowSaveConfirm(false);
-      setActiveTab("preview"); // Voltar para preview após salvar
+      setActiveTab("preview");
     }
   };
 
@@ -91,9 +91,46 @@ export default function PerfilPage() {
     );
   }
 
+  // ✅ FUNÇÃO COMPLETA DE CONVERSÃO - Garantir que todos os campos opcionais tenham valores padrão
+  const convertProfileForPreview = (profile: typeof profileData) => {
+    return {
+      ...profile,
+      // Campos obrigatórios que podem vir como undefined do banco
+      email: profile.email || "",
+      data_nascimento: profile.data_nascimento || "",
+
+      // Outros campos opcionais que podem precisar de valores padrão
+      endereco_cep: profile.endereco_cep || "",
+      endereco_logradouro: profile.endereco_logradouro || "",
+      endereco_numero: profile.endereco_numero || "",
+      endereco_complemento: profile.endereco_complemento || "",
+      endereco_bairro: profile.endereco_bairro || "",
+      endereco_cidade: profile.endereco_cidade || "",
+      endereco_estado: profile.endereco_estado || "",
+
+      especialidades: profile.especialidades || "",
+      crp: profile.crp || "",
+      registro_profissional: profile.registro_profissional || "",
+      valor_sessao: profile.valor_sessao || 0,
+      formacao_principal: profile.formacao_principal || "",
+      experiencia_anos: profile.experiencia_anos || 0,
+      abordagem_terapeutica: profile.abordagem_terapeutica || "",
+      bio_profissional: profile.bio_profissional || "",
+
+      foto_perfil_url: profile.foto_perfil_url || "",
+      link_linkedin: profile.link_linkedin || "",
+      link_instagram: profile.link_instagram || "",
+      link_youtube: profile.link_youtube || "",
+      site_pessoal: profile.site_pessoal || "",
+
+      conselho_tipo: profile.conselho_tipo || "",
+      conselho_numero: profile.conselho_numero || "",
+    };
+  };
+
   return (
     <div className="mobile-safe-container space-y-6">
-      {/* 🔧 USAR O NOVO PROFILEHEADER */}
+      {/* Header */}
       <ProfileHeader
         isEditing={isEditing}
         activeTab={activeTab}
@@ -105,11 +142,14 @@ export default function PerfilPage() {
         onChangeTab={handleChangeTab}
       />
 
-      {/* 🔧 CONTEÚDO RESPONSIVO */}
+      {/* Conteúdo */}
       <div className="space-y-6">
         {activeTab === "preview" && (
           <div className="card-mobile">
-            <ProfilePreview profileData={profileData} />
+            {/* ✅ CORREÇÃO: Usar função de conversão simples */}
+            <ProfilePreview
+              profileData={convertProfileForPreview(profileData)}
+            />
           </div>
         )}
 
@@ -126,7 +166,7 @@ export default function PerfilPage() {
         )}
       </div>
 
-      {/* 🔧 MODAL DE CONFIRMAÇÃO DE SALVAMENTO */}
+      {/* Modal de confirmação */}
       {showSaveConfirm && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -160,24 +200,12 @@ export default function PerfilPage() {
                 <button
                   type="button"
                   onClick={() => setShowSaveConfirm(false)}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   Cancelar
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* 🔧 TOAST DE SUCESSO/ERRO */}
-      {saving && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-4 flex items-center space-x-3">
-            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-sm font-medium text-gray-900">
-              Salvando alterações...
-            </span>
           </div>
         </div>
       )}

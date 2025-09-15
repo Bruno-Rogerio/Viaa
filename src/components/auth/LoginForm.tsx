@@ -1,4 +1,4 @@
-// viaa\src\components\auth\LoginForm.tsx
+// src/components/auth/LoginForm.tsx - VERSÃO CORRIGIDA
 
 "use client";
 import { useState } from "react";
@@ -8,6 +8,12 @@ import Link from "next/link";
 
 interface LoginFormProps {
   onSuccess?: () => void;
+}
+
+interface DatabaseError {
+  message: string;
+  code?: string;
+  details?: string;
 }
 
 export default function LoginForm({ onSuccess }: LoginFormProps) {
@@ -31,7 +37,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       );
 
       if (authError) {
-        throw authError; // Lançar erros de autenticação
+        throw authError;
       }
 
       if (data.user) {
@@ -47,7 +53,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
         }
 
         let temPerfil = false;
-        let perfilCheckError: any = null; // Para armazenar erros da verificação de perfil
+        let perfilCheckError: DatabaseError | null = null;
 
         try {
           switch (tipoUsuario) {
@@ -91,39 +97,47 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
               perfilCheckError = empresaError;
               temPerfil = !!perfilEmpresa;
               break;
+            default:
+              console.log("Tipo usuário desconhecido:", tipoUsuario);
           }
-        } catch (e: any) {
-          // Este catch pegará erros lançados por .single() (como o 406)
-          perfilCheckError = e;
-          console.error("Erro inesperado durante a verificação do perfil:", e);
-          temPerfil = false; // Se houve um erro, consideramos que o perfil não está completo
-        }
 
-        // Se houver um erro na verificação do perfil (ex: 406 ou PGRST116), registre-o
-        if (perfilCheckError) {
-          console.error(
-            "Detalhes do erro na verificação de perfil:",
-            perfilCheckError
-          );
-          // Se o erro for 'PGRST116' (no rows found), temPerfil já será false, o que é o esperado.
-          // Se for um 406, também significa que o perfil não foi encontrado ou acessível.
-        }
+          console.log("Tem perfil:", temPerfil);
+          console.log("Erro ao verificar perfil:", perfilCheckError);
 
-        console.log("Tem perfil completo:", temPerfil);
-        if (!temPerfil) {
-          console.log("Redirecionando para onboarding - sem perfil");
-          onSuccess?.();
-          router.push("/onboarding");
-          return;
+          if (temPerfil) {
+            console.log("Perfil encontrado - redirecionando para dashboard");
+            onSuccess?.();
+            router.push(`/dashboard`);
+          } else {
+            console.log(
+              "Perfil não encontrado - redirecionando para onboarding"
+            );
+            onSuccess?.();
+            router.push("/onboarding");
+          }
+        } catch (profileError) {
+          console.error("Erro ao verificar perfil:", profileError);
+          const errorMessage =
+            profileError instanceof Error
+              ? profileError.message
+              : "Erro ao verificar perfil do usuário.";
+          setError(errorMessage);
         }
-
-        console.log("Redirecionando para dashboard - tudo completo");
-        onSuccess?.();
-        router.push("/dashboard");
       }
-    } catch (error: any) {
-      console.error("Erro no login ou verificação de perfil:", error);
-      setError(error.message || "Erro ao fazer login ou verificar perfil.");
+    } catch (authError) {
+      console.error("Erro de autenticação:", authError);
+      const errorMessage =
+        authError instanceof Error ? authError.message : "Erro ao fazer login.";
+
+      if (errorMessage.includes("Invalid login credentials")) {
+        setError("Email ou senha incorretos.");
+      } else if (errorMessage.includes("Email not confirmed")) {
+        setError(
+          "Por favor, verifique seu email e clique no link de confirmação antes de fazer login."
+        );
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -131,64 +145,82 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <form onSubmit={handleLogin} className="space-y-6">
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="seu@email.com"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Senha
-          </label>
-          <input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="••••••••"
-          />
-        </div>
-        {error && (
-          <div className="text-red-600 text-sm bg-red-50 p-3 rounded-md">
-            {error}
+      <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+        <form onSubmit={handleLogin} className="space-y-6">
+          {/* Email */}
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
+              placeholder="seu@email.com"
+            />
           </div>
-        )}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? "Entrando..." : "Entrar"}
-        </button>
-      </form>
-      <div className="mt-6 text-center">
-        <p className="text-sm text-gray-600">
-          Não tem uma conta?{" "}
-          <Link
-            href="/signup"
-            className="font-medium text-blue-600 hover:text-blue-500"
+
+          {/* Senha */}
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Senha
+            </label>
+            <input
+              id="password"
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
+              placeholder="Sua senha"
+            />
+          </div>
+
+          {/* Erro */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl"
           >
-            Cadastre-se
-          </Link>
-        </p>
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                Entrando...
+              </div>
+            ) : (
+              "Entrar"
+            )}
+          </button>
+        </form>
+
+        {/* Link para cadastro */}
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-600">
+            Não tem uma conta?{" "}
+            <Link
+              href="/cadastro"
+              className="font-semibold text-transparent bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
+            >
+              Criar conta
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
