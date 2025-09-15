@@ -1,4 +1,5 @@
-// src/components/auth/SignupForm.tsx - CORREÇÃO DO REDIRECIONAMENTO
+// src/components/auth/SignupForm.tsx
+// 🚀 VERSÃO PRODUÇÃO - ZERO LOCALHOST
 
 "use client";
 import { useState } from "react";
@@ -61,20 +62,30 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     },
   ];
 
-  // 🔧 FUNÇÃO PARA OBTER URL BASE CORRETA
-  const getBaseUrl = (): string => {
-    // 1. PRIORIDADE: Variável de ambiente (produção)
-    if (process.env.NEXT_PUBLIC_SITE_URL) {
-      return process.env.NEXT_PUBLIC_SITE_URL;
+  // 🎯 FUNÇÃO QUE **NUNCA** USA LOCALHOST
+  const getProductionUrl = (): string => {
+    // ❌ REMOVIDO: window.location.origin (pode ser localhost)
+    // ❌ REMOVIDO: Qualquer referência a localhost
+
+    // ✅ APENAS: URL de produção obrigatória
+    const productionUrl = process.env.NEXT_PUBLIC_SITE_URL;
+
+    if (!productionUrl) {
+      console.error("❌ NEXT_PUBLIC_SITE_URL não configurada!");
+      // 🔴 Fallback hardcoded para sua URL do Vercel (SUBSTITUA AQUI)
+      return "https://viaa-git-main-brunos-projects-6a73c557.vercel.app"; // 👈 SUBSTITUA pela sua URL
     }
 
-    // 2. FALLBACK: window.location.origin (desenvolvimento)
-    if (typeof window !== "undefined") {
-      return window.location.origin;
+    // Garantir que não seja localhost
+    if (
+      productionUrl.includes("localhost") ||
+      productionUrl.includes("127.0.0.1")
+    ) {
+      console.error("❌ URL de produção não pode ser localhost!");
+      return "https://viaa-git-main-brunos-projects-6a73c557.vercel.app"; // 👈 SUBSTITUA pela sua URL
     }
 
-    // 3. ÚLTIMO RECURSO: localhost (não deveria acontecer)
-    return "http://localhost:3000";
+    return productionUrl;
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -101,15 +112,15 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     }
 
     try {
-      // 🎯 URL CORRIGIDA - Agora usa a função que prioriza variável de ambiente
-      const baseUrl = getBaseUrl();
+      // 🚀 URL DE PRODUÇÃO GARANTIDA (ZERO LOCALHOST)
+      const baseUrl = getProductionUrl();
       const redirectUrl = `${baseUrl}/auth/confirm?type=${tipoUsuario}`;
 
-      console.log("=== DEBUG SIGNUP ===");
-      console.log("Base URL:", baseUrl);
-      console.log("Redirect URL:", redirectUrl);
-      console.log("Tipo usuário:", tipoUsuario);
-      console.log("===================");
+      console.log("=== PRODUÇÃO APENAS ===");
+      console.log("🚀 Base URL:", baseUrl);
+      console.log("🚀 Redirect URL:", redirectUrl);
+      console.log("🚀 Tipo usuário:", tipoUsuario);
+      console.log("======================");
 
       // 1. Cadastrar usuário no Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -117,33 +128,35 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
         password,
         options: {
           data: {
-            tipo_usuario: tipoUsuario, // Armazena o tipo de usuário nos metadados do Auth
+            tipo_usuario: tipoUsuario,
           },
-          // 🔧 CORREÇÃO PRINCIPAL: URL dinâmica baseada no ambiente
+          // 🎯 GARANTIDO: Sempre URL de produção
           emailRedirectTo: redirectUrl,
         },
       });
 
       if (authError) throw authError;
 
-      console.log("=== DEBUG CADASTRO ===");
-      console.log("Data retornada:", authData);
-      console.log("User metadata:", authData.user?.user_metadata);
-      console.log("Email redirect configurado para:", redirectUrl);
-      console.log("====================");
+      console.log("=== SIGNUP REALIZADO ===");
+      console.log("✅ User criado:", authData.user?.id);
+      console.log("✅ Email redirect:", redirectUrl);
+      console.log(
+        "✅ Tipo no metadata:",
+        authData.user?.user_metadata?.tipo_usuario
+      );
+      console.log("========================");
 
-      // Após o cadastro, o usuário SEMPRE precisa verificar o e-mail.
       setSuccess(
         "🎉 Conta criada com sucesso! Verifique seu email e clique no link de confirmação para ativar sua conta."
       );
-      onSuccess?.(); // Chama o callback se fornecido
+      onSuccess?.();
 
-      // Armazenar informações úteis para a página de confirmação
+      // Armazenar informações para debug
       localStorage.setItem("signup_user_type", tipoUsuario);
       localStorage.setItem("signup_email", email);
-      localStorage.setItem("signup_redirect_url", redirectUrl); // Para debug
+      localStorage.setItem("production_url_used", redirectUrl);
     } catch (error: any) {
-      console.error("Erro no signup:", error);
+      console.error("❌ Erro no signup:", error);
       setError(error.message || "Erro ao criar conta.");
     } finally {
       setLoading(false);
@@ -245,6 +258,12 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               placeholder="Repita sua senha"
             />
+          </div>
+
+          {/* Debug Info (temporário) */}
+          <div className="bg-blue-50 border border-blue-200 p-3 rounded-xl text-xs">
+            <p className="font-medium text-blue-800">🚀 Modo Produção Ativo</p>
+            <p className="text-blue-600">URL base: {getProductionUrl()}</p>
           </div>
 
           {/* Mensagens de erro/sucesso */}
