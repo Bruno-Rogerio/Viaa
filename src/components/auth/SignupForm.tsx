@@ -1,8 +1,9 @@
-// src/components/auth/SignupForm.tsx - VERSÃO COMPLETA CORRIGIDA
+// src/components/auth/SignupForm.tsx - CORREÇÃO DO REDIRECIONAMENTO
 
 "use client";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface SignupFormProps {
@@ -19,6 +20,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const router = useRouter();
 
   const userTypes = [
     {
@@ -59,6 +61,22 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     },
   ];
 
+  // 🔧 FUNÇÃO PARA OBTER URL BASE CORRETA
+  const getBaseUrl = (): string => {
+    // 1. PRIORIDADE: Variável de ambiente (produção)
+    if (process.env.NEXT_PUBLIC_SITE_URL) {
+      return process.env.NEXT_PUBLIC_SITE_URL;
+    }
+
+    // 2. FALLBACK: window.location.origin (desenvolvimento)
+    if (typeof window !== "undefined") {
+      return window.location.origin;
+    }
+
+    // 3. ÚLTIMO RECURSO: localhost (não deveria acontecer)
+    return "http://localhost:3000";
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -83,47 +101,50 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     }
 
     try {
-      // CORRIGIDO: Usar variável de ambiente
-      const siteUrl =
-        process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      // 🎯 URL CORRIGIDA - Agora usa a função que prioriza variável de ambiente
+      const baseUrl = getBaseUrl();
+      const redirectUrl = `${baseUrl}/auth/confirm?type=${tipoUsuario}`;
 
+      console.log("=== DEBUG SIGNUP ===");
+      console.log("Base URL:", baseUrl);
+      console.log("Redirect URL:", redirectUrl);
+      console.log("Tipo usuário:", tipoUsuario);
+      console.log("===================");
+
+      // 1. Cadastrar usuário no Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            tipo_usuario: tipoUsuario,
+            tipo_usuario: tipoUsuario, // Armazena o tipo de usuário nos metadados do Auth
           },
-          // CORREÇÃO: URL sempre correta
-          emailRedirectTo: `${siteUrl}/auth/callback?type=${tipoUsuario}`,
+          // 🔧 CORREÇÃO PRINCIPAL: URL dinâmica baseada no ambiente
+          emailRedirectTo: redirectUrl,
         },
       });
 
       if (authError) throw authError;
 
       console.log("=== DEBUG CADASTRO ===");
-      console.log("Tipo selecionado:", tipoUsuario);
-      console.log("Site URL:", siteUrl);
-      console.log(
-        "Email redirect URL:",
-        `${siteUrl}/auth/callback?type=${tipoUsuario}`
-      );
       console.log("Data retornada:", authData);
       console.log("User metadata:", authData.user?.user_metadata);
+      console.log("Email redirect configurado para:", redirectUrl);
       console.log("====================");
 
+      // Após o cadastro, o usuário SEMPRE precisa verificar o e-mail.
       setSuccess(
         "🎉 Conta criada com sucesso! Verifique seu email e clique no link de confirmação para ativar sua conta."
       );
-      onSuccess?.();
+      onSuccess?.(); // Chama o callback se fornecido
 
-      localStorage.setItem("signup_user_type", tipoUsuario || "");
+      // Armazenar informações úteis para a página de confirmação
+      localStorage.setItem("signup_user_type", tipoUsuario);
       localStorage.setItem("signup_email", email);
-    } catch (error: unknown) {
+      localStorage.setItem("signup_redirect_url", redirectUrl); // Para debug
+    } catch (error: any) {
       console.error("Erro no signup:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Erro ao criar conta.";
-      setError(errorMessage);
+      setError(error.message || "Erro ao criar conta.");
     } finally {
       setLoading(false);
     }
@@ -147,23 +168,21 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
                   className={`relative p-4 rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
                     tipoUsuario === type.value
                       ? `${type.borderColor} ${type.bgColor} shadow-lg`
-                      : "border-gray-200 hover:border-gray-300 hover:shadow-md"
+                      : "border-gray-200 hover:border-gray-300 bg-white"
                   }`}
                 >
                   <div className="text-center">
-                    <div className="text-2xl mb-2 group-hover:animate-bounce">
-                      {type.icon}
-                    </div>
-                    <div className="font-semibold text-sm text-gray-800 mb-1">
+                    <div className="text-2xl mb-2">{type.icon}</div>
+                    <h3 className="font-semibold text-sm text-gray-800">
                       {type.label}
-                    </div>
-                    <div className="text-xs text-gray-600">
+                    </h3>
+                    <p className="text-xs text-gray-600 mt-1">
                       {type.description}
-                    </div>
+                    </p>
                   </div>
                   {tipoUsuario === type.value && (
-                    <div className="absolute top-2 right-2 w-5 h-5 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full flex items-center justify-center">
-                      <div className="w-2 h-2 bg-white rounded-full"></div>
+                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs">✓</span>
                     </div>
                   )}
                 </button>
@@ -171,78 +190,81 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
             </div>
           </div>
 
-          {/* Campos de Email e Senha */}
-          <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                placeholder="seu@email.com"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Senha
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                placeholder="Mínimo 6 caracteres"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="confirmPassword"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Confirmar Senha
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                placeholder="Digite a senha novamente"
-              />
-            </div>
+          {/* Email */}
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              placeholder="seu@email.com"
+            />
           </div>
 
-          {/* Mensagens de erro e sucesso */}
+          {/* Senha */}
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Senha
+            </label>
+            <input
+              id="password"
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              placeholder="Mínimo 6 caracteres"
+            />
+          </div>
+
+          {/* Confirmar Senha */}
+          <div>
+            <label
+              htmlFor="confirmPassword"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Confirmar Senha
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              placeholder="Repita sua senha"
+            />
+          </div>
+
+          {/* Mensagens de erro/sucesso */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
               {error}
             </div>
           )}
+
           {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl">
               {success}
             </div>
           )}
 
-          {/* Botão de submit */}
+          {/* Botão de cadastro */}
           <button
             type="submit"
             disabled={loading || !tipoUsuario}
-            className="w-full bg-gradient-to-r from-rose-500 via-sky-500 to-emerald-500 hover:from-rose-600 hover:via-sky-600 hover:to-emerald-600 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl"
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
           >
             {loading ? (
               <div className="flex items-center justify-center">
@@ -261,9 +283,9 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
             Já tem uma conta?{" "}
             <Link
               href="/auth"
-              className="font-semibold text-transparent bg-gradient-to-r from-rose-500 to-sky-500 bg-clip-text hover:from-rose-600 hover:to-sky-600 transition-all duration-300"
+              className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
             >
-              Faça login
+              Fazer login
             </Link>
           </p>
         </div>
