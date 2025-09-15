@@ -1,4 +1,5 @@
-// viaa/src/components/dashboard/professional/feed/ProfessionalFeedContainer.tsx
+// src/components/dashboard/professional/feed/ProfessionalFeedContainer.tsx
+// 🔧 CORREÇÃO: Erro author null + validações
 
 "use client";
 import { useState } from "react";
@@ -51,6 +52,39 @@ export default function ProfessionalFeedContainer() {
     }
   };
 
+  // 🔧 FUNÇÃO PARA VALIDAR POSTS
+  const validatePost = (post: any): boolean => {
+    // Verificar se o post existe
+    if (!post || !post.id) {
+      console.warn("Post inválido - sem ID:", post);
+      return false;
+    }
+
+    // Verificar se o autor existe
+    if (!post.author) {
+      console.warn("Post sem author:", post.id);
+      return false;
+    }
+
+    // Verificar campos obrigatórios do autor
+    if (!post.author.id || !post.author.nome) {
+      console.warn("Author com dados inválidos:", post.author);
+      return false;
+    }
+
+    return true;
+  };
+
+  // 🔧 FILTRAR POSTS VÁLIDOS
+  const validPosts = posts.filter(validatePost);
+
+  // 🔧 LOG PARA DEBUG
+  if (posts.length !== validPosts.length) {
+    console.warn(
+      `⚠️ Filtrados ${posts.length - validPosts.length} posts inválidos`
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Criador de Post */}
@@ -77,7 +111,7 @@ export default function ProfessionalFeedContainer() {
       )}
 
       {/* Loading State Inicial */}
-      {loading && posts.length === 0 && (
+      {loading && validPosts.length === 0 && (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <LoadingSpinner size="lg" />
@@ -86,41 +120,50 @@ export default function ProfessionalFeedContainer() {
         </div>
       )}
 
-      {/* Lista de Posts */}
-      {posts.length > 0 && (
+      {/* Lista de Posts - COM VALIDAÇÃO */}
+      {validPosts.length > 0 && (
         <div className="space-y-6">
-          {posts.map((post) => (
-            <PostCard
-              key={post.id}
-              post={{
-                id: post.id,
-                author: {
-                  id: post.author.id,
-                  name: `${post.author.nome} ${post.author.sobrenome}`,
-                  specialization: post.author.especialidades,
-                  avatar: post.author.foto_perfil_url,
-                  verified: post.author.verificado,
-                },
-                content: post.content,
-                image: post.image_url,
-                createdAt: post.created_at,
-                likes: post.likes_count,
-                comments: post.comments_count,
-                shares: post.shares_count,
-                isLiked: post.is_liked || false,
-                type: post.type,
-              }}
-              // REMOVIDO: onLike - deixar o PostCard usar o usePostLikes
-              canInteract={true}
-              canComment={true}
-              showScheduleButton={false}
-            />
-          ))}
+          {validPosts.map((post) => {
+            // 🔧 VALIDAÇÃO EXTRA: Verificar se todos os dados existem
+            const authorName =
+              post.author?.nome && post.author?.sobrenome
+                ? `${post.author.nome} ${post.author.sobrenome}`
+                : post.author?.nome || "Usuário";
+
+            const authorData = {
+              id: post.author?.id || "",
+              name: authorName,
+              specialization: post.author?.especialidades || "Profissional",
+              avatar: post.author?.foto_perfil_url || undefined,
+              verified: post.author?.verificado || false,
+            };
+
+            return (
+              <PostCard
+                key={post.id}
+                post={{
+                  id: post.id,
+                  author: authorData,
+                  content: post.content || "",
+                  image: post.image_url,
+                  createdAt: post.created_at,
+                  likes: post.likes_count || 0,
+                  comments: post.comments_count || 0,
+                  shares: post.shares_count || 0,
+                  isLiked: post.is_liked || false,
+                  type: post.type || "text",
+                }}
+                canInteract={true}
+                canComment={true}
+                showScheduleButton={false}
+              />
+            );
+          })}
         </div>
       )}
 
       {/* Empty State */}
-      {!loading && posts.length === 0 && !error && (
+      {!loading && validPosts.length === 0 && !error && (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📝</div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -133,7 +176,7 @@ export default function ProfessionalFeedContainer() {
       )}
 
       {/* Load More Button */}
-      {pagination.has_more && !loading && (
+      {pagination.has_more && !loading && validPosts.length > 0 && (
         <div className="text-center">
           <button
             onClick={handleLoadMore}
@@ -145,9 +188,19 @@ export default function ProfessionalFeedContainer() {
       )}
 
       {/* Loading More */}
-      {loading && posts.length > 0 && (
+      {loading && validPosts.length > 0 && (
         <div className="text-center py-4">
           <LoadingSpinner size="md" />
+        </div>
+      )}
+
+      {/* Debug Info (remover em produção) */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="mt-4 p-3 bg-gray-100 rounded text-xs">
+          <p>📊 Posts totais: {posts.length}</p>
+          <p>✅ Posts válidos: {validPosts.length}</p>
+          <p>🔄 Loading: {loading ? "Sim" : "Não"}</p>
+          <p>❌ Error: {error || "Nenhum"}</p>
         </div>
       )}
     </div>
