@@ -1,5 +1,5 @@
 // src/components/dashboard/professional/layout/ProfessionalLayout.tsx
-// 🔧 VERSÃO CORRIGIDA - Ícones e containers mobile fixos
+// 🔧 VERSÃO SIMPLIFICADA - SEM COMPLICAÇÕES
 
 "use client";
 import { useState, useEffect } from "react";
@@ -16,40 +16,22 @@ interface ProfessionalLayoutProps {
 export function ProfessionalLayout({ children }: ProfessionalLayoutProps) {
   const { user, profile, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // 📱 DETECTAR MOBILE SIMPLES
   const [isMobile, setIsMobile] = useState(false);
-
-  // 📱 DETECTAR TAMANHO DA TELA
   useEffect(() => {
-    const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 1024); // lg breakpoint
-    };
-
-    checkScreenSize();
-    window.addEventListener("resize", checkScreenSize);
-    return () => window.removeEventListener("resize", checkScreenSize);
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // 📱 FECHAR SIDEBAR AO REDIMENSIONAR PARA DESKTOP
+  // 📱 FECHAR SIDEBAR EM DESKTOP
   useEffect(() => {
-    if (!isMobile) {
-      setSidebarOpen(false);
-    }
+    if (!isMobile) setSidebarOpen(false);
   }, [isMobile]);
 
-  // 📱 PREVENIR SCROLL DO BODY QUANDO SIDEBAR ESTÁ ABERTA
-  useEffect(() => {
-    if (sidebarOpen && isMobile) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-
-    // Cleanup
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [sidebarOpen, isMobile]);
-
+  // 📱 LOADING E VALIDAÇÕES
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -105,61 +87,48 @@ export function ProfessionalLayout({ children }: ProfessionalLayoutProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 📱 HEADER FIXO NO TOPO */}
+      {/* ✅ HEADER FIXO */}
       <ProfessionalHeader
         onMenuClick={() => setSidebarOpen(true)}
         user={user}
         profile={profile}
       />
 
-      {/* 📱 SIDEBAR */}
+      {/* ✅ SIDEBAR */}
       <ProfessionalSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         profile={profile}
       />
 
-      {/* 🔧 MAIN CONTENT - CONTAINER CORRIGIDO PARA MOBILE */}
+      {/* 🔧 MAIN CONTENT - LAYOUT CORRIGIDO */}
       <main
         className={`
-          transition-all duration-300
-          ${!isMobile ? "lg:ml-80" : ""}
-          pt-16
-          ${sidebarOpen && isMobile ? "overflow-hidden" : ""}
-        `}
+        transition-all duration-300
+        ${isMobile ? "pt-16" : "lg:ml-72 pt-16"}
+      `}
       >
-        {/* 🔧 CONTAINER PRINCIPAL COM PADDING CORRETO */}
-        <div className="w-full max-w-7xl mx-auto">
-          {/* 📱 GRID RESPONSIVO COM OVERFLOW CONTROLADO */}
+        {/* 🔧 CONTAINER SIMPLES E DIRETO */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {/* 🔧 GRID SIMPLES */}
           <div
             className={`
-              grid gap-4 p-3 sm:p-4 lg:p-6
-              ${isMobile ? "grid-cols-1" : "lg:grid-cols-1 xl:grid-cols-4"}
-              ${isMobile ? "max-w-full overflow-hidden" : ""}
-            `}
+            ${isMobile ? "block" : "grid grid-cols-1 xl:grid-cols-4 gap-6"}
+          `}
           >
-            {/* 🔧 ÁREA PRINCIPAL DO CONTEÚDO COM OVERFLOW CONTROLADO */}
+            {/* 📱 CONTEÚDO PRINCIPAL */}
             <div
               className={`
-                w-full min-w-0
-                ${isMobile ? "col-span-1 px-1 sm:px-2" : "xl:col-span-3"}
-                ${isMobile ? "overflow-x-hidden" : ""}
-              `}
+              ${isMobile ? "w-full" : "xl:col-span-3"}
+            `}
             >
-              {/* 📱 WRAPPER PARA CONTEÚDO MOBILE */}
-              <div
-                className={`
-                ${isMobile ? "w-full max-w-full overflow-hidden" : ""}
-              `}
-              >
-                {children}
-              </div>
+              {children}
             </div>
 
-            {/* 📱 WIDGET LATERAL - APENAS DESKTOP */}
+            {/* 📱 WIDGET LATERAL - SÓ DESKTOP */}
             {!isMobile && (
-              <div className="xl:col-span-1 hidden xl:block">
-                <div className="sticky top-20">
+              <div className="xl:col-span-1">
+                <div className="sticky top-24">
                   <ProfessionalWidget />
                 </div>
               </div>
@@ -168,18 +137,17 @@ export function ProfessionalLayout({ children }: ProfessionalLayoutProps) {
         </div>
       </main>
 
-      {/* 📱 OVERLAY DE BACKDROP PARA MOBILE */}
+      {/* 📱 OVERLAY MOBILE */}
       {sidebarOpen && isMobile && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
-          aria-hidden="true"
         />
       )}
 
-      {/* 📱 DEBUG INFO - REMOVER EM PRODUÇÃO */}
+      {/* 🔧 DEBUG (REMOVER EM PRODUÇÃO) */}
       {process.env.NODE_ENV === "development" && (
-        <div className="fixed bottom-4 left-4 z-50 bg-black/80 text-white text-xs p-2 rounded">
+        <div className="fixed bottom-4 right-4 z-50 bg-black/80 text-white text-xs p-2 rounded">
           <div>Mobile: {isMobile ? "Sim" : "Não"}</div>
           <div>Sidebar: {sidebarOpen ? "Aberta" : "Fechada"}</div>
           <div>
