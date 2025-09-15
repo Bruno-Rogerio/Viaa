@@ -1,5 +1,5 @@
 // src/components/dashboard/shared/feed/PostCard.tsx
-// 📱 VERSÃO TOTALMENTE RESPONSIVA PARA MOBILE
+// 🔧 VERSÃO CORRIGIDA - Mobile responsivo sem ícones "voando"
 
 "use client";
 import { useState } from "react";
@@ -15,7 +15,6 @@ import Avatar from "../../common/Avatar";
 import CommentSection from "./CommentSection";
 import { usePostLikes } from "@/hooks/dashboard/usePostLikes";
 import { useAuth } from "@/contexts/AuthContext";
-import { PerfilProfissional } from "@/types/database";
 
 interface PostCardProps {
   post: {
@@ -74,9 +73,7 @@ export default function PostCard({
 
   // Função para o novo sistema de curtidas com optimistic updates
   const handleLikeToggle = async (postId: string, isLiked: boolean) => {
-    if (isLiking || !canInteract) return; // Evitar cliques múltiplos
-
-    console.log("Clicou no like/unlike", { postId, isLiked });
+    if (isLiking || !canInteract) return;
 
     // Optimistic update - atualiza interface imediatamente
     const newIsLiked = !isLiked;
@@ -87,15 +84,11 @@ export default function PostCard({
     setIsLiking(true);
 
     try {
-      const success = await toggleLike(postId, isLiked);
-
-      if (!success) {
-        // Reverter em caso de erro
-        setLocalIsLiked(isLiked);
-        setLocalLikesCount(post.likes);
-      }
+      await toggleLike(postId, newIsLiked);
+      onLike?.();
     } catch (error) {
-      // Reverter em caso de erro
+      console.error("Erro ao curtir/descurtir:", error);
+      // Reverter mudanças em caso de erro
       setLocalIsLiked(isLiked);
       setLocalLikesCount(post.likes);
     } finally {
@@ -104,155 +97,156 @@ export default function PostCard({
   };
 
   return (
-    <article className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
-      {/* 📱 HEADER DO POST - RESPONSIVO */}
-      <div className="p-4 sm:p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-3 flex-1 min-w-0">
-            <Avatar
-              src={post.author.avatar}
-              alt={post.author.name}
-              size="md"
-              className="flex-shrink-0"
-            />
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2 flex-wrap">
-                <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
-                  {post.author.name}
-                </h3>
-                {post.author.verified && (
-                  <span className="text-blue-500 flex-shrink-0">✓</span>
-                )}
-              </div>
-
-              <p className="text-xs sm:text-sm text-gray-600 line-clamp-2 mt-1">
-                {post.author.specialization}
-              </p>
-
-              <div className="flex items-center space-x-2 mt-1">
-                <time className="text-xs text-gray-500">
-                  {formatTimeAgo(post.createdAt)}
-                </time>
-                {post.type !== "text" && (
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                    {post.type === "image"
-                      ? "📷"
-                      : post.type === "video"
-                      ? "🎥"
-                      : "📝"}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
-            <EllipsisHorizontalIcon className="w-5 h-5" />
-          </button>
+    <article className="dashboard-card viaa-safe-container">
+      {/* 🔧 HEADER DO POST - LAYOUT RESPONSIVO CONTROLADO */}
+      <div className="viaa-flex-safe space-x-3 mb-3 sm:mb-4">
+        {/* Avatar */}
+        <div className="flex-shrink-0">
+          <Avatar
+            src={post.author.avatar}
+            alt={post.author.name}
+            size="md"
+            className="responsive-icon-lg"
+          />
         </div>
 
-        {/* 📱 CONTEÚDO DO POST - RESPONSIVO */}
-        <div className="mt-4">
-          <div className="prose prose-sm sm:prose max-w-none text-gray-900">
-            <p className="whitespace-pre-wrap leading-relaxed text-sm sm:text-base">
-              {post.content}
+        {/* Informações do autor - TEXTO RESPONSIVO */}
+        <div className="flex-1 min-w-0">
+          <div className="viaa-flex-safe space-x-2">
+            <h3 className="responsive-body-lg font-semibold text-gray-900 viaa-text-safe">
+              {post.author.name}
+            </h3>
+            {post.author.verified && (
+              <div className="flex-shrink-0">
+                <svg
+                  className="responsive-icon-sm text-blue-600"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            )}
+          </div>
+
+          {/* Especialização e tempo - TEXTO RESPONSIVO */}
+          <div className="viaa-flex-safe space-x-2 mt-0.5">
+            <p className="responsive-body-sm text-gray-600 viaa-text-safe">
+              {post.author.specialization}
             </p>
-          </div>
-
-          {/* 📱 IMAGEM RESPONSIVA */}
-          {post.image && (
-            <div className="mt-4 rounded-lg overflow-hidden bg-gray-100">
-              <img
-                src={post.image}
-                alt="Conteúdo do post"
-                className="w-full h-auto max-h-96 object-cover"
-                loading="lazy"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* 📱 MÉTRICAS - MOBILE FRIENDLY */}
-        <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-          <div className="flex items-center space-x-4 text-xs sm:text-sm text-gray-500">
-            <span>
-              {localLikesCount} curtida{localLikesCount !== 1 ? "s" : ""}
-            </span>
-            <span>
-              {post.comments} comentário{post.comments !== 1 ? "s" : ""}
-            </span>
-            <span>
-              {post.shares} compartilhamento{post.shares !== 1 ? "s" : ""}
-            </span>
+            <span className="responsive-body-sm text-gray-400">•</span>
+            <time className="responsive-body-sm text-gray-500 flex-shrink-0">
+              {formatTimeAgo(post.createdAt)}
+            </time>
           </div>
         </div>
 
-        {/* 📱 AÇÕES - BOTÕES RESPONSIVOS */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-          <div className="flex items-center space-x-1 sm:space-x-2">
-            {/* Botão Curtir */}
-            {canInteract && (
-              <button
-                onClick={() => handleLikeToggle(post.id, localIsLiked)}
-                disabled={isLiking}
-                className={`
-                  flex items-center space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200
-                  ${
-                    localIsLiked
-                      ? "text-red-600 bg-red-50 hover:bg-red-100"
-                      : "text-gray-600 hover:text-red-600 hover:bg-red-50"
-                  }
-                  ${
-                    isLiking
-                      ? "opacity-50 cursor-not-allowed"
-                      : "hover:scale-105"
-                  }
-                `}
-              >
-                {localIsLiked ? (
-                  <HeartSolidIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                ) : (
-                  <HeartIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                )}
-                <span className="hidden sm:inline">Curtir</span>
-              </button>
-            )}
-
-            {/* Botão Comentar */}
-            {canComment && (
-              <button
-                onClick={() => setShowComments(!showComments)}
-                className="flex items-center space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 hover:scale-105"
-              >
-                <ChatBubbleLeftIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">Comentar</span>
-              </button>
-            )}
-
-            {/* Botão Compartilhar */}
-            <button className="flex items-center space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-gray-600 hover:text-green-600 hover:bg-green-50 transition-all duration-200 hover:scale-105">
-              <ShareIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline">Compartilhar</span>
-            </button>
-          </div>
-
-          {/* 📱 BOTÃO AGENDAR - MOBILE FRIENDLY */}
-          {showScheduleButton && onSchedule && (
-            <button
-              onClick={onSchedule}
-              className="flex items-center space-x-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm"
-            >
-              <CalendarDaysIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>Agendar</span>
-            </button>
-          )}
+        {/* Menu de opções - TAMANHO RESPONSIVO */}
+        <div className="flex-shrink-0">
+          <button className="p-1 sm:p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+            <EllipsisHorizontalIcon className="responsive-icon-sm" />
+          </button>
         </div>
       </div>
 
-      {/* 📱 SEÇÃO DE COMENTÁRIOS - RESPONSIVA */}
+      {/* 🔧 CONTEÚDO DO POST - TEXTO RESPONSIVO */}
+      <div className="mb-3 sm:mb-4">
+        <p className="responsive-body-lg text-gray-900 text-break-mobile leading-relaxed">
+          {post.content}
+        </p>
+      </div>
+
+      {/* 🔧 IMAGEM - RESPONSIVA */}
+      {post.image && (
+        <div className="mb-3 sm:mb-4 -mx-3 sm:-mx-4 lg:-mx-6">
+          <img
+            src={post.image}
+            alt="Post image"
+            className="w-full h-48 sm:h-64 lg:h-80 object-cover"
+          />
+        </div>
+      )}
+
+      {/* 🔧 ESTATÍSTICAS - LAYOUT RESPONSIVO */}
+      <div className="viaa-flex-safe justify-between py-2 sm:py-3 border-t border-gray-100">
+        <div className="viaa-flex-safe space-x-4 sm:space-x-6">
+          <span className="responsive-body-sm text-gray-600">
+            {localLikesCount} curtidas
+          </span>
+          <span className="responsive-body-sm text-gray-600">
+            {post.comments} comentários
+          </span>
+          <span className="responsive-body-sm text-gray-600">
+            {post.shares} compartilhamentos
+          </span>
+        </div>
+      </div>
+
+      {/* 🔧 AÇÕES - BOTÕES RESPONSIVOS E SEGUROS */}
+      <div className="viaa-flex-safe justify-between items-center pt-2 sm:pt-3 border-t border-gray-100">
+        {/* Grupo de ações principais */}
+        <div className="viaa-flex-safe space-x-1 sm:space-x-2">
+          {/* Botão Curtir */}
+          {canInteract && (
+            <button
+              onClick={() => handleLikeToggle(post.id, localIsLiked)}
+              disabled={isLiking}
+              className={`
+                viaa-button-adaptive
+                ${
+                  localIsLiked
+                    ? "text-red-600 bg-red-50 hover:bg-red-100"
+                    : "text-gray-600 hover:text-red-600 hover:bg-red-50"
+                }
+                ${isLiking ? "opacity-50 cursor-not-allowed" : ""}
+              `}
+            >
+              {localIsLiked ? (
+                <HeartSolidIcon className="responsive-icon-sm" />
+              ) : (
+                <HeartIcon className="responsive-icon-sm" />
+              )}
+              <span className="hidden sm:inline">Curtir</span>
+            </button>
+          )}
+
+          {/* Botão Comentar */}
+          {canComment && (
+            <button
+              onClick={() => setShowComments(!showComments)}
+              className="viaa-button-adaptive text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+            >
+              <ChatBubbleLeftIcon className="responsive-icon-sm" />
+              <span className="hidden sm:inline">Comentar</span>
+            </button>
+          )}
+
+          {/* Botão Compartilhar */}
+          <button className="viaa-button-adaptive text-gray-600 hover:text-green-600 hover:bg-green-50">
+            <ShareIcon className="responsive-icon-sm" />
+            <span className="hidden sm:inline">Compartilhar</span>
+          </button>
+        </div>
+
+        {/* 🔧 BOTÃO AGENDAR - RESPONSIVO */}
+        {showScheduleButton && onSchedule && (
+          <button
+            onClick={onSchedule}
+            className="viaa-button-adaptive bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+          >
+            <CalendarDaysIcon className="responsive-icon-sm" />
+            <span className="hidden xs:inline">Agendar</span>
+          </button>
+        )}
+      </div>
+
+      {/* 🔧 SEÇÃO DE COMENTÁRIOS - RESPONSIVA */}
       {showComments && canComment && (
-        <div className="border-t border-gray-100">
+        <div className="border-t border-gray-100 mt-3 sm:mt-4">
           <CommentSection
             postId={post.id}
             initialCommentsCount={post.comments}

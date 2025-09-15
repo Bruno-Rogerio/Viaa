@@ -1,5 +1,5 @@
 // src/components/dashboard/professional/layout/ProfessionalLayout.tsx
-// 📱 VERSÃO COMPLETAMENTE RESPONSIVA
+// 🔧 VERSÃO CORRIGIDA - Ícones e containers mobile fixos
 
 "use client";
 import { useState, useEffect } from "react";
@@ -93,53 +93,10 @@ export function ProfessionalLayout({ children }: ProfessionalLayoutProps) {
             Este dashboard é exclusivo para profissionais aprovados.
           </p>
           <a
-            href="/onboarding"
+            href="/dashboard"
             className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Completar Cadastro
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  const dados = profile.dados as any;
-  if (dados?.status_verificacao === "pendente") {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="text-center max-w-md w-full">
-          <h2 className="text-xl font-semibold text-amber-600 mb-2">
-            Aprovação Pendente
-          </h2>
-          <p className="text-gray-600 mb-4">
-            Seu cadastro está sendo analisado pela nossa equipe.
-          </p>
-          <a
-            href="/onboarding"
-            className="inline-block bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors"
-          >
-            Ver Status
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  if (dados?.status_verificacao === "rejeitado") {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="text-center max-w-md w-full">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">
-            Cadastro Rejeitado
-          </h2>
-          <p className="text-gray-600 mb-4">
-            Entre em contato com o suporte para mais informações.
-          </p>
-          <a
-            href="/onboarding"
-            className="inline-block bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Refazer Cadastro
+            Voltar ao Dashboard
           </a>
         </div>
       </div>
@@ -148,61 +105,68 @@ export function ProfessionalLayout({ children }: ProfessionalLayoutProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 📱 HEADER FIXO */}
+      {/* 📱 HEADER FIXO NO TOPO */}
       <ProfessionalHeader
         onMenuClick={() => setSidebarOpen(true)}
         user={user}
         profile={profile}
       />
 
-      {/* 📱 LAYOUT PRINCIPAL RESPONSIVO */}
-      <div className="flex min-h-screen">
-        {/* 📱 SIDEBAR RESPONSIVA */}
-        <ProfessionalSidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          profile={profile}
-        />
+      {/* 📱 SIDEBAR */}
+      <ProfessionalSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        profile={profile}
+      />
 
-        {/* 📱 CONTEÚDO PRINCIPAL ADAPTATIVO */}
-        <main
-          className={`
-          flex-1 transition-all duration-300 ease-in-out
-          ${isMobile ? "pt-16" : "lg:ml-80 pt-16"}
+      {/* 🔧 MAIN CONTENT - CONTAINER CORRIGIDO PARA MOBILE */}
+      <main
+        className={`
+          transition-all duration-300
+          ${!isMobile ? "lg:ml-80" : ""}
+          pt-16
           ${sidebarOpen && isMobile ? "overflow-hidden" : ""}
         `}
-        >
-          <div className="w-full max-w-7xl mx-auto">
-            {/* 📱 GRID RESPONSIVO INTELIGENTE */}
+      >
+        {/* 🔧 CONTAINER PRINCIPAL COM PADDING CORRETO */}
+        <div className="w-full max-w-7xl mx-auto">
+          {/* 📱 GRID RESPONSIVO COM OVERFLOW CONTROLADO */}
+          <div
+            className={`
+              grid gap-4 p-3 sm:p-4 lg:p-6
+              ${isMobile ? "grid-cols-1" : "lg:grid-cols-1 xl:grid-cols-4"}
+              ${isMobile ? "max-w-full overflow-hidden" : ""}
+            `}
+          >
+            {/* 🔧 ÁREA PRINCIPAL DO CONTEÚDO COM OVERFLOW CONTROLADO */}
             <div
               className={`
-              grid gap-4 p-4
-              sm:gap-6 sm:p-6
-              ${isMobile ? "grid-cols-1" : "lg:grid-cols-1 xl:grid-cols-4"}
-            `}
+                w-full min-w-0
+                ${isMobile ? "col-span-1 px-1 sm:px-2" : "xl:col-span-3"}
+                ${isMobile ? "overflow-x-hidden" : ""}
+              `}
             >
-              {/* 📱 ÁREA PRINCIPAL DO CONTEÚDO */}
+              {/* 📱 WRAPPER PARA CONTEÚDO MOBILE */}
               <div
                 className={`
-                w-full
-                ${isMobile ? "col-span-1" : "xl:col-span-3"}
+                ${isMobile ? "w-full max-w-full overflow-hidden" : ""}
               `}
               >
                 {children}
               </div>
-
-              {/* 📱 WIDGET LATERAL - APENAS DESKTOP */}
-              {!isMobile && (
-                <div className="xl:col-span-1 hidden xl:block">
-                  <div className="sticky top-20">
-                    <ProfessionalWidget />
-                  </div>
-                </div>
-              )}
             </div>
+
+            {/* 📱 WIDGET LATERAL - APENAS DESKTOP */}
+            {!isMobile && (
+              <div className="xl:col-span-1 hidden xl:block">
+                <div className="sticky top-20">
+                  <ProfessionalWidget />
+                </div>
+              </div>
+            )}
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
 
       {/* 📱 OVERLAY DE BACKDROP PARA MOBILE */}
       {sidebarOpen && isMobile && (

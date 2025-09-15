@@ -1,22 +1,66 @@
 // src/components/dashboard/professional/layout/ProfessionalSidebar.tsx
-// 📱 VERSÃO TOTALMENTE RESPONSIVA COM Z-INDEX CORRETO
+// 🔧 VERSÃO CORRIGIDA - Botão logout fixo e JSX válido
 
 "use client";
+import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
 import {
-  CalendarDaysIcon,
-  UserGroupIcon,
+  HomeIcon,
+  CalendarIcon,
+  UserIcon,
+  ChatBubbleLeftRightIcon,
   DocumentTextIcon,
-  ShoppingBagIcon,
   ChartBarIcon,
-  CogIcon,
   ArrowRightOnRectangleIcon,
   XMarkIcon,
-  HomeIcon,
 } from "@heroicons/react/24/outline";
-import { Avatar } from "../../common";
 import { useAuth } from "@/contexts/AuthContext";
+
+const navigation = [
+  {
+    name: "Dashboard",
+    href: "/dashboard",
+    icon: HomeIcon,
+    description: "Visão geral",
+    color: "text-blue-600",
+  },
+  {
+    name: "Agenda",
+    href: "/dashboard/agenda",
+    icon: CalendarIcon,
+    description: "Consultas e horários",
+    color: "text-emerald-600",
+  },
+  {
+    name: "Perfil",
+    href: "/dashboard/perfil",
+    icon: UserIcon,
+    description: "Meus dados",
+    color: "text-purple-600",
+  },
+  {
+    name: "Feed",
+    href: "/dashboard/feed",
+    icon: ChatBubbleLeftRightIcon,
+    description: "Rede social",
+    color: "text-rose-600",
+  },
+  {
+    name: "Prontuários",
+    href: "/dashboard/prontuarios",
+    icon: DocumentTextIcon,
+    description: "Registros médicos",
+    color: "text-amber-600",
+  },
+  {
+    name: "Analytics",
+    href: "/dashboard/analytics",
+    icon: ChartBarIcon,
+    description: "Relatórios",
+    color: "text-cyan-600",
+  },
+];
 
 interface ProfessionalSidebarProps {
   isOpen: boolean;
@@ -29,160 +73,73 @@ export default function ProfessionalSidebar({
   onClose,
   profile,
 }: ProfessionalSidebarProps) {
-  const router = useRouter();
   const pathname = usePathname();
+  const router = useRouter();
   const { signOut } = useAuth();
-
-  const navigationItems = [
-    {
-      name: "Início",
-      href: "/dashboard",
-      icon: HomeIcon,
-      description: "Feed e visão geral",
-      color: "text-blue-600 bg-blue-50",
-    },
-    {
-      name: "Minha Agenda",
-      href: "/dashboard/agenda",
-      icon: CalendarDaysIcon,
-      description: "Consultas e disponibilidade",
-      color: "text-emerald-600 bg-emerald-50",
-    },
-    {
-      name: "Meus Pacientes",
-      href: "/dashboard/pacientes",
-      icon: UserGroupIcon,
-      description: "Gestão de pacientes",
-      color: "text-purple-600 bg-purple-50",
-    },
-    {
-      name: "Prontuários",
-      href: "/dashboard/prontuarios",
-      icon: DocumentTextIcon,
-      description: "Histórico e anotações",
-      color: "text-orange-600 bg-orange-50",
-    },
-    {
-      name: "Loja/Serviços",
-      href: "/dashboard/loja",
-      icon: ShoppingBagIcon,
-      description: "Produtos e consultas",
-      color: "text-green-600 bg-green-50",
-    },
-    {
-      name: "Analytics",
-      href: "/dashboard/analytics",
-      icon: ChartBarIcon,
-      description: "Métricas e relatórios",
-      color: "text-indigo-600 bg-indigo-50",
-    },
-    {
-      name: "Configurações",
-      href: "/dashboard/configuracoes",
-      icon: CogIcon,
-      description: "Conta e preferências",
-      color: "text-gray-600 bg-gray-50",
-    },
-  ];
 
   const handleLogout = async () => {
     await signOut();
     router.push("/");
   };
 
-  const profileData = profile?.dados;
+  // Detectar se é mobile
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+
+    checkScreenSize();
+    window.addEventListener("resize", checkScreenSize);
+    return () => window.removeEventListener("resize", checkScreenSize);
+  }, []);
 
   return (
-    <>
-      {/* 🔧 SIDEBAR COM Z-INDEX CORRIGIDO */}
-      <div
-        className={`
-        fixed top-16 left-0 z-50 w-80 h-[calc(100vh-4rem)] bg-white border-r border-gray-200 
-        transform transition-transform duration-300 ease-in-out overflow-y-auto
+    <div
+      className={`
+        ${isMobile ? "fixed" : "fixed lg:static"} 
+        inset-y-0 left-0 z-50 
+        ${isMobile ? "w-80" : "w-80 lg:w-72"} 
+        transform transition-transform duration-300 ease-in-out
         ${isOpen ? "translate-x-0" : "-translate-x-full"}
-        lg:translate-x-0
-        shadow-xl lg:shadow-none
+        ${!isMobile ? "lg:translate-x-0" : ""}
+        bg-white shadow-xl border-r border-gray-200
       `}
-      >
-        {/* 📱 BOTÃO FECHAR MOBILE */}
-        <div className="lg:hidden flex justify-end p-4 border-b border-gray-100">
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-          >
-            <XMarkIcon className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* 📱 PERFIL DO USUÁRIO - RESPONSIVO */}
-        <div className="p-4 lg:p-6 border-b border-gray-200">
-          <Link
-            href="/dashboard/perfil"
-            className="flex items-start space-x-3 lg:space-x-4 p-3 lg:p-4 rounded-xl hover:bg-gray-50 transition-colors group"
-            onClick={onClose}
-          >
-            <Avatar
-              src={profileData?.foto_perfil_url}
-              alt={`${profileData?.nome} ${profileData?.sobrenome}`}
-              size="md"
-              className="flex-shrink-0"
-            />
-
-            <div className="flex-1 min-w-0">
-              <h3 className="text-base lg:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
-                {profileData?.nome} {profileData?.sobrenome}
-              </h3>
-
-              <p className="text-xs lg:text-sm text-gray-600 mb-2 line-clamp-2">
-                {profileData?.especialidades || "Profissional de Saúde Mental"}
-              </p>
-
-              <div className="flex items-center text-xs text-gray-500 mb-2">
-                <span className="inline-flex items-center truncate">
-                  📍 {profileData?.endereco_cidade},{" "}
-                  {profileData?.endereco_estado}
-                </span>
-              </div>
-
-              <div className="flex items-center">
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  ✓ Verificado
-                </span>
-              </div>
-            </div>
-          </Link>
-
-          {/* 📱 MÉTRICAS COMPACTAS */}
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="text-center p-2 lg:p-3 rounded-lg bg-blue-50">
-              <div className="text-sm lg:text-lg font-semibold text-blue-600">
-                52
-              </div>
-              <div className="text-xs text-blue-600">Visualizações</div>
-            </div>
-            <div className="text-center p-2 lg:p-3 rounded-lg bg-emerald-50">
-              <div className="text-sm lg:text-lg font-semibold text-emerald-600">
-                26
-              </div>
-              <div className="text-xs text-emerald-600">Conexões</div>
-            </div>
+    >
+      {/* 🔧 CONTAINER PRINCIPAL COM FLEXBOX E ALTURA TOTAL */}
+      <div className="h-full flex flex-col">
+        {/* 📱 HEADER DA SIDEBAR */}
+        <div className="flex-shrink-0 p-4 lg:p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg lg:text-xl font-bold text-gray-900">
+              Dashboard
+            </h2>
+            {isMobile && (
+              <button
+                onClick={onClose}
+                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* 📱 NAVEGAÇÃO RESPONSIVA */}
-        <nav className="p-3 lg:p-4">
-          <div className="space-y-1 lg:space-y-2">
-            {navigationItems.map((item) => {
+        {/* 🔧 NAVEGAÇÃO PRINCIPAL - ÁREA EXPANSÍVEL */}
+        <nav className="flex-1 overflow-y-auto p-3 lg:p-4">
+          <div className="space-y-1">
+            {navigation.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname.startsWith(item.href);
+              const isActive = pathname === item.href;
 
               return (
                 <Link
                   key={item.name}
                   href={item.href}
-                  onClick={onClose}
+                  onClick={isMobile ? onClose : undefined}
                   className={`
-                    flex items-center p-2 lg:p-3 rounded-lg transition-all duration-200 group
+                    flex items-center w-full p-2 lg:p-3 rounded-lg transition-all duration-200 group
                     ${
                       isActive
                         ? "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm"
@@ -192,13 +149,13 @@ export default function ProfessionalSidebar({
                 >
                   <div
                     className={`
-                    p-1.5 lg:p-2 rounded-lg mr-3 transition-colors
-                    ${
-                      isActive
-                        ? item.color
-                        : "text-gray-400 group-hover:text-gray-600"
-                    }
-                  `}
+                      p-1.5 lg:p-2 rounded-lg mr-3 transition-colors
+                      ${
+                        isActive
+                          ? item.color
+                          : "text-gray-400 group-hover:text-gray-600"
+                      }
+                    `}
                   >
                     <Icon className="w-4 h-4 lg:w-5 lg:h-5" />
                   </div>
@@ -221,8 +178,8 @@ export default function ProfessionalSidebar({
           </div>
         </nav>
 
-        {/* 📱 SEÇÃO INFERIOR - LOGOUT */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 lg:p-4 bg-gray-50 border-t border-gray-200">
+        {/* 🔧 SEÇÃO LOGOUT - FIXADA NO RODAPÉ */}
+        <div className="flex-shrink-0 p-3 lg:p-4 bg-gray-50 border-t border-gray-200">
           <button
             onClick={handleLogout}
             className="w-full flex items-center p-2 lg:p-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors group"
@@ -234,6 +191,6 @@ export default function ProfessionalSidebar({
           </button>
         </div>
       </div>
-    </>
+    </div>
   );
 }
