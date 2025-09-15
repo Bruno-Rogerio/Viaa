@@ -14,20 +14,11 @@ import {
   ChartBarIcon,
   ArrowRightOnRectangleIcon,
   XMarkIcon,
+  CogIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/contexts/AuthContext";
 
 const navigation = [
-  {
-    name: "Dashboard",
-    href: "/dashboard",
-    icon: HomeIcon,
-  },
-  {
-    name: "Agenda",
-    href: "/dashboard/agenda",
-    icon: CalendarIcon,
-  },
   {
     name: "Perfil",
     href: "/dashboard/perfil",
@@ -35,8 +26,13 @@ const navigation = [
   },
   {
     name: "Feed",
-    href: "/dashboard/feed",
-    icon: ChatBubbleLeftRightIcon,
+    href: "/dashboard", // Feed é o dashboard principal
+    icon: HomeIcon,
+  },
+  {
+    name: "Agenda",
+    href: "/dashboard/agenda",
+    icon: CalendarIcon,
   },
   {
     name: "Prontuários",
@@ -47,6 +43,11 @@ const navigation = [
     name: "Analytics",
     href: "/dashboard/analytics",
     icon: ChartBarIcon,
+  },
+  {
+    name: "Configurações",
+    href: "/dashboard/configuracoes",
+    icon: CogIcon,
   },
 ];
 
