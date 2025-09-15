@@ -1,5 +1,5 @@
 // src/components/dashboard/professional/agenda/ProfessionalAgendaHeader.tsx
-// Header específico para agenda de profissionais - CARDS CORRIGIDOS
+// 🔧 VERSÃO MOBILE CORRIGIDA - Layout responsivo e compacto
 
 "use client";
 
@@ -63,119 +63,99 @@ export default function ProfessionalAgendaHeader({
     (consulta) => consulta.status === "agendada"
   ).length;
 
-  // Obter resumo dos horários configurados
-  const resumoHorarios = diasAtivos.map((dia) => ({
-    dia: NOMES_DIAS[dia as keyof typeof NOMES_DIAS],
-    horario: `${horariosConfigurados[dia].hora_inicio} - ${horariosConfigurados[dia].hora_fim}`,
-  }));
-
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Minha Agenda Profissional
-          </h1>
-          <p className="text-gray-600">
-            Gerencie suas consultas e configure seus horários disponíveis
+    <div className="card-mobile space-mobile-md">
+      {/* 🔧 HEADER RESPONSIVO */}
+      <div className="space-mobile-sm">
+        {/* Título e subtítulo */}
+        <div className="space-mobile-xs">
+          <h1 className="title-mobile-lg text-gray-900">Minha Agenda</h1>
+          <p className="text-mobile-sm text-gray-600">
+            Gerencie consultas e horários
           </p>
         </div>
 
-        {/* Botão de configuração */}
-        <div className="flex items-center">
+        {/* 🔧 BOTÃO CONFIGURAR - SEMPRE VISÍVEL E RESPONSIVO */}
+        <div className="flex justify-end">
           <button
             onClick={onConfigurarHorarios}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg"
+            className="button-mobile bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
           >
-            <CogIcon className="w-5 h-5" />
-            <span className="font-medium">Configurar Horários</span>
+            <CogIcon className="icon-mobile-sm mr-1" />
+            <span className="hidden sm:inline">Configurar</span>
+            <span className="sm:hidden">Config</span>
           </button>
         </div>
       </div>
 
-      {/* Status da configuração */}
-      <div className="mb-6">
+      {/* 🔧 STATUS DE CONFIGURAÇÃO COMPACTO */}
+      <div className="space-mobile-sm">
         {loadingHorarios ? (
-          <div className="flex items-center space-x-2 text-gray-500">
-            <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-            <span className="text-sm">Carregando configuração...</span>
+          <div className="flex-mobile-safe bg-blue-50 p-3 rounded-lg">
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2"></div>
+            <span className="text-mobile-sm text-blue-700">
+              Carregando configurações...
+            </span>
           </div>
         ) : temHorariosConfigurados ? (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="flex items-start space-x-3">
-              <CheckIcon className="w-5 h-5 text-green-600 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-green-800 font-medium mb-1">
-                  Horários Configurados
-                </h3>
-                <p className="text-green-700 text-sm mb-3">
-                  Você tem {diasAtivos.length} dia(s) ativo(s) na semana
-                </p>
-
-                {/* Resumo dos horários */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
-                  {resumoHorarios.map((item, index) => (
-                    <div
-                      key={index}
-                      className="bg-white/60 px-2 py-1 rounded text-xs text-center"
-                    >
-                      <div className="font-medium text-green-800">
-                        {item.dia}
-                      </div>
-                      <div className="text-green-600">{item.horario}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          <div className="bg-green-50 p-3 rounded-lg">
+            <div className="flex-mobile-safe text-green-700 mb-1">
+              <CheckIcon className="icon-mobile-sm mr-1 flex-shrink-0" />
+              <span className="text-mobile-sm font-medium">
+                Horários configurados
+              </span>
+            </div>
+            <div className="text-mobile-xs text-green-600">
+              Ativo em {diasAtivos.length} dias:{" "}
+              {diasAtivos
+                .map((dia) => NOMES_DIAS[dia as keyof typeof NOMES_DIAS])
+                .join(", ")}
             </div>
           </div>
         ) : (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <div className="flex items-start space-x-3">
-              <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 mt-0.5" />
-              <div>
-                <h3 className="text-amber-800 font-medium mb-1">
-                  Nenhum horário configurado
-                </h3>
-                <p className="text-amber-700 text-sm mb-3">
-                  Configure seus horários disponíveis para que pacientes possam
-                  agendar consultas com você.
-                </p>
-                <button
-                  onClick={onConfigurarHorarios}
-                  className="text-amber-800 hover:text-amber-900 text-sm font-medium underline"
-                >
-                  Configurar agora
-                </button>
-              </div>
+          <div className="bg-amber-50 p-3 rounded-lg">
+            <div className="flex-mobile-safe text-amber-700 mb-1">
+              <ExclamationTriangleIcon className="icon-mobile-sm mr-1 flex-shrink-0" />
+              <span className="text-mobile-sm font-medium">
+                Configure seus horários
+              </span>
             </div>
+            <div className="text-mobile-xs text-amber-600 mb-2">
+              Defina quando você está disponível para receber pacientes
+            </div>
+            <button
+              onClick={onConfigurarHorarios}
+              className="text-mobile-xs text-amber-800 hover:text-amber-900 font-medium underline"
+            >
+              Configurar agora
+            </button>
           </div>
         )}
       </div>
 
-      {/* Estatísticas - CARDS MENORES */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold mb-1">Consultas Hoje</h3>
-              <p className="text-2xl font-bold">{consultasHoje}</p>
+      {/* 🔧 ESTATÍSTICAS RESPONSIVAS - GRID MOBILE SEGURO */}
+      <div className="grid-mobile-safe cols-2 gap-3">
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-3 text-white">
+          <div className="flex-mobile-safe justify-between">
+            <div className="flex-grow">
+              <h3 className="text-mobile-xs font-semibold mb-1">Hoje</h3>
+              <p className="title-mobile-md font-bold">{consultasHoje}</p>
             </div>
-            <div className="bg-white/20 p-2 rounded-lg">
-              <CalendarIcon className="w-5 h-5" />
+            <div className="bg-white/20 p-2 rounded-lg flex-shrink-0">
+              <CalendarIcon className="icon-mobile-sm" />
             </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg p-4 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold mb-1">Pendentes</h3>
-              <p className="text-2xl font-bold">{consultasPendentes}</p>
+        <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg p-3 text-white">
+          <div className="flex-mobile-safe justify-between">
+            <div className="flex-grow">
+              <h3 className="text-mobile-xs font-semibold mb-1">Pendentes</h3>
+              <p className="title-mobile-md font-bold">{consultasPendentes}</p>
             </div>
-            <div className="bg-white/20 p-2 rounded-lg">
+            <div className="bg-white/20 p-2 rounded-lg flex-shrink-0">
               <svg
-                className="w-5 h-5"
+                className="icon-mobile-sm"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -191,15 +171,15 @@ export default function ProfessionalAgendaHeader({
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-rose-500 to-rose-600 rounded-lg p-4 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold mb-1">Receita Mês</h3>
-              <p className="text-2xl font-bold">R$ 2.840</p>
+        <div className="bg-gradient-to-r from-rose-500 to-rose-600 rounded-lg p-3 text-white">
+          <div className="flex-mobile-safe justify-between">
+            <div className="flex-grow">
+              <h3 className="text-mobile-xs font-semibold mb-1">Receita</h3>
+              <p className="title-mobile-sm font-bold">R$ 2.840</p>
             </div>
-            <div className="bg-white/20 p-2 rounded-lg">
+            <div className="bg-white/20 p-2 rounded-lg flex-shrink-0">
               <svg
-                className="w-5 h-5"
+                className="icon-mobile-sm"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -215,15 +195,15 @@ export default function ProfessionalAgendaHeader({
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-amber-500 to-amber-600 rounded-lg p-4 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold mb-1">Taxa Presença</h3>
-              <p className="text-2xl font-bold">94%</p>
+        <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-3 text-white">
+          <div className="flex-mobile-safe justify-between">
+            <div className="flex-grow">
+              <h3 className="text-mobile-xs font-semibold mb-1">Pacientes</h3>
+              <p className="title-mobile-md font-bold">14</p>
             </div>
-            <div className="bg-white/20 p-2 rounded-lg">
+            <div className="bg-white/20 p-2 rounded-lg flex-shrink-0">
               <svg
-                className="w-5 h-5"
+                className="icon-mobile-sm"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -232,7 +212,7 @@ export default function ProfessionalAgendaHeader({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                 />
               </svg>
             </div>

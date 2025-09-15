@@ -1,19 +1,14 @@
 // src/app/dashboard/perfil/page.tsx
-// Página completa de perfil profissional - Visualizar e Editar
+// 🔧 VERSÃO ATUALIZADA - Usando ProfileHeader mobile-friendly
 
 "use client";
 
 import { useState } from "react";
-import {
-  PencilIcon,
-  XMarkIcon,
-  CheckIcon,
-  EyeIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useProfile } from "@/hooks/dashboard/useProfile";
 import ProfilePreview from "@/components/dashboard/professional/profile/ProfilePreview";
 import ProfileEditForm from "@/components/dashboard/professional/profile/ProfileEditForm";
+import ProfileHeader from "@/components/dashboard/professional/profile/ProfileHeader";
 
 export default function PerfilPage() {
   const [activeTab, setActiveTab] = useState<"preview" | "edit">("preview");
@@ -57,6 +52,16 @@ export default function PerfilPage() {
     setActiveTab("edit");
   };
 
+  const handleChangeTab = (tab: "preview" | "edit") => {
+    if (tab === "edit" && !isEditing) {
+      toggleEditing();
+    }
+    setActiveTab(tab);
+  };
+
+  // Verificar se há mudanças não salvas
+  const hasUnsavedChanges = isEditing && Object.keys(errors).length === 0;
+
   // Loading state
   if (loading) {
     return (
@@ -72,13 +77,13 @@ export default function PerfilPage() {
   // Se não tem dados do perfil
   if (!profileData) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="card-mobile">
         <div className="text-center py-8">
           <ExclamationTriangleIcon className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          <h2 className="title-mobile-lg text-gray-900 mb-2">
             Perfil não encontrado
           </h2>
-          <p className="text-gray-600">
+          <p className="text-mobile-base text-gray-600">
             Não foi possível carregar os dados do seu perfil.
           </p>
         </div>
@@ -86,131 +91,30 @@ export default function PerfilPage() {
     );
   }
 
-  // Verificar se há mudanças não salvas
-  const hasUnsavedChanges = isEditing && Object.keys(errors).length === 0;
-
   return (
-    <div className="space-y-6">
-      {/* Header da página */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Meu Perfil Profissional
-            </h1>
-            <p className="text-gray-600">
-              {isEditing
-                ? "Edite suas informações profissionais"
-                : "Visualize como seu perfil aparece para os pacientes"}
-            </p>
-          </div>
+    <div className="mobile-safe-container space-y-6">
+      {/* 🔧 USAR O NOVO PROFILEHEADER */}
+      <ProfileHeader
+        isEditing={isEditing}
+        activeTab={activeTab}
+        saving={saving}
+        hasUnsavedChanges={hasUnsavedChanges}
+        onToggleEdit={toggleEditing}
+        onSave={handleSave}
+        onCancel={handleCancelEdit}
+        onChangeTab={handleChangeTab}
+      />
 
-          <div className="flex items-center space-x-3">
-            {/* Abas de navegação */}
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab("preview")}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === "preview"
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                <EyeIcon className="w-4 h-4" />
-                <span>Visualizar</span>
-              </button>
-              <button
-                onClick={() => setActiveTab("edit")}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === "edit"
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                <PencilIcon className="w-4 h-4" />
-                <span>Editar</span>
-              </button>
-            </div>
-
-            {/* Botões de ação */}
-            {activeTab === "edit" && (
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleCancelEdit}
-                  disabled={saving}
-                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  <XMarkIcon className="w-4 h-4" />
-                  <span>Cancelar</span>
-                </button>
-
-                <button
-                  onClick={handleSave}
-                  disabled={saving || Object.keys(errors).length > 0}
-                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {saving ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <CheckIcon className="w-4 h-4" />
-                  )}
-                  <span>{saving ? "Salvando..." : "Salvar"}</span>
-                </button>
-              </div>
-            )}
-
-            {activeTab === "preview" && !isEditing && (
-              <button
-                onClick={handleStartEdit}
-                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-              >
-                <PencilIcon className="w-4 h-4" />
-                <span>Editar Perfil</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Barra de status */}
-        {isEditing && (
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <ExclamationTriangleIcon className="w-5 h-5 text-amber-600" />
-              <p className="text-sm text-amber-700">
-                Você tem alterações não salvas. Lembre-se de salvar antes de
-                sair.
-              </p>
-            </div>
+      {/* 🔧 CONTEÚDO RESPONSIVO */}
+      <div className="space-y-6">
+        {activeTab === "preview" && (
+          <div className="card-mobile">
+            <ProfilePreview profileData={profileData} />
           </div>
         )}
 
-        {/* Mostrar erros se houver */}
-        {Object.keys(errors).length > 0 && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-start space-x-2">
-              <ExclamationTriangleIcon className="w-5 h-5 text-red-600 mt-0.5" />
-              <div>
-                <p className="text-sm text-red-700 font-medium mb-1">
-                  Corrija os seguintes erros:
-                </p>
-                <ul className="text-sm text-red-600 space-y-1">
-                  {Object.entries(errors).map(([field, error]) => (
-                    <li key={field}>• {error}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Conteúdo principal */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Coluna principal - Preview ou Formulário */}
-        <div className="lg:col-span-2">
-          {activeTab === "preview" && <ProfilePreview profileData={formData} />}
-
-          {activeTab === "edit" && (
+        {activeTab === "edit" && isEditing && (
+          <div className="card-mobile">
             <ProfileEditForm
               formData={formData}
               errors={errors}
@@ -218,172 +122,62 @@ export default function PerfilPage() {
               onUpdateField={updateField}
               onUploadPhoto={uploadPhoto}
             />
-          )}
-        </div>
-
-        {/* Sidebar direita - Informações e dicas */}
-        <div className="space-y-6">
-          {/* Card de status do perfil */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Status do Perfil
-            </h3>
-
-            <div className="space-y-4">
-              {/* Completude do perfil */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">
-                    Perfil Completo
-                  </span>
-                  <span className="text-sm text-gray-600">85%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: "85%" }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Status de verificação */}
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-gray-700">Perfil verificado</span>
-              </div>
-
-              {/* Última atualização */}
-              <div className="text-sm text-gray-500">
-                Última atualização:{" "}
-                {new Date(profileData.updated_at).toLocaleDateString("pt-BR")}
-              </div>
-            </div>
           </div>
-
-          {/* Dicas para melhorar o perfil */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              💡 Dicas para Melhorar seu Perfil
-            </h3>
-
-            <div className="space-y-3 text-sm">
-              <div className="flex items-start space-x-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2"></div>
-                <p className="text-gray-700">
-                  <strong>Foto profissional:</strong> Use uma foto clara e
-                  profissional para gerar mais confiança
-                </p>
-              </div>
-
-              <div className="flex items-start space-x-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2"></div>
-                <p className="text-gray-700">
-                  <strong>Biografia completa:</strong> Conte sua história e
-                  abordagem terapêutica
-                </p>
-              </div>
-
-              <div className="flex items-start space-x-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2"></div>
-                <p className="text-gray-700">
-                  <strong>Links sociais:</strong> Adicione seus perfis
-                  profissionais para mais credibilidade
-                </p>
-              </div>
-
-              <div className="flex items-start space-x-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2"></div>
-                <p className="text-gray-700">
-                  <strong>Valor da sessão:</strong> Defina seus preços para
-                  facilitar o agendamento
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Estatísticas do perfil */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              📊 Estatísticas
-            </h3>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">
-                  Visualizações do perfil
-                </span>
-                <span className="text-sm font-semibold text-gray-900">152</span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">
-                  Agendamentos este mês
-                </span>
-                <span className="text-sm font-semibold text-gray-900">8</span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Avaliação média</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  4.9 ⭐
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Taxa de resposta</span>
-                <span className="text-sm font-semibold text-gray-900">98%</span>
-              </div>
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                Ver relatório completo →
-              </button>
-            </div>
-          </div>
-
-          {/* Ações rápidas */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              ⚡ Ações Rápidas
-            </h3>
-
-            <div className="space-y-3">
-              <button className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
-                <div className="text-sm font-medium text-gray-900">
-                  Configurar Agenda
-                </div>
-                <div className="text-xs text-gray-600">
-                  Defina seus horários disponíveis
-                </div>
-              </button>
-
-              <button className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
-                <div className="text-sm font-medium text-gray-900">
-                  Ver meu Perfil Público
-                </div>
-                <div className="text-xs text-gray-600">
-                  Como os pacientes veem você
-                </div>
-              </button>
-
-              <button className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
-                <div className="text-sm font-medium text-gray-900">
-                  Configurar Notificações
-                </div>
-                <div className="text-xs text-gray-600">Lembretes e alertas</div>
-              </button>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Toast de sucesso */}
+      {/* 🔧 MODAL DE CONFIRMAÇÃO DE SALVAMENTO */}
       {showSaveConfirm && (
-        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50">
-          <div className="flex items-center space-x-2">
-            <CheckIcon className="w-5 h-5" />
-            <span className="font-medium">Perfil salvo com sucesso!</span>
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <div className="sm:flex sm:items-start">
+                <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
+                  <ExclamationTriangleIcon className="h-6 w-6 text-green-600" />
+                </div>
+                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">
+                    Salvar alterações
+                  </h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500">
+                      Deseja salvar as alterações feitas no seu perfil?
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                >
+                  {saving ? "Salvando..." : "Salvar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSaveConfirm(false)}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔧 TOAST DE SUCESSO/ERRO */}
+      {saving && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-4 flex items-center space-x-3">
+            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-sm font-medium text-gray-900">
+              Salvando alterações...
+            </span>
           </div>
         </div>
       )}

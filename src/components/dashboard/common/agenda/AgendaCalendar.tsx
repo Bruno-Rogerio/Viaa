@@ -1,31 +1,22 @@
 // src/components/dashboard/common/agenda/AgendaCalendar.tsx
-// Componente PURO do calendário com todas as visualizações - VERSÃO FINAL
+// 🔧 VERSÃO ATUALIZADA - Usando AgendaControls mobile-friendly
 
 "use client";
 
 import { useState, useMemo } from "react";
 import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
   CalendarIcon as CalendarSolid,
   ClockIcon,
-  CogIcon,
   UserIcon,
   VideoCameraIcon,
   MapPinIcon,
-  FunnelIcon,
-  MagnifyingGlassIcon,
-} from "@heroicons/react/24/solid";
-import {
-  CalendarDaysIcon,
-  ListBulletIcon,
-  Squares2X2Icon,
-  EllipsisVerticalIcon,
   CheckCircleIcon,
   XCircleIcon,
   PlayCircleIcon,
   StopCircleIcon,
-} from "@heroicons/react/24/outline";
+} from "@heroicons/react/24/solid";
+import { EllipsisVerticalIcon } from "@heroicons/react/24/outline";
+import AgendaControls from "./AgendaControls";
 import type {
   Consulta,
   StatusConsulta,
@@ -147,7 +138,7 @@ export default function AgendaCalendar({
   >("todos");
   const [buscaLista, setBuscaLista] = useState("");
 
-  // HOOK MOVIDO PARA NÍVEL SUPERIOR - Filtrar consultas para modo lista
+  // Filtrar consultas para modo lista
   const consultasFiltradas = useMemo(() => {
     let filtradas = consultas;
 
@@ -205,59 +196,6 @@ export default function AgendaCalendar({
     );
   }, [consultas, filtroLista, buscaLista]);
 
-  // Navegação de data
-  const navegarData = (direcao: "anterior" | "proximo") => {
-    const nova = new Date(dataAtual);
-
-    switch (modoVisualizacao) {
-      case "semana":
-        nova.setDate(nova.getDate() + (direcao === "proximo" ? 7 : -7));
-        break;
-      case "dia":
-        nova.setDate(nova.getDate() + (direcao === "proximo" ? 1 : -1));
-        break;
-      default:
-        nova.setMonth(nova.getMonth() + (direcao === "proximo" ? 1 : -1));
-    }
-
-    onNavigateData?.(nova);
-  };
-
-  // Obter texto da data atual
-  const obterTextoData = () => {
-    const meses = [
-      "Janeiro",
-      "Fevereiro",
-      "Março",
-      "Abril",
-      "Maio",
-      "Junho",
-      "Julho",
-      "Agosto",
-      "Setembro",
-      "Outubro",
-      "Novembro",
-      "Dezembro",
-    ];
-
-    switch (modoVisualizacao) {
-      case "semana":
-        const inicioSemana = new Date(dataAtual);
-        inicioSemana.setDate(dataAtual.getDate() - dataAtual.getDay());
-        const fimSemana = new Date(inicioSemana);
-        fimSemana.setDate(inicioSemana.getDate() + 6);
-        return `${inicioSemana.getDate()} - ${fimSemana.getDate()} de ${
-          meses[dataAtual.getMonth()]
-        } ${dataAtual.getFullYear()}`;
-      case "dia":
-        return `${dataAtual.getDate()} de ${
-          meses[dataAtual.getMonth()]
-        } ${dataAtual.getFullYear()}`;
-      default:
-        return `${meses[dataAtual.getMonth()]} ${dataAtual.getFullYear()}`;
-    }
-  };
-
   // Verificar se uma data tem horário disponível
   const temHorarioDisponivel = (data: Date) => {
     const diaSemana = data.getDay();
@@ -306,24 +244,21 @@ export default function AgendaCalendar({
     }
 
     return (
-      <div className="p-6">
+      <div className="h-full">
         {/* Cabeçalho dos dias da semana */}
-        <div className="grid grid-cols-7 gap-1 mb-4">
+        <div className="grid grid-cols-7 gap-1 mb-2 text-center text-sm font-medium text-gray-500">
           {DIAS_SEMANA.map((dia) => (
-            <div
-              key={dia}
-              className="text-center text-sm font-medium text-gray-600 py-2"
-            >
+            <div key={dia} className="p-2">
               {dia}
             </div>
           ))}
         </div>
 
         {/* Grid do calendário */}
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-1 h-full">
           {dias.map((dia, index) => {
             if (!dia) {
-              return <div key={index} className="h-24"></div>;
+              return <div key={index} className="p-1"></div>;
             }
 
             const data = new Date(
@@ -331,70 +266,68 @@ export default function AgendaCalendar({
               dataAtual.getMonth(),
               dia
             );
-            const consultasDia = consultasNaData(data);
             const temHorario = temHorarioDisponivel(data);
-            const ehHoje = data.toDateString() === new Date().toDateString();
+            const consultasDia = consultasNaData(data);
+            const isHoje = data.toDateString() === new Date().toDateString();
 
             return (
               <div
                 key={dia}
                 onClick={() => onDiaClick?.(data)}
                 className={`
-                  h-24 border border-gray-200 rounded-lg p-2 cursor-pointer transition-all hover:shadow-sm
+                  relative p-2 min-h-[80px] border border-gray-200 rounded-lg cursor-pointer
+                  hover:border-blue-300 transition-colors
                   ${
-                    ehHoje
-                      ? "ring-2 ring-blue-500 bg-blue-50"
+                    isHoje
+                      ? "bg-blue-50 border-blue-300"
                       : "bg-white hover:bg-gray-50"
                   }
-                  ${temHorario ? "border-green-300" : ""}
+                  ${
+                    !temHorario && mostrarIndicadores.diasInativos
+                      ? "bg-gray-100"
+                      : ""
+                  }
                 `}
               >
-                <div
-                  className={`
-                    text-sm font-medium mb-1
-                    ${ehHoje ? "text-blue-600" : "text-gray-900"}
-                  `}
-                >
+                <div className="text-sm font-medium text-gray-900 mb-1">
                   {dia}
                 </div>
 
                 {/* Indicador de horário disponível */}
-                {temHorario && consultasDia.length === 0 && (
-                  <div className="w-2 h-2 bg-green-400 rounded-full mb-1"></div>
+                {temHorario && mostrarIndicadores.horariosDisponiveis && (
+                  <div className="absolute top-1 right-1 w-2 h-2 bg-green-400 rounded-full"></div>
                 )}
 
                 {/* Consultas do dia */}
                 <div className="space-y-1">
-                  {consultasDia.slice(0, 3).map((consulta) => {
-                    const cores = CORES_STATUS[consulta.status];
-                    return (
-                      <div
-                        key={consulta.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onConsultaClick?.(consulta);
-                        }}
-                        className={`
-                          text-xs p-1 rounded border-l-2 truncate hover:shadow-sm
-                          ${cores.bg} ${cores.text} ${cores.border}
-                        `}
-                      >
-                        {new Date(consulta.data_inicio)
-                          .toTimeString()
-                          .slice(0, 5)}{" "}
-                        -{" "}
-                        {consulta.paciente?.nome
-                          ? `${consulta.paciente.nome} ${
-                              consulta.paciente?.sobrenome || ""
-                            }`
-                          : "Paciente"}
-                      </div>
-                    );
-                  })}
-
-                  {consultasDia.length > 3 && (
-                    <div className="text-xs text-gray-500 font-medium">
-                      +{consultasDia.length - 3} mais
+                  {consultasDia.slice(0, 2).map((consulta) => (
+                    <div
+                      key={consulta.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onConsultaClick?.(consulta);
+                      }}
+                      className={`
+                        text-xs p-1 rounded truncate cursor-pointer
+                        ${CORES_STATUS[consulta.status].bg}
+                        ${CORES_STATUS[consulta.status].text}
+                        ${CORES_STATUS[consulta.status].border}
+                        hover:opacity-80
+                      `}
+                    >
+                      {new Date(consulta.data_inicio).toLocaleTimeString(
+                        "pt-BR",
+                        {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }
+                      )}{" "}
+                      - {consulta.titulo}
+                    </div>
+                  ))}
+                  {consultasDia.length > 2 && (
+                    <div className="text-xs text-gray-500 text-center">
+                      +{consultasDia.length - 2} mais
                     </div>
                   )}
                 </div>
@@ -411,308 +344,241 @@ export default function AgendaCalendar({
     const inicioSemana = new Date(dataAtual);
     inicioSemana.setDate(dataAtual.getDate() - dataAtual.getDay());
 
-    const diasSemana = Array.from({ length: 7 }, (_, i) => {
-      const dia = new Date(inicioSemana);
-      dia.setDate(inicioSemana.getDate() + i);
-      return dia;
-    });
+    const diasSemana = [];
+    for (let i = 0; i < 7; i++) {
+      const data = new Date(inicioSemana);
+      data.setDate(inicioSemana.getDate() + i);
+      diasSemana.push(data);
+    }
 
     return (
-      <div className="p-6">
-        <div className="grid grid-cols-8 gap-1">
-          {/* Coluna de horários */}
-          <div className="space-y-12">
-            <div className="h-16"></div> {/* Espaço para header dos dias */}
-            {HORARIOS_PADRAO.map((horario) => (
-              <div
-                key={horario}
-                className="text-xs text-gray-500 text-right pr-2 -mt-2"
-              >
-                {horario}
-              </div>
-            ))}
-          </div>
-
-          {/* Colunas dos dias */}
-          {diasSemana.map((dia, diaIndex) => {
-            const consultasDia = consultasNaData(dia);
-            const temHorario = temHorarioDisponivel(dia);
-            const ehHoje = dia.toDateString() === new Date().toDateString();
-
+      <div className="h-full flex flex-col">
+        {/* Header dos dias */}
+        <div className="grid grid-cols-8 gap-1 mb-2">
+          <div className="p-2"></div> {/* Espaço para horários */}
+          {diasSemana.map((data, index) => {
+            const isHoje = data.toDateString() === new Date().toDateString();
             return (
-              <div key={diaIndex} className="min-h-full">
-                {/* Header do dia */}
-                <div
-                  className={`
-                    h-16 border-b border-gray-200 p-2 text-center cursor-pointer
-                    ${ehHoje ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50"}
-                  `}
-                  onClick={() => onDiaClick?.(dia)}
-                >
-                  <div className="text-xs text-gray-600">
-                    {DIAS_SEMANA[dia.getDay()]}
-                  </div>
-                  <div
-                    className={`text-lg font-semibold ${
-                      ehHoje ? "text-blue-600" : "text-gray-900"
-                    }`}
-                  >
-                    {dia.getDate()}
-                  </div>
-                </div>
-
-                {/* Grid de horários */}
-                <div className="space-y-12">
-                  {HORARIOS_PADRAO.map((horario) => {
-                    const consultaNoHorario = consultasDia.find((consulta) => {
-                      const horaConsulta = new Date(consulta.data_inicio)
-                        .toTimeString()
-                        .slice(0, 5);
-                      return horaConsulta === horario;
-                    });
-
-                    return (
-                      <div
-                        key={horario}
-                        className={`
-                          h-12 border border-gray-100 rounded cursor-pointer transition-colors
-                          ${
-                            consultaNoHorario
-                              ? ""
-                              : temHorario
-                              ? "hover:bg-green-50 border-green-200"
-                              : "bg-gray-50"
-                          }
-                        `}
-                        onClick={() => {
-                          if (consultaNoHorario) {
-                            onConsultaClick?.(consultaNoHorario);
-                          } else if (temHorario) {
-                            onHorarioClick?.(dia, horario);
-                          }
-                        }}
-                      >
-                        {consultaNoHorario ? (
-                          <div
-                            className={`
-                              h-full p-1 rounded text-xs
-                              ${CORES_STATUS[consultaNoHorario.status].bg}
-                              ${CORES_STATUS[consultaNoHorario.status].text}
-                            `}
-                          >
-                            <div className="font-medium truncate">
-                              {consultaNoHorario.paciente?.nome || "Paciente"}
-                            </div>
-                            <div className="text-xs opacity-75">
-                              {consultaNoHorario.tipo}
-                            </div>
-                          </div>
-                        ) : (
-                          temHorario && (
-                            <div className="h-full flex items-center justify-center text-green-600">
-                              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+              <div
+                key={index}
+                className={`p-2 text-center text-sm font-medium rounded-lg ${
+                  isHoje ? "bg-blue-100 text-blue-800" : "text-gray-600"
+                }`}
+              >
+                <div>{DIAS_SEMANA[data.getDay()]}</div>
+                <div className="text-lg font-bold">{data.getDate()}</div>
               </div>
             );
           })}
+        </div>
+
+        {/* Grid de horários */}
+        <div className="flex-1 overflow-auto">
+          <div className="grid grid-cols-8 gap-1">
+            {/* Coluna de horários */}
+            <div className="space-y-1">
+              {HORARIOS_PADRAO.map((horario) => (
+                <div
+                  key={horario}
+                  className="h-12 p-1 text-xs text-gray-500 text-right"
+                >
+                  {horario}
+                </div>
+              ))}
+            </div>
+
+            {/* Colunas dos dias */}
+            {diasSemana.map((data, diaIndex) => (
+              <div key={diaIndex} className="space-y-1">
+                {HORARIOS_PADRAO.map((horario) => {
+                  const consultasHorario = consultas.filter((consulta) => {
+                    const dataConsulta = new Date(consulta.data_inicio);
+                    const horarioConsulta = dataConsulta.toLocaleTimeString(
+                      "pt-BR",
+                      {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }
+                    );
+                    return (
+                      dataConsulta.toDateString() === data.toDateString() &&
+                      horarioConsulta === horario
+                    );
+                  });
+
+                  const temHorario = temHorarioDisponivel(data);
+
+                  return (
+                    <div
+                      key={horario}
+                      onClick={() => onHorarioClick?.(data, horario)}
+                      className={`
+                        h-12 p-1 border border-gray-200 rounded cursor-pointer text-xs
+                        hover:border-blue-300 transition-colors
+                        ${temHorario ? "bg-green-50" : "bg-gray-50"}
+                        ${consultasHorario.length > 0 ? "bg-blue-100" : ""}
+                      `}
+                    >
+                      {consultasHorario.map((consulta) => (
+                        <div
+                          key={consulta.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onConsultaClick?.(consulta);
+                          }}
+                          className={`
+                            text-xs p-1 rounded truncate cursor-pointer mb-1
+                            ${CORES_STATUS[consulta.status].bg}
+                            ${CORES_STATUS[consulta.status].text}
+                          `}
+                        >
+                          {consulta.titulo}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
   };
 
-  // ===== VISUALIZAÇÃO EM LISTA =====
+  // ===== VISUALIZAÇÃO LISTA =====
   const renderLista = () => {
     return (
-      <div className="p-6 space-y-6">
-        {/* Controles de filtro */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Filtros por período */}
-          <div className="flex space-x-2">
-            {(["todos", "hoje", "semana", "mes"] as const).map((filtro) => (
-              <button
-                key={filtro}
-                onClick={() => setFiltroLista(filtro)}
-                className={`
-                  px-3 py-2 text-sm font-medium rounded-lg transition-colors
-                  ${
-                    filtroLista === filtro
-                      ? "bg-blue-100 text-blue-700"
-                      : "text-gray-600 hover:bg-gray-100"
-                  }
-                `}
-              >
-                {filtro.charAt(0).toUpperCase() + filtro.slice(1)}
-              </button>
-            ))}
+      <div className="h-full flex flex-col">
+        {/* Filtros para lista */}
+        <div className="p-4 border-b border-gray-200 space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setFiltroLista("todos")}
+              className={`px-3 py-1 text-sm rounded-lg ${
+                filtroLista === "todos"
+                  ? "bg-blue-100 text-blue-800"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setFiltroLista("hoje")}
+              className={`px-3 py-1 text-sm rounded-lg ${
+                filtroLista === "hoje"
+                  ? "bg-blue-100 text-blue-800"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              Hoje
+            </button>
+            <button
+              onClick={() => setFiltroLista("semana")}
+              className={`px-3 py-1 text-sm rounded-lg ${
+                filtroLista === "semana"
+                  ? "bg-blue-100 text-blue-800"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              Esta Semana
+            </button>
+            <button
+              onClick={() => setFiltroLista("mes")}
+              className={`px-3 py-1 text-sm rounded-lg ${
+                filtroLista === "mes"
+                  ? "bg-blue-100 text-blue-800"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              Este Mês
+            </button>
           </div>
 
-          {/* Busca */}
-          <div className="relative flex-1 max-w-sm">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <div className="relative">
             <input
               type="text"
-              placeholder="Buscar consultas..."
+              placeholder="Buscar por paciente ou título..."
               value={buscaLista}
               onChange={(e) => setBuscaLista(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
         </div>
 
         {/* Lista de consultas */}
-        <div className="space-y-4">
+        <div className="flex-1 overflow-auto p-4">
           {consultasFiltradas.length === 0 ? (
-            <div className="text-center py-8">
-              <CalendarSolid className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Nenhuma consulta encontrada
-              </h3>
-              <p className="text-gray-600">
-                {buscaLista.trim()
-                  ? "Tente ajustar sua busca"
-                  : "Nenhuma consulta para o período selecionado"}
-              </p>
+            <div className="text-center py-8 text-gray-500">
+              Nenhuma consulta encontrada
             </div>
           ) : (
-            consultasFiltradas.map((consulta: Consulta) => {
-              const cores = CORES_STATUS[consulta.status];
-              const dataInicio = new Date(consulta.data_inicio);
-              const dataFim = new Date(consulta.data_fim);
-
-              return (
+            <div className="space-y-3">
+              {consultasFiltradas.map((consulta) => (
                 <div
                   key={consulta.id}
                   onClick={() => onConsultaClick?.(consulta)}
                   className={`
-                    p-4 rounded-xl border transition-all hover:shadow-lg cursor-pointer
-                    ${cores.bg} ${cores.border} hover:scale-[1.02]
+                    p-4 rounded-lg border cursor-pointer hover:shadow-md transition-all
+                    ${CORES_STATUS[consulta.status].bg}
+                    ${CORES_STATUS[consulta.status].border}
                   `}
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex justify-between items-start mb-2">
                     <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                          {(consulta.paciente?.nome || "P")
-                            .charAt(0)
-                            .toUpperCase()}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">
-                            {consulta.paciente?.nome || "Paciente"}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            {dataInicio.toTimeString().slice(0, 5)} -{" "}
-                            {dataFim.toTimeString().slice(0, 5)}
-                          </p>
-                        </div>
-                      </div>
+                      <h3 className="font-medium text-gray-900">
+                        {consulta.titulo}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {consulta.paciente?.nome} {consulta.paciente?.sobrenome}
+                      </p>
+                    </div>
+                    <span
+                      className={`
+                        px-2 py-1 text-xs font-medium rounded-full
+                        ${CORES_STATUS[consulta.status].text}
+                        ${CORES_STATUS[consulta.status].bg}
+                      `}
+                    >
+                      {consulta.status}
+                    </span>
+                  </div>
 
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
-                        <div className="flex items-center">
-                          {consulta.tipo === "online" ? (
-                            <VideoCameraIcon className="w-4 h-4 mr-1" />
-                          ) : (
-                            <MapPinIcon className="w-4 h-4 mr-1" />
-                          )}
-                          {consulta.tipo === "online" ? "Online" : "Presencial"}
-                        </div>
-
-                        {consulta.valor && (
-                          <div className="flex items-center">
-                            <span className="font-medium">
-                              R$ {consulta.valor.toFixed(2)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {consulta.observacoes && (
-                        <p className="text-sm text-gray-600 mt-2 line-clamp-2">
-                          {consulta.observacoes}
-                        </p>
+                  <div className="flex items-center text-sm text-gray-600 space-x-4">
+                    <div className="flex items-center">
+                      <CalendarSolid className="w-4 h-4 mr-1" />
+                      {new Date(consulta.data_inicio).toLocaleDateString(
+                        "pt-BR"
                       )}
                     </div>
-
-                    <div className="flex flex-col items-end space-y-2">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${cores.bg} ${cores.text}`}
-                      >
-                        {consulta.status.replace("_", " ")}
-                      </span>
-
-                      <div className="flex space-x-1">
-                        {consulta.status === "agendada" && (
-                          <>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // TODO: Confirmar consulta
-                              }}
-                              className="p-1 text-green-600 hover:bg-green-100 rounded"
-                              title="Confirmar consulta"
-                            >
-                              <CheckCircleIcon className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // TODO: Rejeitar consulta
-                              }}
-                              className="p-1 text-red-600 hover:bg-red-100 rounded"
-                              title="Rejeitar consulta"
-                            >
-                              <XCircleIcon className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-
-                        {consulta.status === "confirmada" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // TODO: Iniciar consulta
-                            }}
-                            className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                            title="Iniciar consulta"
-                          >
-                            <PlayCircleIcon className="w-4 h-4" />
-                          </button>
-                        )}
-
-                        {consulta.status === "em_andamento" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // TODO: Finalizar consulta
-                            }}
-                            className="p-1 text-purple-600 hover:bg-purple-100 rounded"
-                            title="Finalizar consulta"
-                          >
-                            <StopCircleIcon className="w-4 h-4" />
-                          </button>
-                        )}
-
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // TODO: Menu de opções
-                          }}
-                          className="p-1 text-gray-600 hover:bg-gray-100 rounded"
-                        >
-                          <EllipsisVerticalIcon className="w-4 h-4" />
-                        </button>
-                      </div>
+                    <div className="flex items-center">
+                      <ClockIcon className="w-4 h-4 mr-1" />
+                      {new Date(consulta.data_inicio).toLocaleTimeString(
+                        "pt-BR",
+                        {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }
+                      )}
+                    </div>
+                    <div className="flex items-center">
+                      {consulta.tipo === "online" ? (
+                        <VideoCameraIcon className="w-4 h-4 mr-1" />
+                      ) : (
+                        <MapPinIcon className="w-4 h-4 mr-1" />
+                      )}
+                      {consulta.tipo}
                     </div>
                   </div>
+
+                  {consulta.observacoes && (
+                    <p className="mt-2 text-sm text-gray-600 line-clamp-2">
+                      {consulta.observacoes}
+                    </p>
+                  )}
                 </div>
-              );
-            })
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -739,116 +605,14 @@ export default function AgendaCalendar({
     <div
       className={`bg-white rounded-xl border border-gray-200 shadow-sm ${className}`}
     >
-      {/* Header da agenda */}
-      <div className="border-b border-gray-200 p-6">
-        <div className="flex items-center justify-between">
-          {/* Navegação de data */}
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center bg-gray-50 rounded-lg p-1">
-              <button
-                onClick={() => navegarData("anterior")}
-                className="p-2 hover:bg-white rounded-md transition-colors"
-                disabled={carregando}
-              >
-                <ChevronLeftIcon className="w-4 h-4" />
-              </button>
-
-              <span className="px-4 py-2 font-semibold text-gray-900 min-w-[200px] text-center">
-                {obterTextoData()}
-              </span>
-
-              <button
-                onClick={() => navegarData("proximo")}
-                className="p-2 hover:bg-white rounded-md transition-colors"
-                disabled={carregando}
-              >
-                <ChevronRightIcon className="w-4 h-4" />
-              </button>
-            </div>
-
-            {modoVisualizacao !== "lista" && (
-              <button
-                onClick={() => onNavigateData?.(new Date())}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-                disabled={carregando}
-              >
-                Hoje
-              </button>
-            )}
-          </div>
-
-          {/* Modos de visualização */}
-          <div className="flex items-center bg-gray-50 rounded-lg p-1">
-            <button
-              onClick={() => onChangeModoVisualizacao?.("mes")}
-              className={`p-2 rounded-md transition-colors ${
-                modoVisualizacao === "mes"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-              title="Visualização Mensal"
-              disabled={carregando}
-            >
-              <Squares2X2Icon className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => onChangeModoVisualizacao?.("semana")}
-              className={`p-2 rounded-md transition-colors ${
-                modoVisualizacao === "semana"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-              title="Visualização Semanal"
-              disabled={carregando}
-            >
-              <CalendarDaysIcon className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => onChangeModoVisualizacao?.("lista")}
-              className={`p-2 rounded-md transition-colors ${
-                modoVisualizacao === "lista"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-              title="Visualização em Lista"
-              disabled={carregando}
-            >
-              <ListBulletIcon className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Indicadores (apenas para mês e semana) */}
-        {(modoVisualizacao === "mes" || modoVisualizacao === "semana") && (
-          <div className="flex items-center space-x-6 mt-4 text-sm">
-            {mostrarIndicadores.consultas && (
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-blue-200 rounded border border-blue-300"></div>
-                <span className="text-gray-600">Consultas agendadas</span>
-              </div>
-            )}
-            {mostrarIndicadores.horariosDisponiveis && (
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-200 rounded border-2 border-dashed border-green-300"></div>
-                <span className="text-gray-600">Horários disponíveis</span>
-              </div>
-            )}
-            {mostrarIndicadores.diasInativos && (
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-gray-200 rounded border border-gray-300"></div>
-                <span className="text-gray-600">Indisponível</span>
-              </div>
-            )}
-            <div className="flex items-center space-x-2">
-              <ClockIcon className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-600">
-                {consultas.length} consulta{consultas.length !== 1 ? "s" : ""}{" "}
-                no período
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* 🔧 USAR O NOVO AGENDACONTROLS */}
+      <AgendaControls
+        dataAtual={dataAtual}
+        modoVisualizacao={modoVisualizacao}
+        carregando={carregando}
+        onNavigateData={onNavigateData}
+        onChangeModoVisualizacao={onChangeModoVisualizacao}
+      />
 
       {/* Conteúdo da agenda */}
       <div className={`${altura} overflow-hidden`}>
