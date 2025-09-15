@@ -1,9 +1,7 @@
 // src/components/dashboard/professional/profile/ProfileEditForm.tsx
-// Formulário completo para edição do perfil profissional
 
-"use client";
-
-import { useRef } from "react";
+// Relative imports
+import React, { useRef, useState } from "react";
 import {
   UserIcon,
   EnvelopeIcon,
@@ -14,21 +12,34 @@ import {
   CameraIcon,
   AcademicCapIcon,
   ClockIcon,
+  DocumentTextIcon,
+  ShieldCheckIcon,
+  ExclamationCircleIcon,
+  CheckIcon,
+  XMarkIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  CalendarDaysIcon,
 } from "@heroicons/react/24/outline";
-import { Avatar } from "@/components/dashboard/common";
 
+// Usando a mesma interface do hook para evitar conflitos
 interface ProfileFormData {
+  // Dados pessoais
   nome: string;
   sobrenome: string;
   email: string;
   telefone: string;
   data_nascimento: string;
+
+  // Dados profissionais
   especialidades: string;
   bio_profissional: string;
   formacao_principal: string;
   experiencia_anos: number;
   valor_sessao: number;
   abordagem_terapeutica: string;
+
+  // Localização
   endereco_cidade: string;
   endereco_estado: string;
   endereco_cep: string;
@@ -36,10 +47,14 @@ interface ProfileFormData {
   endereco_numero: string;
   endereco_bairro: string;
   endereco_complemento: string;
+
+  // Links sociais
   link_linkedin: string;
   link_instagram: string;
   link_youtube: string;
   site_pessoal: string;
+
+  // Foto
   foto_perfil_url: string;
 }
 
@@ -51,15 +66,107 @@ interface ProfileEditFormProps {
   onUploadPhoto: (file: File) => Promise<boolean>;
 }
 
+// Componente Avatar para preview da foto
+interface AvatarProps {
+  src?: string;
+  alt: string;
+  size?: "sm" | "md" | "lg" | "xl";
+  className?: string;
+}
+
+const Avatar: React.FC<AvatarProps> = ({
+  src,
+  alt,
+  size = "lg",
+  className = "",
+}) => {
+  const [imageError, setImageError] = useState(false);
+
+  const sizeClasses: Record<string, string> = {
+    sm: "w-12 h-12 text-sm",
+    md: "w-16 h-16 text-base",
+    lg: "w-20 h-20 text-lg",
+    xl: "w-24 h-24 text-xl",
+  };
+
+  const getInitials = (name: string): string => {
+    return name
+      .split(" ")
+      .map((word: string) => word[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const baseClasses = `
+    ${sizeClasses[size]}
+    rounded-full 
+    flex 
+    items-center 
+    justify-center 
+    font-bold 
+    bg-gradient-to-br 
+    from-blue-500 
+    to-purple-600 
+    text-white
+    ${className}
+  `;
+
+  if (src && !imageError) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={`${baseClasses} object-cover`}
+        onError={() => setImageError(true)}
+      />
+    );
+  }
+
+  return <div className={baseClasses}>{getInitials(alt)}</div>;
+};
+
+// Dados de exemplo compatíveis com o hook existente
+const exampleFormData: ProfileFormData = {
+  nome: "Marina",
+  sobrenome: "Silva Santos",
+  email: "marina@email.com",
+  telefone: "(11) 99999-9999",
+  data_nascimento: "1990-05-15",
+  especialidades: "Terapia Cognitivo-Comportamental, Ansiedade, Depressão",
+  bio_profissional:
+    "Psicóloga clínica especializada em TCC com foco em ansiedade e depressão.",
+  formacao_principal: "Psicologia - USP",
+  experiencia_anos: 8,
+  valor_sessao: 150,
+  abordagem_terapeutica:
+    "Terapia Cognitivo-Comportamental integrada com Mindfulness",
+  endereco_cep: "01234-567",
+  endereco_logradouro: "Rua das Flores",
+  endereco_numero: "123",
+  endereco_bairro: "Centro",
+  endereco_cidade: "São Paulo",
+  endereco_estado: "SP",
+  endereco_complemento: "Sala 101",
+  link_linkedin: "https://linkedin.com/in/marina-silva",
+  link_instagram: "https://instagram.com/dra.marinasilva",
+  link_youtube: "",
+  site_pessoal: "https://dramarinasilva.com.br",
+  foto_perfil_url: "",
+};
+
 export default function ProfileEditForm({
-  formData,
-  errors,
-  uploadingPhoto,
-  onUpdateField,
-  onUploadPhoto,
+  formData = exampleFormData,
+  errors = {},
+  uploadingPhoto = false,
+  onUpdateField = () => {},
+  onUploadPhoto = async () => true,
 }: ProfileEditFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
+  // Função para lidar com upload de foto
   const handlePhotoUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -81,33 +188,152 @@ export default function ProfileEditForm({
     }
   };
 
-  return (
-    <div className="space-y-8">
-      {/* Seção: Foto de Perfil */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Foto de Perfil
-        </h3>
+  // Função para aplicar máscara de telefone
+  const formatPhone = (value: string): string => {
+    const cleaned = value.replace(/\D/g, "");
+    const match = cleaned.match(/^(\d{2})(\d{4,5})(\d{4})$/);
+    if (match) {
+      return `(${match[1]}) ${match[2]}-${match[3]}`;
+    }
+    return value;
+  };
 
-        <div className="flex items-center space-x-6">
-          <div className="relative">
+  // Função para aplicar máscara de CPF
+  const formatCPF = (value: string): string => {
+    const cleaned = value.replace(/\D/g, "");
+    const match = cleaned.match(/^(\d{3})(\d{3})(\d{3})(\d{2})$/);
+    if (match) {
+      return `${match[1]}.${match[2]}.${match[3]}-${match[4]}`;
+    }
+    return value;
+  };
+
+  // Função para aplicar máscara de CEP
+  const formatCEP = (value: string): string => {
+    const cleaned = value.replace(/\D/g, "");
+    const match = cleaned.match(/^(\d{5})(\d{3})$/);
+    if (match) {
+      return `${match[1]}-${match[2]}`;
+    }
+    return value;
+  };
+
+  // Componente de campo com validação visual
+  const InputField: React.FC<{
+    label: string;
+    type?: string;
+    value: string | number;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    icon?: React.ReactNode;
+    error?: string;
+    required?: boolean;
+    mask?: (value: string) => string;
+    maxLength?: number;
+  }> = ({
+    label,
+    type = "text",
+    value,
+    onChange,
+    placeholder,
+    icon,
+    error,
+    required = false,
+    mask,
+    maxLength,
+  }) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let newValue = e.target.value;
+      if (mask) {
+        newValue = mask(newValue);
+      }
+      onChange(newValue);
+    };
+
+    return (
+      <div className="space-y-2">
+        <label className="block text-sm font-semibold text-gray-700">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        <div className="relative">
+          {icon && (
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+              {icon}
+            </div>
+          )}
+          <input
+            type={type}
+            value={value}
+            onChange={handleChange}
+            maxLength={maxLength}
+            className={`
+              w-full 
+              ${icon ? "pl-10" : "pl-4"} 
+              pr-4 py-3 
+              border rounded-xl 
+              focus:ring-2 focus:ring-blue-500 focus:border-transparent
+              transition-all duration-200
+              ${
+                error
+                  ? "border-red-500 bg-red-50"
+                  : "border-gray-300 hover:border-gray-400"
+              }
+              ${value ? "bg-blue-50/30" : "bg-white"}
+            `}
+            placeholder={placeholder}
+          />
+          {error && (
+            <ExclamationCircleIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-red-500" />
+          )}
+          {value && !error && (
+            <CheckIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-green-500" />
+          )}
+        </div>
+        {error && (
+          <p className="text-red-500 text-sm flex items-center gap-1">
+            <ExclamationCircleIcon className="w-4 h-4" />
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-8 max-w-4xl mx-auto">
+      {/* Seção: Foto de Perfil */}
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <div className="flex items-center gap-6 mb-6">
+          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+            <CameraIcon className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Foto de Perfil</h3>
+            <p className="text-gray-600">
+              Sua foto ajuda pacientes a se conectarem com você
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-8">
+          <div className="relative group">
             <Avatar
               src={formData.foto_perfil_url}
               alt={`${formData.nome} ${formData.sobrenome}`}
               size="xl"
-              className="ring-2 ring-gray-200"
+              className="ring-4 ring-gray-200 group-hover:ring-blue-300 transition-all duration-300"
             />
 
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingPhoto}
-              className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-lg hover:shadow-xl"
             >
               {uploadingPhoto ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                <CameraIcon className="w-4 h-4" />
+                <CameraIcon className="w-5 h-5" />
               )}
             </button>
 
@@ -120,147 +346,132 @@ export default function ProfileEditForm({
             />
           </div>
 
-          <div>
-            <p className="text-sm text-gray-600 mb-2">
-              Escolha uma foto profissional que represente você.
+          <div className="space-y-3">
+            <p className="text-gray-700 font-medium">
+              Dicas para uma boa foto:
             </p>
-            <p className="text-xs text-gray-500">
-              Formatos aceitos: JPG, PNG. Tamanho máximo: 5MB.
-            </p>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li className="flex items-center gap-2">
+                <CheckIcon className="w-4 h-4 text-green-500" />
+                Use uma foto profissional e recente
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckIcon className="w-4 h-4 text-green-500" />
+                Certifique-se que seu rosto está bem iluminado
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckIcon className="w-4 h-4 text-green-500" />
+                Formatos aceitos: JPG, PNG. Máximo: 5MB
+              </li>
+            </ul>
           </div>
         </div>
       </div>
 
       {/* Seção: Dados Pessoais */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Dados Pessoais
-        </h3>
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <div className="flex items-center gap-6 mb-8">
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
+            <UserIcon className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Dados Pessoais</h3>
+            <p className="text-gray-600">Informações básicas do seu perfil</p>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Nome */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nome *
-            </label>
-            <div className="relative">
-              <UserIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={formData.nome}
-                onChange={(e) => onUpdateField("nome", e.target.value)}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.nome ? "border-red-500" : "border-gray-300"
-                }`}
-                placeholder="Seu nome"
-              />
-            </div>
-            {errors.nome && (
-              <p className="text-red-500 text-sm mt-1">{errors.nome}</p>
-            )}
-          </div>
+          <InputField
+            label="Nome"
+            value={formData.nome}
+            onChange={(value) => onUpdateField("nome", value)}
+            placeholder="Seu primeiro nome"
+            icon={<UserIcon className="w-5 h-5" />}
+            error={errors.nome}
+            required
+          />
 
-          {/* Sobrenome */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Sobrenome *
-            </label>
-            <div className="relative">
-              <UserIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={formData.sobrenome}
-                onChange={(e) => onUpdateField("sobrenome", e.target.value)}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.sobrenome ? "border-red-500" : "border-gray-300"
-                }`}
-                placeholder="Seu sobrenome"
-              />
-            </div>
-            {errors.sobrenome && (
-              <p className="text-red-500 text-sm mt-1">{errors.sobrenome}</p>
-            )}
-          </div>
+          <InputField
+            label="Sobrenome"
+            value={formData.sobrenome}
+            onChange={(value) => onUpdateField("sobrenome", value)}
+            placeholder="Seu sobrenome"
+            icon={<UserIcon className="w-5 h-5" />}
+            error={errors.sobrenome}
+            required
+          />
 
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <div className="relative">
-              <EnvelopeIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => onUpdateField("email", e.target.value)}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.email ? "border-red-500" : "border-gray-300"
-                }`}
-                placeholder="seu.email@exemplo.com"
-              />
-            </div>
-            {errors.email && (
-              <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-            )}
-          </div>
+          <InputField
+            label="E-mail"
+            type="email"
+            value={formData.email}
+            onChange={(value) => onUpdateField("email", value)}
+            placeholder="seu@email.com"
+            icon={<EnvelopeIcon className="w-5 h-5" />}
+            error={errors.email}
+          />
 
-          {/* Telefone */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Telefone *
-            </label>
-            <div className="relative">
-              <PhoneIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="tel"
-                value={formData.telefone}
-                onChange={(e) => onUpdateField("telefone", e.target.value)}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.telefone ? "border-red-500" : "border-gray-300"
-                }`}
-                placeholder="(11) 99999-9999"
-              />
-            </div>
-            {errors.telefone && (
-              <p className="text-red-500 text-sm mt-1">{errors.telefone}</p>
-            )}
-          </div>
+          <InputField
+            label="Telefone"
+            value={formData.telefone}
+            onChange={(value) => onUpdateField("telefone", value)}
+            placeholder="(11) 99999-9999"
+            icon={<PhoneIcon className="w-5 h-5" />}
+            error={errors.telefone}
+            mask={formatPhone}
+            maxLength={15}
+          />
 
-          {/* Data de Nascimento */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Data de Nascimento
-            </label>
-            <input
-              type="date"
-              value={formData.data_nascimento}
-              onChange={(e) => onUpdateField("data_nascimento", e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+          <InputField
+            label="Data de Nascimento"
+            type="date"
+            value={formData.data_nascimento}
+            onChange={(value) => onUpdateField("data_nascimento", value)}
+            icon={<CalendarDaysIcon className="w-5 h-5" />}
+            error={errors.data_nascimento}
+          />
+
+          {/* Placeholder para manter o grid 2x3 */}
+          <div></div>
         </div>
       </div>
 
       {/* Seção: Informações Profissionais */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Informações Profissionais
-        </h3>
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <div className="flex items-center gap-6 mb-8">
+          <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center">
+            <AcademicCapIcon className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">
+              Informações Profissionais
+            </h3>
+            <p className="text-gray-600">
+              Dados sobre sua formação e experiência
+            </p>
+          </div>
+        </div>
 
         <div className="space-y-6">
           {/* Especialidades */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Especialidades *
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Especialidades <span className="text-red-500">*</span>
             </label>
             <textarea
               value={formData.especialidades}
               onChange={(e) => onUpdateField("especialidades", e.target.value)}
               rows={3}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                errors.especialidades ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="Descreva suas especialidades (ex: Terapia Cognitivo-Comportamental, Ansiedade, Depressão...)"
+              className={`
+                w-full px-4 py-3 border rounded-xl resize-none
+                focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                ${
+                  errors.especialidades
+                    ? "border-red-500 bg-red-50"
+                    : "border-gray-300"
+                }
+              `}
+              placeholder="Ex: Terapia Cognitivo-Comportamental, Ansiedade, Depressão, Relacionamentos..."
             />
             {errors.especialidades && (
               <p className="text-red-500 text-sm mt-1">
@@ -269,352 +480,233 @@ export default function ProfileEditForm({
             )}
           </div>
 
-          {/* Bio Profissional */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Biografia Profissional
-            </label>
-            <textarea
-              value={formData.bio_profissional}
-              onChange={(e) =>
-                onUpdateField("bio_profissional", e.target.value)
-              }
-              rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Conte um pouco sobre você, sua experiência e abordagem terapêutica..."
-            />
-          </div>
-
+          {/* Grid de informações profissionais */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Experiência */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Anos de Experiência
-              </label>
-              <div className="relative">
-                <ClockIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                <input
-                  type="number"
-                  min="0"
-                  max="50"
-                  value={formData.experiencia_anos}
-                  onChange={(e) =>
-                    onUpdateField(
-                      "experiencia_anos",
-                      parseInt(e.target.value) || 0
-                    )
-                  }
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0"
-                />
-              </div>
-            </div>
+            <InputField
+              label="Formação Principal"
+              value={formData.formacao_principal}
+              onChange={(value) => onUpdateField("formacao_principal", value)}
+              placeholder="Ex: Psicologia - USP"
+              icon={<AcademicCapIcon className="w-5 h-5" />}
+              error={errors.formacao_principal}
+            />
+
+            <InputField
+              label="Anos de Experiência"
+              type="number"
+              value={formData.experiencia_anos}
+              onChange={(value) =>
+                onUpdateField("experiencia_anos", parseInt(value) || 0)
+              }
+              placeholder="0"
+              icon={<ClockIcon className="w-5 h-5" />}
+              error={errors.experiencia_anos}
+            />
 
             {/* Valor da Sessão */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Valor da Sessão (R$)
-              </label>
-              <div className="relative">
-                <CurrencyDollarIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.valor_sessao}
-                  onChange={(e) =>
-                    onUpdateField(
-                      "valor_sessao",
-                      parseFloat(e.target.value) || 0
-                    )
-                  }
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="150.00"
-                />
-              </div>
-            </div>
+            <InputField
+              label="Valor da Sessão (R$)"
+              type="number"
+              value={formData.valor_sessao}
+              onChange={(value) =>
+                onUpdateField("valor_sessao", parseInt(value) || 0)
+              }
+              placeholder="150"
+              icon={<CurrencyDollarIcon className="w-5 h-5" />}
+              error={errors.valor_sessao}
+            />
           </div>
 
-          {/* Formação */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Formação Principal
-            </label>
-            <div className="relative">
-              <AcademicCapIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={formData.formacao_principal}
+          {/* Bio e Abordagem */}
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Biografia Profissional
+              </label>
+              <textarea
+                value={formData.bio_profissional}
                 onChange={(e) =>
-                  onUpdateField("formacao_principal", e.target.value)
+                  onUpdateField("bio_profissional", e.target.value)
                 }
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Ex: Psicologia - Universidade de São Paulo"
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Conte um pouco sobre você, sua trajetória e filosofia de trabalho..."
               />
             </div>
-          </div>
 
-          {/* Abordagem Terapêutica */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Abordagem Terapêutica
-            </label>
-            <textarea
-              value={formData.abordagem_terapeutica}
-              onChange={(e) =>
-                onUpdateField("abordagem_terapeutica", e.target.value)
-              }
-              rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Descreva sua abordagem terapêutica e metodologias utilizadas..."
-            />
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Abordagem Terapêutica
+              </label>
+              <textarea
+                value={formData.abordagem_terapeutica}
+                onChange={(e) =>
+                  onUpdateField("abordagem_terapeutica", e.target.value)
+                }
+                rows={3}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Descreva sua abordagem e métodos terapêuticos..."
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Seção: Endereço */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Localização
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* CEP */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              CEP
-            </label>
-            <input
-              type="text"
-              value={formData.endereco_cep}
-              onChange={(e) => onUpdateField("endereco_cep", e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="00000-000"
-            />
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <div className="flex items-center gap-6 mb-8">
+          <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
+            <MapPinIcon className="w-6 h-6 text-white" />
           </div>
-
-          {/* Cidade */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Cidade
-            </label>
-            <div className="relative">
-              <MapPinIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={formData.endereco_cidade}
-                onChange={(e) =>
-                  onUpdateField("endereco_cidade", e.target.value)
-                }
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="São Paulo"
-              />
-            </div>
+            <h3 className="text-xl font-bold text-gray-900">Localização</h3>
+            <p className="text-gray-600">Onde você atende seus pacientes</p>
           </div>
+        </div>
 
-          {/* Estado */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Estado
-            </label>
-            <select
-              value={formData.endereco_estado}
-              onChange={(e) => onUpdateField("endereco_estado", e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Selecione...</option>
-              <option value="AC">Acre</option>
-              <option value="AL">Alagoas</option>
-              <option value="AP">Amapá</option>
-              <option value="AM">Amazonas</option>
-              <option value="BA">Bahia</option>
-              <option value="CE">Ceará</option>
-              <option value="DF">Distrito Federal</option>
-              <option value="ES">Espírito Santo</option>
-              <option value="GO">Goiás</option>
-              <option value="MA">Maranhão</option>
-              <option value="MT">Mato Grosso</option>
-              <option value="MS">Mato Grosso do Sul</option>
-              <option value="MG">Minas Gerais</option>
-              <option value="PA">Pará</option>
-              <option value="PB">Paraíba</option>
-              <option value="PR">Paraná</option>
-              <option value="PE">Pernambuco</option>
-              <option value="PI">Piauí</option>
-              <option value="RJ">Rio de Janeiro</option>
-              <option value="RN">Rio Grande do Norte</option>
-              <option value="RS">Rio Grande do Sul</option>
-              <option value="RO">Rondônia</option>
-              <option value="RR">Roraima</option>
-              <option value="SC">Santa Catarina</option>
-              <option value="SP">São Paulo</option>
-              <option value="SE">Sergipe</option>
-              <option value="TO">Tocantins</option>
-            </select>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <InputField
+            label="CEP"
+            value={formData.endereco_cep}
+            onChange={(value) => onUpdateField("endereco_cep", value)}
+            placeholder="01234-567"
+            icon={<MapPinIcon className="w-5 h-5" />}
+            error={errors.endereco_cep}
+            mask={formatCEP}
+            maxLength={9}
+          />
 
-          {/* Logradouro */}
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Logradouro
-            </label>
-            <input
-              type="text"
+            <InputField
+              label="Logradouro"
               value={formData.endereco_logradouro}
-              onChange={(e) =>
-                onUpdateField("endereco_logradouro", e.target.value)
-              }
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(value) => onUpdateField("endereco_logradouro", value)}
               placeholder="Rua das Flores"
+              error={errors.endereco_logradouro}
             />
           </div>
 
-          {/* Número */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Número
-            </label>
-            <input
-              type="text"
-              value={formData.endereco_numero}
-              onChange={(e) => onUpdateField("endereco_numero", e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="123"
-            />
-          </div>
+          <InputField
+            label="Número"
+            value={formData.endereco_numero}
+            onChange={(value) => onUpdateField("endereco_numero", value)}
+            placeholder="123"
+            error={errors.endereco_numero}
+          />
 
-          {/* Bairro */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Bairro
-            </label>
-            <input
-              type="text"
-              value={formData.endereco_bairro}
-              onChange={(e) => onUpdateField("endereco_bairro", e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Centro"
-            />
-          </div>
+          <InputField
+            label="Bairro"
+            value={formData.endereco_bairro}
+            onChange={(value) => onUpdateField("endereco_bairro", value)}
+            placeholder="Centro"
+            error={errors.endereco_bairro}
+          />
 
-          {/* Complemento */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Complemento
-            </label>
-            <input
-              type="text"
-              value={formData.endereco_complemento}
-              onChange={(e) =>
-                onUpdateField("endereco_complemento", e.target.value)
-              }
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Apt 101"
-            />
-          </div>
+          <InputField
+            label="Complemento"
+            value={formData.endereco_complemento}
+            onChange={(value) => onUpdateField("endereco_complemento", value)}
+            placeholder="Sala 101"
+            error={errors.endereco_complemento}
+          />
+
+          <InputField
+            label="Cidade"
+            value={formData.endereco_cidade}
+            onChange={(value) => onUpdateField("endereco_cidade", value)}
+            placeholder="São Paulo"
+            error={errors.endereco_cidade}
+          />
+
+          <InputField
+            label="Estado"
+            value={formData.endereco_estado}
+            onChange={(value) => onUpdateField("endereco_estado", value)}
+            placeholder="SP"
+            error={errors.endereco_estado}
+            maxLength={2}
+          />
         </div>
       </div>
 
-      {/* Seção: Links Sociais */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Links e Redes Sociais
-        </h3>
+      {/* Seção: Links e Redes Sociais */}
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <div className="flex items-center gap-6 mb-8">
+          <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center">
+            <LinkIcon className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">
+              Links e Redes Sociais
+            </h3>
+            <p className="text-gray-600">
+              Conecte-se com seus pacientes online
+            </p>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* LinkedIn */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              LinkedIn
-            </label>
-            <div className="relative">
-              <LinkIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="url"
-                value={formData.link_linkedin}
-                onChange={(e) => onUpdateField("link_linkedin", e.target.value)}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.link_linkedin ? "border-red-500" : "border-gray-300"
-                }`}
-                placeholder="https://linkedin.com/in/seuperfil"
-              />
-            </div>
-            {errors.link_linkedin && (
-              <p className="text-red-500 text-sm mt-1">
-                {errors.link_linkedin}
-              </p>
-            )}
-          </div>
+          <InputField
+            label="LinkedIn"
+            type="url"
+            value={formData.link_linkedin}
+            onChange={(value) => onUpdateField("link_linkedin", value)}
+            placeholder="https://linkedin.com/in/seu-perfil"
+            icon={<LinkIcon className="w-5 h-5" />}
+            error={errors.link_linkedin}
+          />
 
-          {/* Instagram */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Instagram
-            </label>
-            <div className="relative">
-              <LinkIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="url"
-                value={formData.link_instagram}
-                onChange={(e) =>
-                  onUpdateField("link_instagram", e.target.value)
-                }
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.link_instagram ? "border-red-500" : "border-gray-300"
-                }`}
-                placeholder="https://instagram.com/seuperfil"
-              />
-            </div>
-            {errors.link_instagram && (
-              <p className="text-red-500 text-sm mt-1">
-                {errors.link_instagram}
-              </p>
-            )}
-          </div>
+          <InputField
+            label="Instagram"
+            type="url"
+            value={formData.link_instagram}
+            onChange={(value) => onUpdateField("link_instagram", value)}
+            placeholder="https://instagram.com/seu.perfil"
+            icon={<LinkIcon className="w-5 h-5" />}
+            error={errors.link_instagram}
+          />
 
-          {/* YouTube */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              YouTube
-            </label>
-            <div className="relative">
-              <LinkIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="url"
-                value={formData.link_youtube}
-                onChange={(e) => onUpdateField("link_youtube", e.target.value)}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.link_youtube ? "border-red-500" : "border-gray-300"
-                }`}
-                placeholder="https://youtube.com/c/seucanal"
-              />
-            </div>
-            {errors.link_youtube && (
-              <p className="text-red-500 text-sm mt-1">{errors.link_youtube}</p>
-            )}
-          </div>
+          <InputField
+            label="YouTube"
+            type="url"
+            value={formData.link_youtube}
+            onChange={(value) => onUpdateField("link_youtube", value)}
+            placeholder="https://youtube.com/@seucanal"
+            icon={<LinkIcon className="w-5 h-5" />}
+            error={errors.link_youtube}
+          />
 
-          {/* Site Pessoal */}
+          <InputField
+            label="Site Pessoal"
+            type="url"
+            value={formData.site_pessoal}
+            onChange={(value) => onUpdateField("site_pessoal", value)}
+            placeholder="https://seusite.com.br"
+            icon={<LinkIcon className="w-5 h-5" />}
+            error={errors.site_pessoal}
+          />
+        </div>
+      </div>
+
+      {/* Footer com estatísticas do perfil */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white">
+        <div className="flex items-center justify-between">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Site Pessoal
-            </label>
-            <div className="relative">
-              <LinkIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="url"
-                value={formData.site_pessoal}
-                onChange={(e) => onUpdateField("site_pessoal", e.target.value)}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.site_pessoal ? "border-red-500" : "border-gray-300"
-                }`}
-                placeholder="https://seusite.com"
-              />
-            </div>
-            {errors.site_pessoal && (
-              <p className="text-red-500 text-sm mt-1">{errors.site_pessoal}</p>
-            )}
+            <h4 className="text-lg font-semibold mb-1">Completude do Perfil</h4>
+            <p className="text-blue-100">
+              Quanto mais completo, melhor sua visibilidade
+            </p>
           </div>
+          <div className="text-right">
+            <div className="text-3xl font-bold">85%</div>
+            <div className="text-sm text-blue-100">Quase lá!</div>
+          </div>
+        </div>
+        <div className="mt-4 bg-white/20 rounded-full h-2">
+          <div
+            className="bg-white h-2 rounded-full"
+            style={{ width: "85%" }}
+          ></div>
         </div>
       </div>
     </div>
