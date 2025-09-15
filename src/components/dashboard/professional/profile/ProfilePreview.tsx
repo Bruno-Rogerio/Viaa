@@ -1,5 +1,4 @@
 // src/components/dashboard/professional/profile/ProfilePreview.tsx
-// 🔧 VERSÃO CORRIGIDA - Interface compatível com PerfilProfissional
 
 // Relative imports
 import React, { useState } from "react";
@@ -18,33 +17,56 @@ import {
   SparklesIcon,
 } from "@heroicons/react/24/solid";
 
-// Tipos baseados no schema real do Supabase
-interface PerfilProfissionalDisplay {
+// Importar os tipos diretamente do hook para garantir compatibilidade
+interface ProfileFormData {
+  // Dados pessoais básicos
   nome: string;
   sobrenome: string;
+  email: string;
+  telefone: string;
+  data_nascimento: string;
+  cpf: string;
+
+  // Dados profissionais
   tipo: "psicologo" | "psicanalista" | "heike" | "holistico" | "coach_mentor";
   especialidades: string;
-  bio_profissional?: string;
-  formacao_principal?: string;
-  experiencia_anos?: number;
-  valor_sessao?: number;
-  abordagem_terapeutica?: string;
-  endereco_cidade?: string;
-  endereco_estado?: string;
-  foto_perfil_url?: string;
-  link_linkedin?: string;
-  link_instagram?: string;
-  link_youtube?: string;
-  site_pessoal?: string;
-  crp?: string;
-  conselho_tipo?: string;
-  conselho_numero?: string;
-  verificado?: boolean;
-  status_verificacao?: "pendente" | "aprovado" | "rejeitado";
+  bio_profissional: string;
+  formacao_principal: string;
+  experiencia_anos: number;
+  valor_sessao: number;
+  abordagem_terapeutica: string;
+
+  // Credenciais profissionais
+  crp: string;
+  conselho_tipo: string;
+  conselho_numero: string;
+  registro_profissional: string;
+
+  // Status profissional (readonly)
+  verificado: boolean;
+  status_verificacao: "pendente" | "aprovado" | "rejeitado";
+
+  // Localização completa
+  endereco_cep: string;
+  endereco_logradouro: string;
+  endereco_numero: string;
+  endereco_bairro: string;
+  endereco_cidade: string;
+  endereco_estado: string;
+  endereco_complemento: string;
+
+  // Links sociais
+  link_linkedin: string;
+  link_instagram: string;
+  link_youtube: string;
+  site_pessoal: string;
+
+  // Foto de perfil
+  foto_perfil_url: string;
 }
 
 interface ProfilePreviewProps {
-  profileData: PerfilProfissionalDisplay;
+  profileData: ProfileFormData;
 }
 
 // Componente Avatar com tipagem correta
@@ -111,10 +133,14 @@ const Avatar: React.FC<AvatarProps> = ({
   return <div className={baseClasses}>{getInitials(alt)}</div>;
 };
 
-// Dados de exemplo para demonstração
-const exampleProfile: PerfilProfissionalDisplay = {
+// Dados de exemplo compatíveis com a interface completa
+const exampleProfile: ProfileFormData = {
   nome: "Dra. Marina",
   sobrenome: "Silva Santos",
+  email: "marina@email.com",
+  telefone: "(11) 99999-9999",
+  data_nascimento: "1990-05-15",
+  cpf: "123.456.789-00",
   tipo: "psicologo",
   especialidades:
     "Terapia Cognitivo-Comportamental, Ansiedade, Depressão, Relacionamentos",
@@ -125,18 +151,24 @@ const exampleProfile: PerfilProfissionalDisplay = {
   valor_sessao: 150,
   abordagem_terapeutica:
     "Terapia Cognitivo-Comportamental integrada com técnicas de Mindfulness e Aceitação e Compromisso (ACT)",
+  crp: "06/123456",
+  conselho_tipo: "CRP",
+  conselho_numero: "06/123456",
+  registro_profissional: "123456",
+  verificado: true,
+  status_verificacao: "aprovado",
+  endereco_cep: "01234-567",
+  endereco_logradouro: "Rua das Flores",
+  endereco_numero: "123",
+  endereco_bairro: "Centro",
   endereco_cidade: "São Paulo",
   endereco_estado: "SP",
-  foto_perfil_url: "",
+  endereco_complemento: "Sala 101",
   link_linkedin: "https://linkedin.com/in/marina-silva",
   link_instagram: "https://instagram.com/dra.marinasilva",
   link_youtube: "",
   site_pessoal: "https://dramarinasilva.com.br",
-  crp: "06/123456",
-  conselho_tipo: "CRP",
-  conselho_numero: "06/123456",
-  verificado: true,
-  status_verificacao: "aprovado",
+  foto_perfil_url: "",
 };
 
 export default function ProfilePreview({

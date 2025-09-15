@@ -1,11 +1,11 @@
-// viaa\src\types\database.ts
+// src/types/database.ts - VERSÃO ATUALIZADA com todos os campos do schema
 
 // Tipos base reutilizáveis
 export type UserType = "paciente" | "profissional" | "clinica" | "empresa";
 export type StatusVerificacao = "pendente" | "aprovado" | "rejeitado";
 export type TipoPrivacidade = "public" | "private" | "friends";
 
-// NOVOS TIPOS DE PROFISSIONAL ATUALIZADOS
+// TIPOS DE PROFISSIONAL ATUALIZADOS
 export type TipoProfissional =
   | "psicologo"
   | "psicanalista"
@@ -13,7 +13,7 @@ export type TipoProfissional =
   | "holistico"
   | "coach_mentor";
 
-// Simplificado - apenas CRP será usado
+// Tipo de conselho profissional
 export type TipoConselho = "CRP";
 
 export type TipoDocumento =
@@ -67,21 +67,26 @@ export interface CriarPerfilPaciente {
   privacidade?: TipoPrivacidade;
 }
 
-// TIPOS PARA PROFISSIONAIS ATUALIZADOS
+// ✅ INTERFACE PROFISSIONAL ATUALIZADA COM TODOS OS CAMPOS DO SCHEMA
 export interface PerfilProfissional {
   id: string;
   user_id: string;
   nome: string;
   sobrenome: string;
-  data_nascimento: string;
+  data_nascimento?: string; // Opcional no schema
   telefone: string;
   cpf: string;
-  tipo: TipoProfissional; // AGORA OBRIGATÓRIO
-  crp?: string; // Apenas para psicólogos
+
+  // Dados profissionais obrigatórios
+  tipo: TipoProfissional;
   especialidades: string;
   verificado: boolean;
   status_verificacao: StatusVerificacao;
+
+  // Campos opcionais pessoais
   email?: string;
+
+  // Endereço completo (todos opcionais)
   endereco_cep?: string;
   endereco_logradouro?: string;
   endereco_numero?: string;
@@ -89,17 +94,28 @@ export interface PerfilProfissional {
   endereco_bairro?: string;
   endereco_cidade?: string;
   endereco_estado?: string;
-  registro_profissional?: string; // Opcional para não-psicólogos
+
+  // ✅ CREDENCIAIS PROFISSIONAIS - NOVOS CAMPOS ADICIONADOS
+  crp?: string; // Para psicólogos especificamente
+  conselho_tipo?: TipoConselho; // "CRP" ou null
+  conselho_numero?: string; // Número completo do conselho (ex: "06/123456")
+  registro_profissional?: string; // Para outros tipos de profissionais
+
+  // Dados profissionais opcionais
   valor_sessao?: number;
   formacao_principal?: string;
   experiencia_anos?: number;
   abordagem_terapeutica?: string;
-  bio_profissional?: string; // AGORA OPCIONAL
+  bio_profissional?: string;
+
+  // Links e redes sociais
   foto_perfil_url?: string;
   link_linkedin?: string;
   link_instagram?: string;
   link_youtube?: string;
   site_pessoal?: string;
+
+  // Timestamps
   created_at: string;
   updated_at: string;
 }
@@ -109,12 +125,14 @@ export interface CriarPerfilProfissional {
   user_id: string;
   nome: string;
   sobrenome: string;
-  data_nascimento: string;
+  data_nascimento?: string;
   telefone: string;
   cpf: string;
-  tipo: TipoProfissional; // OBRIGATÓRIO
+  tipo: TipoProfissional;
   especialidades: string;
   email?: string;
+
+  // Endereço
   endereco_cep?: string;
   endereco_logradouro?: string;
   endereco_numero?: string;
@@ -122,19 +140,29 @@ export interface CriarPerfilProfissional {
   endereco_bairro?: string;
   endereco_cidade?: string;
   endereco_estado?: string;
-  crp?: string; // Apenas para psicólogos
-  registro_profissional?: string; // Opcional
+
+  // ✅ CREDENCIAIS ATUALIZADAS
+  crp?: string;
+  conselho_tipo?: TipoConselho;
+  conselho_numero?: string;
+  registro_profissional?: string;
+
+  // Dados profissionais
   valor_sessao?: number;
   formacao_principal?: string;
   experiencia_anos?: number;
   abordagem_terapeutica?: string;
-  bio_profissional?: string; // OPCIONAL
+  bio_profissional?: string;
+
+  // Links
   foto_perfil_url?: string;
   link_linkedin?: string;
   link_instagram?: string;
+  link_youtube?: string;
+  site_pessoal?: string;
 }
 
-// NOVO: Interface para documentos de profissionais
+// Interface para documentos de profissionais
 export interface DocumentoProfissional {
   id: string;
   profissional_id: string;
@@ -164,7 +192,6 @@ export interface PerfilClinica {
   cnpj: string;
   telefone: string;
   email_contato?: string;
-  endereco_cep: string;
   endereco_logradouro: string;
   endereco_numero: string;
   endereco_complemento?: string;
@@ -199,7 +226,7 @@ export interface CriarPerfilClinica {
   responsavel_tecnico_crp: string;
 }
 
-// Tipos para Empresas (inalterado)
+// Tipos para Empresas
 export interface PerfilEmpresa {
   id: string;
   user_id: string;
@@ -247,7 +274,7 @@ export interface CriarPerfilEmpresa {
   responsavel_email?: string;
 }
 
-// Tipos para Questionários (inalterado)
+// Tipos para Questionários
 export interface Questionario {
   id: string;
   user_id: string;

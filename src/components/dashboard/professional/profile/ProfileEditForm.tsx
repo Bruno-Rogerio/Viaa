@@ -22,7 +22,7 @@ import {
   CalendarDaysIcon,
 } from "@heroicons/react/24/outline";
 
-// Usando a mesma interface do hook para evitar conflitos
+// Usando a interface expandida do hook atualizado
 interface ProfileFormData {
   // Dados pessoais
   nome: string;
@@ -30,14 +30,26 @@ interface ProfileFormData {
   email: string;
   telefone: string;
   data_nascimento: string;
+  cpf: string;
 
   // Dados profissionais
+  tipo: "psicologo" | "psicanalista" | "heike" | "holistico" | "coach_mentor";
   especialidades: string;
   bio_profissional: string;
   formacao_principal: string;
   experiencia_anos: number;
   valor_sessao: number;
   abordagem_terapeutica: string;
+
+  // Credenciais profissionais
+  crp: string;
+  conselho_tipo: string;
+  conselho_numero: string;
+  registro_profissional: string;
+
+  // Status (readonly)
+  verificado: boolean;
+  status_verificacao: "pendente" | "aprovado" | "rejeitado";
 
   // Localização
   endereco_cidade: string;
@@ -126,13 +138,15 @@ const Avatar: React.FC<AvatarProps> = ({
   return <div className={baseClasses}>{getInitials(alt)}</div>;
 };
 
-// Dados de exemplo compatíveis com o hook existente
+// Dados de exemplo compatíveis com a interface completa
 const exampleFormData: ProfileFormData = {
   nome: "Marina",
   sobrenome: "Silva Santos",
   email: "marina@email.com",
   telefone: "(11) 99999-9999",
   data_nascimento: "1990-05-15",
+  cpf: "123.456.789-00",
+  tipo: "psicologo",
   especialidades: "Terapia Cognitivo-Comportamental, Ansiedade, Depressão",
   bio_profissional:
     "Psicóloga clínica especializada em TCC com foco em ansiedade e depressão.",
@@ -141,6 +155,12 @@ const exampleFormData: ProfileFormData = {
   valor_sessao: 150,
   abordagem_terapeutica:
     "Terapia Cognitivo-Comportamental integrada com Mindfulness",
+  crp: "06/123456",
+  conselho_tipo: "CRP",
+  conselho_numero: "06/123456",
+  registro_profissional: "123456",
+  verificado: true,
+  status_verificacao: "aprovado",
   endereco_cep: "01234-567",
   endereco_logradouro: "Rua das Flores",
   endereco_numero: "123",
@@ -431,8 +451,17 @@ export default function ProfileEditForm({
             error={errors.data_nascimento}
           />
 
-          {/* Placeholder para manter o grid 2x3 */}
-          <div></div>
+          <InputField
+            label="CPF"
+            value={formData.cpf}
+            onChange={(value) => onUpdateField("cpf", value)}
+            placeholder="123.456.789-00"
+            icon={<DocumentTextIcon className="w-5 h-5" />}
+            error={errors.cpf}
+            mask={formatCPF}
+            maxLength={14}
+            required
+          />
         </div>
       </div>
 
@@ -453,6 +482,43 @@ export default function ProfileEditForm({
         </div>
 
         <div className="space-y-6">
+          {/* Tipo de Profissional */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
+              Tipo de Profissional <span className="text-red-500">*</span>
+            </label>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {[
+                { value: "psicologo", label: "Psicólogo(a)", icon: "🧠" },
+                { value: "psicanalista", label: "Psicanalista", icon: "🔍" },
+                { value: "heike", label: "Terapeuta Reiki", icon: "✨" },
+                {
+                  value: "holistico",
+                  label: "Terapeuta Holístico",
+                  icon: "🌿",
+                },
+                { value: "coach_mentor", label: "Coach/Mentor", icon: "🎯" },
+              ].map((tipo) => (
+                <button
+                  key={tipo.value}
+                  type="button"
+                  onClick={() => onUpdateField("tipo", tipo.value)}
+                  className={`
+                    p-4 rounded-xl border-2 transition-all duration-200 text-center
+                    ${
+                      formData.tipo === tipo.value
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-gray-200 hover:border-gray-300 text-gray-700"
+                    }
+                  `}
+                >
+                  <div className="text-2xl mb-1">{tipo.icon}</div>
+                  <div className="text-sm font-medium">{tipo.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Especialidades */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -503,7 +569,6 @@ export default function ProfileEditForm({
               error={errors.experiencia_anos}
             />
 
-            {/* Valor da Sessão */}
             <InputField
               label="Valor da Sessão (R$)"
               type="number"
@@ -515,6 +580,82 @@ export default function ProfileEditForm({
               icon={<CurrencyDollarIcon className="w-5 h-5" />}
               error={errors.valor_sessao}
             />
+          </div>
+
+          {/* Credenciais Profissionais */}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
+            <h4 className="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
+              <ShieldCheckIcon className="w-5 h-5" />
+              Credenciais Profissionais
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* CRP - apenas para psicólogos */}
+              {formData.tipo === "psicologo" && (
+                <>
+                  <InputField
+                    label="CRP"
+                    value={formData.crp}
+                    onChange={(value) => onUpdateField("crp", value)}
+                    placeholder="06/123456"
+                    icon={<ShieldCheckIcon className="w-5 h-5" />}
+                    error={errors.crp}
+                    required
+                  />
+
+                  <InputField
+                    label="Conselho"
+                    value={formData.conselho_tipo}
+                    onChange={(value) => onUpdateField("conselho_tipo", value)}
+                    placeholder="CRP"
+                    error={errors.conselho_tipo}
+                  />
+                </>
+              )}
+
+              {/* Registro profissional para outros tipos */}
+              {formData.tipo !== "psicologo" && (
+                <InputField
+                  label="Registro Profissional"
+                  value={formData.registro_profissional}
+                  onChange={(value) =>
+                    onUpdateField("registro_profissional", value)
+                  }
+                  placeholder="Número do registro ou certificação"
+                  icon={<DocumentTextIcon className="w-5 h-5" />}
+                  error={errors.registro_profissional}
+                />
+              )}
+            </div>
+
+            {/* Status de verificação (readonly) */}
+            <div className="mt-4 flex items-center gap-3">
+              <div
+                className={`
+                px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2
+                ${
+                  formData.verificado
+                    ? "bg-green-100 text-green-800 border border-green-200"
+                    : "bg-yellow-100 text-yellow-800 border border-yellow-200"
+                }
+              `}
+              >
+                {formData.verificado ? (
+                  <>
+                    <CheckIcon className="w-4 h-4" />
+                    Perfil Verificado
+                  </>
+                ) : (
+                  <>
+                    <ClockIcon className="w-4 h-4" />
+                    {formData.status_verificacao === "pendente" &&
+                      "Aguardando Verificação"}
+                    {formData.status_verificacao === "rejeitado" &&
+                      "Verificação Rejeitada"}
+                  </>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Bio e Abordagem */}
@@ -698,16 +839,80 @@ export default function ProfileEditForm({
             </p>
           </div>
           <div className="text-right">
-            <div className="text-3xl font-bold">85%</div>
-            <div className="text-sm text-blue-100">Quase lá!</div>
+            <div className="text-3xl font-bold">
+              {Math.round(
+                (Object.values(formData).filter(
+                  (value) =>
+                    value !== null &&
+                    value !== undefined &&
+                    value !== "" &&
+                    value !== 0
+                ).length /
+                  Object.keys(formData).length) *
+                  100
+              )}
+              %
+            </div>
+            <div className="text-sm text-blue-100">
+              {Object.values(formData).filter(
+                (value) =>
+                  value !== null &&
+                  value !== undefined &&
+                  value !== "" &&
+                  value !== 0
+              ).length >
+              Object.keys(formData).length * 0.8
+                ? "Excelente!"
+                : "Quase lá!"}
+            </div>
           </div>
         </div>
         <div className="mt-4 bg-white/20 rounded-full h-2">
           <div
-            className="bg-white h-2 rounded-full"
-            style={{ width: "85%" }}
+            className="bg-white h-2 rounded-full transition-all duration-500"
+            style={{
+              width: `${Math.round(
+                (Object.values(formData).filter(
+                  (value) =>
+                    value !== null &&
+                    value !== undefined &&
+                    value !== "" &&
+                    value !== 0
+                ).length /
+                  Object.keys(formData).length) *
+                  100
+              )}%`,
+            }}
           ></div>
         </div>
+
+        {/* Lista de campos importantes faltando */}
+        {formData.nome && formData.sobrenome && formData.especialidades && (
+          <div className="mt-4 text-sm text-blue-100">
+            <div className="flex flex-wrap gap-2">
+              {!formData.bio_profissional && (
+                <span className="bg-white/20 px-2 py-1 rounded text-xs">
+                  📝 Bio profissional
+                </span>
+              )}
+              {!formData.foto_perfil_url && (
+                <span className="bg-white/20 px-2 py-1 rounded text-xs">
+                  📸 Foto de perfil
+                </span>
+              )}
+              {!formData.formacao_principal && (
+                <span className="bg-white/20 px-2 py-1 rounded text-xs">
+                  🎓 Formação
+                </span>
+              )}
+              {formData.valor_sessao === 0 && (
+                <span className="bg-white/20 px-2 py-1 rounded text-xs">
+                  💰 Valor da sessão
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
