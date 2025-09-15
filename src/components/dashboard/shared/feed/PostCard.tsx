@@ -1,4 +1,5 @@
-// viaa\src\components\dashboard\shared\feed\PostCard.tsx
+// src/components/dashboard/shared/feed/PostCard.tsx
+// 📱 VERSÃO TOTALMENTE RESPONSIVA PARA MOBILE
 
 "use client";
 import { useState } from "react";
@@ -7,6 +8,7 @@ import {
   EllipsisHorizontalIcon,
   CalendarDaysIcon,
   HeartIcon,
+  ChatBubbleLeftIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import Avatar from "../../common/Avatar";
@@ -53,6 +55,7 @@ export default function PostCard({
   const [localIsLiked, setLocalIsLiked] = useState(post.isLiked);
   const [localLikesCount, setLocalLikesCount] = useState(post.likes);
   const [isLiking, setIsLiking] = useState(false);
+  const [showComments, setShowComments] = useState(false);
 
   // Usar o novo hook de curtidas
   const { toggleLike } = usePostLikes();
@@ -71,7 +74,7 @@ export default function PostCard({
 
   // Função para o novo sistema de curtidas com optimistic updates
   const handleLikeToggle = async (postId: string, isLiked: boolean) => {
-    if (isLiking) return; // Evitar cliques múltiplos
+    if (isLiking || !canInteract) return; // Evitar cliques múltiplos
 
     console.log("Clicou no like/unlike", { postId, isLiked });
 
@@ -84,134 +87,181 @@ export default function PostCard({
     setIsLiking(true);
 
     try {
-      // Fazer chamada real para API
       const success = await toggleLike(postId, isLiked);
 
       if (!success) {
         // Reverter em caso de erro
         setLocalIsLiked(isLiked);
-        setLocalLikesCount(localLikesCount);
-        console.error("Erro ao processar curtida");
+        setLocalLikesCount(post.likes);
       }
     } catch (error) {
       // Reverter em caso de erro
       setLocalIsLiked(isLiked);
-      setLocalLikesCount(localLikesCount);
-      console.error("Erro na requisição de curtida:", error);
+      setLocalLikesCount(post.likes);
     } finally {
       setIsLiking(false);
     }
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-      {/* Header do Post */}
-      <div className="p-6 pb-4">
+    <article className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+      {/* 📱 HEADER DO POST - RESPONSIVO */}
+      <div className="p-4 sm:p-6">
         <div className="flex items-start justify-between">
-          <div className="flex items-center space-x-3">
-            <Avatar src={post.author.avatar} alt={post.author.name} size="md" />
-            <div>
-              <div className="flex items-center space-x-2">
-                <h3 className="font-semibold text-gray-900 text-sm">
+          <div className="flex items-start space-x-3 flex-1 min-w-0">
+            <Avatar
+              src={post.author.avatar}
+              alt={post.author.name}
+              size="md"
+              className="flex-shrink-0"
+            />
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center space-x-2 flex-wrap">
+                <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
                   {post.author.name}
                 </h3>
                 {post.author.verified && (
-                  <span className="text-blue-500 text-sm">✓</span>
+                  <span className="text-blue-500 flex-shrink-0">✓</span>
                 )}
               </div>
-              <p className="text-gray-600 text-xs">
+
+              <p className="text-xs sm:text-sm text-gray-600 line-clamp-2 mt-1">
                 {post.author.specialization}
               </p>
-              <p className="text-gray-500 text-xs">
-                {formatTimeAgo(post.createdAt)}
-              </p>
+
+              <div className="flex items-center space-x-2 mt-1">
+                <time className="text-xs text-gray-500">
+                  {formatTimeAgo(post.createdAt)}
+                </time>
+                {post.type !== "text" && (
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                    {post.type === "image"
+                      ? "📷"
+                      : post.type === "video"
+                      ? "🎥"
+                      : "📝"}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Menu de opções */}
-          <button className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
+          <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
             <EllipsisHorizontalIcon className="w-5 h-5" />
           </button>
         </div>
-      </div>
 
-      {/* Conteúdo do Post */}
-      <div className="px-6 pb-4">
-        <p className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap">
-          {post.content}
-        </p>
-      </div>
+        {/* 📱 CONTEÚDO DO POST - RESPONSIVO */}
+        <div className="mt-4">
+          <div className="prose prose-sm sm:prose max-w-none text-gray-900">
+            <p className="whitespace-pre-wrap leading-relaxed text-sm sm:text-base">
+              {post.content}
+            </p>
+          </div>
 
-      {/* Imagem do Post */}
-      {post.image && (
-        <div className="px-6 pb-4">
-          <img
-            src={post.image}
-            alt="Imagem do post"
-            className="w-full rounded-lg object-cover max-h-96"
-          />
+          {/* 📱 IMAGEM RESPONSIVA */}
+          {post.image && (
+            <div className="mt-4 rounded-lg overflow-hidden bg-gray-100">
+              <img
+                src={post.image}
+                alt="Conteúdo do post"
+                className="w-full h-auto max-h-96 object-cover"
+                loading="lazy"
+              />
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Ações do Post */}
-      <div className="px-6 py-4 border-t border-gray-100">
-        <div className="flex items-center justify-between">
-          {/* Botão de Curtir */}
-          {canInteract && (
+        {/* 📱 MÉTRICAS - MOBILE FRIENDLY */}
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+          <div className="flex items-center space-x-4 text-xs sm:text-sm text-gray-500">
+            <span>
+              {localLikesCount} curtida{localLikesCount !== 1 ? "s" : ""}
+            </span>
+            <span>
+              {post.comments} comentário{post.comments !== 1 ? "s" : ""}
+            </span>
+            <span>
+              {post.shares} compartilhamento{post.shares !== 1 ? "s" : ""}
+            </span>
+          </div>
+        </div>
+
+        {/* 📱 AÇÕES - BOTÕES RESPONSIVOS */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+          <div className="flex items-center space-x-1 sm:space-x-2">
+            {/* Botão Curtir */}
+            {canInteract && (
+              <button
+                onClick={() => handleLikeToggle(post.id, localIsLiked)}
+                disabled={isLiking}
+                className={`
+                  flex items-center space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200
+                  ${
+                    localIsLiked
+                      ? "text-red-600 bg-red-50 hover:bg-red-100"
+                      : "text-gray-600 hover:text-red-600 hover:bg-red-50"
+                  }
+                  ${
+                    isLiking
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:scale-105"
+                  }
+                `}
+              >
+                {localIsLiked ? (
+                  <HeartSolidIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                ) : (
+                  <HeartIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                )}
+                <span className="hidden sm:inline">Curtir</span>
+              </button>
+            )}
+
+            {/* Botão Comentar */}
+            {canComment && (
+              <button
+                onClick={() => setShowComments(!showComments)}
+                className="flex items-center space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 hover:scale-105"
+              >
+                <ChatBubbleLeftIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Comentar</span>
+              </button>
+            )}
+
+            {/* Botão Compartilhar */}
+            <button className="flex items-center space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-gray-600 hover:text-green-600 hover:bg-green-50 transition-all duration-200 hover:scale-105">
+              <ShareIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Compartilhar</span>
+            </button>
+          </div>
+
+          {/* 📱 BOTÃO AGENDAR - MOBILE FRIENDLY */}
+          {showScheduleButton && onSchedule && (
             <button
-              onClick={() => handleLikeToggle(post.id, localIsLiked)}
-              disabled={isLiking}
-              className={`
-                group flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors
-                ${
-                  localIsLiked
-                    ? "text-red-600"
-                    : "text-gray-600 hover:text-red-600"
-                }
-                ${isLiking ? "opacity-70" : ""}
-              `}
+              onClick={onSchedule}
+              className="flex items-center space-x-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm"
             >
-              {localIsLiked ? (
-                <HeartSolidIcon className="w-5 h-5 text-red-500 group-hover:scale-110 transition-transform" />
-              ) : (
-                <HeartIcon className="w-5 h-5 group-hover:text-red-500 group-hover:scale-110 transition-transform" />
-              )}
-              <span className="text-sm font-medium">{localLikesCount}</span>
-              {isLiking && (
-                <div className="w-3 h-3 border border-red-300 border-t-red-500 rounded-full animate-spin" />
-              )}
+              <CalendarDaysIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span>Agendar</span>
             </button>
           )}
+        </div>
+      </div>
 
-          {/* Sistema de Comentários */}
+      {/* 📱 SEÇÃO DE COMENTÁRIOS - RESPONSIVA */}
+      {showComments && canComment && (
+        <div className="border-t border-gray-100">
           <CommentSection
             postId={post.id}
             initialCommentsCount={post.comments}
             canComment={canComment}
             postAuthorName={post.author.name}
-            postAuthorId={post.author.id} // LINHA ADICIONADA - ID do autor para lógica de menções
+            postAuthorId={post.author.id}
           />
-
-          {/* Botão de Compartilhar */}
-          {canInteract && (
-            <button className="flex items-center space-x-2 text-gray-600 hover:text-green-600 px-3 py-2 rounded-lg hover:bg-green-50 transition-colors">
-              <ShareIcon className="w-5 h-5" />
-              <span className="text-sm font-medium">{post.shares}</span>
-            </button>
-          )}
         </div>
-
-        {/* Botão de Agendar (para pacientes) */}
-        {showScheduleButton && onSchedule && (
-          <button
-            onClick={onSchedule}
-            className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors mt-4"
-          >
-            <CalendarDaysIcon className="w-4 h-4" />
-            <span className="text-sm font-medium">Agendar</span>
-          </button>
-        )}
-      </div>
-    </div>
+      )}
+    </article>
   );
 }
