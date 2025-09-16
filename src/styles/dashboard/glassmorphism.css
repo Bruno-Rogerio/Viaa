@@ -1,0 +1,514 @@
+/* src/styles/glassmorphism.css */
+/* 🔥 ESTILOS GLASSMORPHISM PREMIUM - Sistema Completo */
+
+/* ==========================================
+   KEYFRAMES PARA ANIMAÇÕES
+   ========================================== */
+
+@keyframes gradient-x {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes float-gentle {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-3px) rotate(1deg);
+  }
+  66% {
+    transform: translateY(1px) rotate(-1deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes bounce-gentle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8),
+      0 0 30px rgba(59, 130, 246, 0.4);
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================
+   CLASSES UTILITÁRIAS GLASSMORPHISM
+   ========================================== */
+
+/* Glassmorphism base */
+.glass-card {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.glass-card-subtle {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+.glass-card-strong {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Glassmorphism com cores temáticas */
+.glass-mental-health {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.1) 0%,
+    rgba(16, 185, 129, 0.1) 50%,
+    rgba(139, 92, 246, 0.1) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.1),
+    0 4px 16px rgba(16, 185, 129, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ==========================================
+   CLASSES DE ANIMAÇÃO
+   ========================================== */
+
+.animate-gradient-x {
+  background-size: 400% 400%;
+  animation: gradient-x 6s ease infinite;
+}
+
+.animate-float-gentle {
+  animation: float-gentle 4s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-bounce-gentle {
+  animation: bounce-gentle 2s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 0.6s ease-out;
+}
+
+/* ==========================================
+   EFEITOS HOVER PREMIUM
+   ========================================== */
+
+.hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.hover-glow {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.hover-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    45deg,
+    rgba(59, 130, 246, 0.3),
+    rgba(16, 185, 129, 0.3),
+    rgba(139, 92, 246, 0.3)
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+  filter: blur(8px);
+}
+
+.hover-glow:hover::before {
+  opacity: 1;
+}
+
+.hover-scale-gentle {
+  transition: transform 0.2s ease;
+}
+
+.hover-scale-gentle:hover {
+  transform: scale(1.05);
+}
+
+/* ==========================================
+   GRADIENTES TEMÁTICOS
+   ========================================== */
+
+.gradient-health-calm {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.1) 0%,
+    rgba(147, 197, 253, 0.1) 50%,
+    rgba(59, 130, 246, 0.1) 100%
+  );
+}
+
+.gradient-health-growth {
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.1) 0%,
+    rgba(110, 231, 183, 0.1) 50%,
+    rgba(16, 185, 129, 0.1) 100%
+  );
+}
+
+.gradient-health-wisdom {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.1) 0%,
+    rgba(196, 181, 253, 0.1) 50%,
+    rgba(139, 92, 246, 0.1) 100%
+  );
+}
+
+.gradient-health-energy {
+  background: linear-gradient(
+    135deg,
+    rgba(245, 101, 101, 0.1) 0%,
+    rgba(252, 165, 165, 0.1) 50%,
+    rgba(245, 101, 101, 0.1) 100%
+  );
+}
+
+.gradient-health-warmth {
+  background: linear-gradient(
+    135deg,
+    rgba(251, 191, 36, 0.1) 0%,
+    rgba(253, 224, 71, 0.1) 50%,
+    rgba(251, 191, 36, 0.1) 100%
+  );
+}
+
+/* ==========================================
+   BORDAS PREMIUM
+   ========================================== */
+
+.border-gradient-health {
+  border: 1px solid transparent;
+  background: linear-gradient(white, white) padding-box,
+    linear-gradient(
+        45deg,
+        rgba(59, 130, 246, 0.5),
+        rgba(16, 185, 129, 0.5),
+        rgba(139, 92, 246, 0.5)
+      )
+      border-box;
+}
+
+.border-glow-soft {
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2),
+    0 0 10px rgba(59, 130, 246, 0.1);
+}
+
+.border-glow-medium {
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3),
+    0 0 20px rgba(59, 130, 246, 0.2), 0 0 40px rgba(59, 130, 246, 0.1);
+}
+
+/* ==========================================
+   SOMBRAS TEMÁTICAS
+   ========================================== */
+
+.shadow-glass-subtle {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.shadow-glass-medium {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.shadow-glass-strong {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2);
+}
+
+.shadow-health-glow {
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.1),
+    0 4px 16px rgba(16, 185, 129, 0.05), 0 2px 8px rgba(139, 92, 246, 0.05);
+}
+
+/* ==========================================
+   ESTADOS INTERATIVOS
+   ========================================== */
+
+.glass-button {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease;
+}
+
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.glass-button:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.glass-input {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.glass-input:focus {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+/* ==========================================
+   RESPONSIVIDADE GLASSMORPHISM
+   ========================================== */
+
+/* Mobile - Glassmorphism mais sutil para performance */
+@media (max-width: 640px) {
+  .glass-card {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-mental-health {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  /* Reduzir animações complexas em mobile */
+  .animate-gradient-x {
+    animation: none;
+  }
+
+  .hover-lift:hover {
+    transform: scale(1.01);
+  }
+}
+
+/* Desktop - Glassmorphism completo */
+@media (min-width: 1024px) {
+  .glass-card {
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+
+  .glass-mental-health {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
+
+/* ==========================================
+   ACESSIBILIDADE
+   ========================================== */
+
+/* Respeitar preferência de movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+  .animate-gradient-x,
+  .animate-float-gentle,
+  .animate-shimmer,
+  .animate-pulse-soft,
+  .animate-bounce-gentle,
+  .animate-glow-pulse {
+    animation: none;
+  }
+
+  .hover-lift,
+  .hover-scale-gentle,
+  .glass-button {
+    transition: none;
+  }
+
+  .hover-lift:hover {
+    transform: none;
+  }
+
+  .hover-scale-gentle:hover {
+    transform: none;
+  }
+}
+
+/* Alto contraste */
+@media (prefers-contrast: high) {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid rgba(0, 0, 0, 0.8);
+  }
+
+  .glass-mental-health {
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid rgba(59, 130, 246, 0.8);
+  }
+}
+
+/* ==========================================
+   DARK MODE SUPPORT
+   ========================================== */
+
+@media (prefers-color-scheme: dark) {
+  .glass-card {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .glass-mental-health {
+    background: linear-gradient(
+      135deg,
+      rgba(59, 130, 246, 0.2) 0%,
+      rgba(16, 185, 129, 0.2) 50%,
+      rgba(139, 92, 246, 0.2) 100%
+    );
+  }
+
+  .glass-button {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .glass-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* ==========================================
+   UTILITÁRIOS DE PERFORMANCE
+   ========================================== */
+
+/* Acelerar animações em hardware */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Otimizar blur para performance */
+.optimized-blur {
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+/* ==========================================
+   CLASSES AUXILIARES VIAA
+   ========================================== */
+
+/* Card de post com glassmorphism temático */
+.viaa-post-card {
+  @apply glass-mental-health hover-lift gpu-accelerated;
+  border-radius: 1rem;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Botão de ação com glassmorphism */
+.viaa-action-button {
+  @apply glass-button hover-scale-gentle;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+}
+
+/* Input com glassmorphism */
+.viaa-glass-input {
+  @apply glass-input;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+/* Container de comentários */
+.viaa-comments-glass {
+  @apply glass-card-subtle;
+  border-radius: 1rem;
+  margin-top: 1rem;
+}
