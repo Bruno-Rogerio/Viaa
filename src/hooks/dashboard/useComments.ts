@@ -35,18 +35,17 @@ export const useComments = (
   // 🔧 QUERY BUILDER - Comentários com aninhamento correto
   const buildCommentsQuery = useCallback(() => {
     let query = supabase
-      .from("comments")
+      .from("post_comments")
       .select(
         `
         *,
-        author:perfis_profissionais!comments_author_id_fkey (
+        author:perfis_profissionais!post_comments_profissional_id_fkey (
           id,
           nome,
           sobrenome,
           especialidades,
           foto_perfil_url,
-          verificado,
-          tipo_usuario
+          verificado
         ),
         user_reaction:comment_reactions!comment_reactions_comment_id_fkey (
           id,
@@ -154,7 +153,7 @@ export const useComments = (
         especialidades: rawComment.author.especialidades,
         foto_perfil_url: rawComment.author.foto_perfil_url,
         verificado: rawComment.author.verificado || false,
-        tipo_usuario: rawComment.author.tipo_usuario || "profissional",
+        tipo_usuario: "profissional", // Sempre profissional na tabela perfis_profissionais
       },
 
       // Estatísticas
@@ -248,12 +247,12 @@ export const useComments = (
         console.log("🔍 Carregando respostas para comentário:", commentId);
 
         const { data, error } = await supabase
-          .from("comments")
+          .from("post_comments")
           .select(
             `
           *,
-          author:perfis_profissionais!comments_author_id_fkey (
-            id, nome, sobrenome, especialidades, foto_perfil_url, verificado, tipo_usuario
+          author:perfis_profissionais!post_comments_profissional_id_fkey (
+            id, nome, sobrenome, especialidades, foto_perfil_url, verificado
           ),
           user_reaction:comment_reactions!comment_reactions_comment_id_fkey (
             id, type, created_at
@@ -308,11 +307,11 @@ export const useComments = (
         };
 
         const { data, error } = await supabase
-          .from("comments")
+          .from("post_comments")
           .insert([
             {
               ...newComment,
-              author_id: user.id,
+              profissional_id: user.id, // Usar profissional_id em vez de author_id
               thread_root_id: parentId
                 ? commentsCache.get(parentId)?.thread_root_id
                 : undefined,
@@ -321,8 +320,8 @@ export const useComments = (
           .select(
             `
           *,
-          author:perfis_profissionais!comments_author_id_fkey (
-            id, nome, sobrenome, especialidades, foto_perfil_url, verificado, tipo_usuario
+          author:perfis_profissionais!post_comments_profissional_id_fkey (
+            id, nome, sobrenome, especialidades, foto_perfil_url, verificado
           )
         `
           )
