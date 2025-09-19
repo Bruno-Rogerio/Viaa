@@ -1,5 +1,5 @@
 // src/hooks/dashboard/useFeed.ts
-// 🔧 CORREÇÃO CRÍTICA: Validação de author null
+// 🔧 VERSÃO CORRIGIDA - Consulta de posts e curtidas
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
@@ -17,8 +17,7 @@ interface UseFeedReturn {
   error: string | null;
   pagination: FeedPagination;
   createPost: (data: CreatePostData) => Promise<boolean>;
-  likePost: (postId: string) => Promise<boolean>;
-  unlikePost: (postId: string) => Promise<boolean>;
+  togglePostLike: (postId: string) => Promise<boolean>;
   loadMore: () => Promise<void>;
   refresh: () => Promise<void>;
   setFilters: (filters: Partial<FeedFilters>) => void;
@@ -39,7 +38,7 @@ export const useFeed = (
     has_more: true,
   });
 
-  // Query para buscar posts com dados do autor
+  // 🔧 CONSULTA CORRIGIDA - SEM FILTRAR CURTIDAS NA QUERY
   const buildPostsQuery = useCallback(
     (page: number = 1, limit: number = 10) => {
       let query = supabase
@@ -54,17 +53,15 @@ export const useFeed = (
           especialidades,
           foto_perfil_url,
           verificado
-        ),
-        user_like:post_likes!post_likes_post_id_fkey (
-          id
         )
-      `
+      `,
+          { count: "exact" }
         )
         .eq("is_active", true)
         .order("created_at", { ascending: false })
         .range((page - 1) * limit, page * limit - 1);
 
-      // Aplicar filtros
+      // Aplicar filtros de conteúdo
       if (filters.author_id) {
         query = query.eq("profissional_id", filters.author_id);
       }
@@ -73,32 +70,50 @@ export const useFeed = (
         query = query.textSearch("content", filters.search);
       }
 
-      // Filtrar curtidas do usuário atual se logado
-      if (user) {
-        query = query.eq("user_like.profissional_id", user.id);
-      }
-
       return query;
     },
-    [filters, user]
+    [filters]
   );
 
-  // 🔧 FUNÇÃO DE VALIDAÇÃO DE DADOS
-  const validateAndTransformPost = (item: any): Post | null => {
+  // 🔧 BUSCAR CURTIDAS DO USUÁRIO SEPARADAMENTE
+  const loadUserLikes = useCallback(
+    async (postIds: string[]) => {
+      if (!user || postIds.length === 0) return new Set<string>();
+
+      try {
+        const { data, error } = await supabase
+          .from("post_likes")
+          .select("post_id")
+          .eq("profissional_id", user.id)
+          .in("post_id", postIds);
+
+        if (error) throw error;
+
+        return new Set(data?.map((like) => like.post_id) || []);
+      } catch (err) {
+        console.error("❌ Erro ao carregar curtidas:", err);
+        return new Set<string>();
+      }
+    },
+    [user]
+  );
+
+  // 🔧 FUNÇÃO DE VALIDAÇÃO DE DADOS (MELHORADA)
+  const validateAndTransformPost = useCallback((item: any): Post | null => {
     try {
-      // 🔥 VALIDAÇÃO CRÍTICA: Verificar se author existe
+      // Verificar se author existe
       if (!item.author) {
         console.warn(`⚠️ Post ${item.id} sem author - ignorando`);
         return null;
       }
 
-      // 🔥 VALIDAÇÃO: Verificar campos obrigatórios do author
+      // Verificar campos obrigatórios do author
       if (!item.author.id || !item.author.nome) {
         console.warn(`⚠️ Post ${item.id} com author inválido:`, item.author);
         return null;
       }
 
-      // ✅ TRANSFORMAÇÃO SEGURA
+      // Transformação segura
       return {
         id: item.id,
         profissional_id: item.profissional_id,
@@ -120,16 +135,16 @@ export const useFeed = (
           foto_perfil_url: item.author.foto_perfil_url,
           verificado: item.author.verificado || false,
         },
-        is_liked: item.user_like && item.user_like.length > 0,
-        user_like_id: item.user_like?.[0]?.id,
+        is_liked: false, // Será atualizado depois
+        user_like_id: undefined,
       };
     } catch (err) {
       console.error(`❌ Erro ao transformar post ${item.id}:`, err);
       return null;
     }
-  };
+  }, []);
 
-  // Carregar posts
+  // 🔧 CARREGAR POSTS (CORRIGIDO)
   const loadPosts = useCallback(
     async (page: number = 1, reset: boolean = true) => {
       try {
@@ -138,12 +153,13 @@ export const useFeed = (
 
         console.log(`🔍 Carregando posts - Página ${page}`);
 
-        const query = buildPostsQuery(page, pagination.limit);
-        const { data, error: queryError, count } = await query;
+        const {
+          data,
+          error: queryError,
+          count,
+        } = await buildPostsQuery(page, pagination.limit);
 
-        if (queryError) {
-          throw queryError;
-        }
+        if (queryError) throw queryError;
 
         if (!data) {
           setPosts([]);
@@ -152,14 +168,38 @@ export const useFeed = (
 
         console.log(`📊 Posts recebidos do Supabase: ${data.length}`);
 
-        // 🔧 TRANSFORMAÇÃO SEGURA COM FILTRO
+        // Transformar posts
         const transformedPosts: Post[] = data
           .map(validateAndTransformPost)
-          .filter((post): post is Post => post !== null); // Remove posts null
+          .filter((post): post is Post => post !== null);
 
         console.log(
           `✅ Posts válidos transformados: ${transformedPosts.length}`
         );
+
+        // Carregar curtidas do usuário para esses posts
+        const postIds = transformedPosts.map((p) => p.id);
+        const userLikes = await loadUserLikes(postIds);
+
+        // Aplicar curtidas aos posts
+        const postsWithLikes = transformedPosts.map((post) => ({
+          ...post,
+          is_liked: userLikes.has(post.id),
+        }));
+
+        // Atualizar estado
+        if (reset) {
+          setPosts(postsWithLikes);
+        } else {
+          setPosts((prev) => [...prev, ...postsWithLikes]);
+        }
+
+        setPagination((prev) => ({
+          ...prev,
+          page,
+          total: count || 0,
+          has_more: transformedPosts.length === pagination.limit,
+        }));
 
         // Log de posts inválidos para debug
         if (data.length !== transformedPosts.length) {
@@ -169,19 +209,6 @@ export const useFeed = (
             } posts foram ignorados por dados inválidos`
           );
         }
-
-        if (reset) {
-          setPosts(transformedPosts);
-        } else {
-          setPosts((prev) => [...prev, ...transformedPosts]);
-        }
-
-        setPagination((prev) => ({
-          ...prev,
-          page,
-          total: count || 0,
-          has_more: transformedPosts.length === pagination.limit,
-        }));
       } catch (err: any) {
         console.error("❌ Erro ao carregar posts:", err);
         setError(err.message || "Erro ao carregar posts");
@@ -189,10 +216,10 @@ export const useFeed = (
         setLoading(false);
       }
     },
-    [buildPostsQuery, pagination.limit]
+    [buildPostsQuery, pagination.limit, validateAndTransformPost, loadUserLikes]
   );
 
-  // Criar novo post
+  // 🔧 CRIAR NOVO POST
   const createPost = useCallback(
     async (data: CreatePostData): Promise<boolean> => {
       if (!user) {
@@ -229,20 +256,13 @@ export const useFeed = (
           )
           .single();
 
-        if (insertError) {
-          throw insertError;
-        }
+        if (insertError) throw insertError;
+        if (!newPost) throw new Error("Erro ao criar post");
 
-        if (!newPost) {
-          throw new Error("Erro ao criar post");
-        }
-
-        // 🔧 VALIDAÇÃO SEGURA PARA NOVO POST
+        // Transformar e validar novo post
         const transformedPost = validateAndTransformPost(newPost);
-
-        if (!transformedPost) {
+        if (!transformedPost)
           throw new Error("Post criado com dados inválidos");
-        }
 
         console.log("✅ Novo post criado e adicionado ao feed");
         setPosts((prev) => [transformedPost, ...prev]);
@@ -256,8 +276,8 @@ export const useFeed = (
     [user, validateAndTransformPost]
   );
 
-  // Curtir post
-  const likePost = useCallback(
+  // 🔧 TOGGLE CURTIDA DE POST (IMPLEMENTADO)
+  const togglePostLike = useCallback(
     async (postId: string): Promise<boolean> => {
       if (!user) {
         setError("Usuário não autenticado");
@@ -267,88 +287,77 @@ export const useFeed = (
       try {
         setError(null);
 
-        const { data, error: likeError } = await supabase
-          .from("post_likes")
-          .insert([
+        // Encontrar post atual
+        const currentPost = posts.find((p) => p.id === postId);
+        if (!currentPost) return false;
+
+        const isCurrentlyLiked = currentPost.is_liked;
+
+        // Optimistic update
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.id === postId
+              ? {
+                  ...post,
+                  is_liked: !isCurrentlyLiked,
+                  likes_count: post.likes_count + (isCurrentlyLiked ? -1 : 1),
+                }
+              : post
+          )
+        );
+
+        console.log(
+          `${isCurrentlyLiked ? "💔" : "❤️"} Toggle curtida post:`,
+          postId
+        );
+
+        if (isCurrentlyLiked) {
+          // Remover curtida
+          const { error } = await supabase
+            .from("post_likes")
+            .delete()
+            .eq("post_id", postId)
+            .eq("profissional_id", user.id);
+
+          if (error) throw error;
+        } else {
+          // Adicionar curtida
+          const { error } = await supabase.from("post_likes").insert([
             {
               post_id: postId,
               profissional_id: user.id,
             },
-          ])
-          .select()
-          .single();
+          ]);
 
-        if (likeError) {
-          throw likeError;
+          if (error) throw error;
         }
 
-        // Atualizar estado local
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === postId
-              ? {
-                  ...post,
-                  likes_count: post.likes_count + 1,
-                  is_liked: true,
-                  user_like_id: data.id,
-                }
-              : post
-          )
-        );
-
+        console.log("✅ Curtida de post processada com sucesso");
         return true;
       } catch (err: any) {
         console.error("❌ Erro ao curtir post:", err);
+
+        // Reverter optimistic update
+        const currentPost = posts.find((p) => p.id === postId);
+        if (currentPost) {
+          setPosts((prev) =>
+            prev.map((post) =>
+              post.id === postId
+                ? {
+                    ...post,
+                    is_liked: currentPost.is_liked,
+                    likes_count: currentPost.likes_count,
+                  }
+                : post
+            )
+          );
+        }
+
         setError(err.message || "Erro ao curtir post");
         return false;
       }
     },
-    [user]
-  );
-
-  // Descurtir post
-  const unlikePost = useCallback(
-    async (postId: string): Promise<boolean> => {
-      if (!user) {
-        setError("Usuário não autenticado");
-        return false;
-      }
-
-      try {
-        setError(null);
-
-        const { error: unlikeError } = await supabase
-          .from("post_likes")
-          .delete()
-          .eq("post_id", postId)
-          .eq("profissional_id", user.id);
-
-        if (unlikeError) {
-          throw unlikeError;
-        }
-
-        // Atualizar estado local
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === postId
-              ? {
-                  ...post,
-                  likes_count: Math.max(0, post.likes_count - 1),
-                  is_liked: false,
-                  user_like_id: undefined,
-                }
-              : post
-          )
-        );
-
-        return true;
-      } catch (err: any) {
-        console.error("❌ Erro ao descurtir post:", err);
-        setError(err.message || "Erro ao descurtir post");
-        return false;
-      }
-    },
-    [user]
+    [user, posts]
   );
 
   // Carregar mais posts (paginação)
@@ -378,8 +387,7 @@ export const useFeed = (
     error,
     pagination,
     createPost,
-    likePost,
-    unlikePost,
+    togglePostLike, // Mudança: função unificada
     loadMore,
     refresh,
     setFilters,

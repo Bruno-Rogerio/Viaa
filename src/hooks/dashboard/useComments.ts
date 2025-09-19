@@ -307,12 +307,15 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
     await loadComments();
   }, [loadComments]);
 
-  // 🔧 CARREGAR CURTIDAS DO USUÁRIO
+  // 🔧 CARREGAR CURTIDAS DO USUÁRIO (CORRIGIDO)
   const loadUserLikes = useCallback(async () => {
-    if (!user) return;
+    if (!user || comments.length === 0) return;
 
     try {
-      console.log("🔍 Carregando curtidas do usuário para post:", postId);
+      console.log(
+        "🔍 Carregando curtidas do usuário para comentários:",
+        comments.map((c) => c.id)
+      );
 
       const { data, error } = await supabase
         .from("comment_likes")
@@ -330,23 +333,26 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
       );
       setUserLikes(likedCommentIds);
 
-      console.log("✅ Curtidas carregadas:", likedCommentIds.size);
+      console.log(
+        "✅ Curtidas do usuário carregadas:",
+        Array.from(likedCommentIds)
+      );
     } catch (err: any) {
       console.error("❌ Erro ao carregar curtidas:", err);
     }
-  }, [user, postId, comments]);
+  }, [user, comments]);
 
   // Carregar comentários na inicialização
   useEffect(() => {
     loadComments();
   }, [loadComments]);
 
-  // Carregar curtidas quando comentários mudam
+  // Carregar curtidas quando comentários estão carregados
   useEffect(() => {
-    if (comments.length > 0) {
+    if (comments.length > 0 && user) {
       loadUserLikes();
     }
-  }, [comments.length > 0]); // Só quando houver comentários
+  }, [comments, user]); // Mudança: depende de comments e user, não de comments.length
 
   return {
     comments,

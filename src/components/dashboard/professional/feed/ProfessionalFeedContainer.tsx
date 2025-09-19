@@ -1,5 +1,5 @@
 // src/components/dashboard/professional/feed/ProfessionalFeedContainer.tsx
-// 🔧 CORREÇÃO: Erro author null + validações
+// 🔧 FEED CONTAINER CORRIGIDO - Integração completa
 
 "use client";
 import { useState } from "react";
@@ -18,6 +18,7 @@ export default function ProfessionalFeedContainer() {
     error,
     pagination,
     createPost,
+    togglePostLike, // 🔧 Usar a função corrigida
     loadMore,
     refresh,
     setFilters,
@@ -52,21 +53,18 @@ export default function ProfessionalFeedContainer() {
     }
   };
 
-  // 🔧 FUNÇÃO PARA VALIDAR POSTS
+  // 🔧 FUNÇÃO PARA VALIDAR POSTS (MANTIDA PARA SEGURANÇA)
   const validatePost = (post: any): boolean => {
-    // Verificar se o post existe
     if (!post || !post.id) {
       console.warn("Post inválido - sem ID:", post);
       return false;
     }
 
-    // Verificar se o autor existe
     if (!post.author) {
       console.warn("Post sem author:", post.id);
       return false;
     }
 
-    // Verificar campos obrigatórios do autor
     if (!post.author.id || !post.author.nome) {
       console.warn("Author com dados inválidos:", post.author);
       return false;
@@ -120,11 +118,10 @@ export default function ProfessionalFeedContainer() {
         </div>
       )}
 
-      {/* Lista de Posts - COM VALIDAÇÃO */}
+      {/* Lista de Posts - COM VALIDAÇÃO E INTEGRAÇÃO CORRETA */}
       {validPosts.length > 0 && (
         <div className="space-y-6">
           {validPosts.map((post) => {
-            // 🔧 VALIDAÇÃO EXTRA: Verificar se todos os dados existem
             const authorName =
               post.author?.nome && post.author?.sobrenome
                 ? `${post.author.nome} ${post.author.sobrenome}`
@@ -150,9 +147,10 @@ export default function ProfessionalFeedContainer() {
                   likes: post.likes_count || 0,
                   comments: post.comments_count || 0,
                   shares: post.shares_count || 0,
-                  isLiked: post.is_liked || false,
+                  isLiked: post.is_liked || false, // 🔧 Estado da curtida do usuário
                   type: post.type || "text",
                 }}
+                onLike={togglePostLike} // 🔧 Passar função de curtida correta
                 canInteract={true}
                 canComment={true}
                 showScheduleButton={false}
@@ -201,6 +199,10 @@ export default function ProfessionalFeedContainer() {
           <p>✅ Posts válidos: {validPosts.length}</p>
           <p>🔄 Loading: {loading ? "Sim" : "Não"}</p>
           <p>❌ Error: {error || "Nenhum"}</p>
+          <p>
+            🎯 Posts com author válido:{" "}
+            {posts.filter((p) => p.author?.nome).length}
+          </p>
         </div>
       )}
     </div>

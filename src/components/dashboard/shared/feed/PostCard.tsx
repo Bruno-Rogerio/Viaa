@@ -1,5 +1,5 @@
 // src/components/dashboard/shared/feed/PostCard.tsx
-// 🔥 POSTCARD PREMIUM - Glassmorphism + Micro-animações
+// 🔧 POSTCARD CORRIGIDO - Integração com useFeed
 
 "use client";
 import { useState, useRef, useEffect } from "react";
@@ -18,8 +18,6 @@ import {
 } from "@heroicons/react/24/solid";
 import Avatar from "../../common/Avatar";
 import CommentSection from "./CommentSection";
-import { usePostLikes } from "@/hooks/dashboard/usePostLikes";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface PostCardProps {
   post: {
@@ -40,7 +38,7 @@ interface PostCardProps {
     isLiked: boolean;
     type: string;
   };
-  onLike?: () => void;
+  onLike?: (postId: string) => Promise<boolean>; // Mudança: função que retorna Promise
   canInteract?: boolean;
   canComment?: boolean;
   showScheduleButton?: boolean;
@@ -55,7 +53,7 @@ export default function PostCard({
   showScheduleButton = false,
   onSchedule,
 }: PostCardProps) {
-  // Estados para interações
+  // Estados para interações (sincronizados com props)
   const [localIsLiked, setLocalIsLiked] = useState(post.isLiked);
   const [localLikesCount, setLocalLikesCount] = useState(post.likes);
   const [isLiking, setIsLiking] = useState(false);
@@ -67,8 +65,11 @@ export default function PostCard({
   const [isVisible, setIsVisible] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Hook de curtidas
-  const { toggleLike } = usePostLikes();
+  // 🔧 SINCRONIZAR COM PROPS QUANDO MUDAREM
+  useEffect(() => {
+    setLocalIsLiked(post.isLiked);
+    setLocalLikesCount(post.likes);
+  }, [post.isLiked, post.likes]);
 
   // Intersection Observer para animação de entrada
   useEffect(() => {
@@ -125,25 +126,26 @@ export default function PostCard({
     return `${Math.floor(diffInSeconds / 86400)}d`;
   };
 
-  // 🔧 MANIPULAR CURTIDA
+  // 🔧 MANIPULAR CURTIDA (INTEGRADO COM HOOK DO FEED)
   const handleLikeToggle = async () => {
-    if (isLiking || !canInteract) return;
+    if (isLiking || !canInteract || !onLike) return;
 
-    const newIsLiked = !localIsLiked;
-    const newCount = localIsLiked ? localLikesCount - 1 : localLikesCount + 1;
-
-    setLocalIsLiked(newIsLiked);
-    setLocalLikesCount(newCount);
     setIsLiking(true);
 
     try {
-      await toggleLike(post.id, newIsLiked);
-      onLike?.();
+      console.log(`${localIsLiked ? "💔" : "❤️"} Curtindo post:`, post.id);
+
+      // Chamar a função de curtida do hook useFeed
+      const success = await onLike(post.id);
+
+      if (success) {
+        console.log("✅ Curtida processada com sucesso");
+        // O estado será atualizado automaticamente pelas props
+      } else {
+        console.error("❌ Falha ao processar curtida");
+      }
     } catch (error) {
-      // Reverter em caso de erro
-      setLocalIsLiked(!newIsLiked);
-      setLocalLikesCount(localLikesCount);
-      console.error("Erro ao curtir:", error);
+      console.error("❌ Erro ao curtir post:", error);
     } finally {
       setIsLiking(false);
     }
@@ -198,103 +200,67 @@ export default function PostCard({
           <div
             className={`
             absolute bottom-8 left-6 w-0.5 h-0.5 bg-white/20 rounded-full
-            ${isHovered ? "animate-bounce delay-75" : ""}
+            ${isHovered ? "animate-bounce" : ""}
           `}
           />
         </div>
 
-        {/* 📱 CONTEÚDO PRINCIPAL */}
+        {/* 📱 CONTEÚDO DO CARD */}
         <div className="relative z-10 p-6">
-          {/* 👤 HEADER DO POST */}
+          {/* 👤 HEADER COM AUTOR */}
           <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center space-x-3 flex-1 min-w-0">
-              {/* Avatar com anel gradiente */}
-              <div className="relative">
-                <div
-                  className={`
-                  absolute inset-0 bg-gradient-to-r ${getBorderGradient(
-                    post.type
-                  )}
-                  rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity
-                `}
-                >
-                  <div className="w-full h-full bg-white rounded-full" />
-                </div>
-                <Avatar
-                  src={post.author.avatar}
-                  alt={post.author.name}
-                  size="md"
-                  className="relative z-10 ring-2 ring-white/10 hover:ring-white/30 transition-all"
-                />
-              </div>
-
-              {/* Info do autor */}
-              <div className="flex-1 min-w-0">
+            <div className="flex items-center space-x-3">
+              <Avatar
+                src={post.author.avatar}
+                alt={post.author.name}
+                size="md"
+                className="ring-2 ring-white/20 shadow-lg"
+              />
+              <div>
                 <div className="flex items-center space-x-2">
-                  <h3 className="font-semibold text-gray-900 truncate hover:text-blue-600 transition-colors cursor-pointer">
+                  <h3 className="font-semibold text-gray-900">
                     {post.author.name}
                   </h3>
-
-                  {/* Badge verificado com glassmorphism */}
                   {post.author.verified && (
-                    <div className="flex items-center">
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-sm" />
-                        <svg
-                          className="relative w-5 h-5 text-blue-500"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </div>
+                    <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs">✓</span>
                     </div>
                   )}
-
-                  {/* Badge tipo de post */}
-                  <span
-                    className={`
-                    inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                    bg-white/10 backdrop-blur-sm border border-white/20 text-gray-700
-                    group-hover:bg-white/20 transition-all
-                  `}
-                  >
-                    {post.type === "article" && "📄 Artigo"}
-                    {post.type === "image" && "🖼️ Imagem"}
-                    {post.type === "video" && "🎥 Vídeo"}
-                    {post.type === "text" && "💭 Reflexão"}
-                    {post.type === "announcement" && "📢 Anúncio"}
-                  </span>
                 </div>
-
-                <div className="flex items-center space-x-2 mt-1">
-                  <p className="text-sm text-gray-600 truncate">
-                    {post.author.specialization}
-                  </p>
-                  <span className="text-gray-400">•</span>
-                  <time className="text-sm text-gray-500 flex-shrink-0">
-                    {formatTimeAgo(post.createdAt)}
-                  </time>
-                </div>
+                <p className="text-sm text-gray-600">
+                  {post.author.specialization}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {formatTimeAgo(post.createdAt)}
+                </p>
               </div>
             </div>
 
-            {/* Menu com glassmorphism */}
-            <button
-              className={`
-              p-2 rounded-xl transition-all duration-200
-              bg-white/5 hover:bg-white/10 backdrop-blur-sm
-              border border-white/10 hover:border-white/20
-              text-gray-400 hover:text-gray-600
-              ${isHovered ? "scale-105" : "scale-100"}
-            `}
-            >
-              <EllipsisHorizontalIcon className="w-5 h-5" />
-            </button>
+            {/* Menu de ações */}
+            <div className="flex items-center space-x-2">
+              {showScheduleButton && (
+                <button
+                  onClick={onSchedule}
+                  className={`
+                    flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200
+                    bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 border border-blue-500/20
+                    hover:scale-105 active:scale-95
+                  `}
+                >
+                  <CalendarDaysIcon className="w-4 h-4" />
+                  <span className="text-sm font-medium">Agendar</span>
+                </button>
+              )}
+
+              <button
+                className={`
+                p-2 rounded-lg transition-all duration-200 hover:bg-white/10 text-gray-500 hover:text-gray-700
+                ${isHovered ? "scale-105" : "scale-100"}
+              `}
+              >
+                <EllipsisHorizontalIcon className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* 📝 CONTEÚDO DO POST */}
@@ -366,7 +332,7 @@ export default function PostCard({
                     <HeartIcon className="w-5 h-5" />
                   )}
                   <span className="text-sm font-medium">
-                    {localIsLiked ? "Curtido" : "Curtir"}
+                    {isLiking ? "..." : localIsLiked ? "Curtido" : "Curtir"}
                   </span>
                 </button>
               )}
@@ -409,59 +375,33 @@ export default function PostCard({
                   {isBookmarked ? "Salvo" : "Salvar"}
                 </span>
               </button>
-            </div>
 
-            {/* Botão agendar (para pacientes) */}
-            {showScheduleButton && onSchedule && (
+              {/* Botão compartilhar */}
               <button
-                onClick={onSchedule}
                 className={`
                   flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200
-                  bg-gradient-to-r from-blue-500 to-purple-600 text-white
-                  hover:from-blue-600 hover:to-purple-700 shadow-lg hover:shadow-xl
-                  border border-white/20 backdrop-blur-sm
-                  hover:scale-105 active:scale-95 font-medium
+                  bg-white/5 hover:bg-white/10 text-gray-600 hover:text-green-600
+                  border border-white/10 hover:border-green-200/50 backdrop-blur-sm
+                  hover:scale-105 active:scale-95
                 `}
               >
-                <CalendarDaysIcon className="w-5 h-5" />
-                <span>Agendar</span>
+                <ShareIcon className="w-5 h-5" />
+                <span className="text-sm font-medium">Compartilhar</span>
               </button>
-            )}
-
-            {/* Botão compartilhar */}
-            <button
-              className={`
-              p-2 rounded-xl transition-all duration-200
-              bg-white/5 hover:bg-white/10 text-gray-600 hover:text-green-600
-              border border-white/10 hover:border-green-200/50 backdrop-blur-sm
-              hover:scale-105 active:scale-95
-            `}
-            >
-              <ShareIcon className="w-5 h-5" />
-            </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 💬 SEÇÃO DE COMENTÁRIOS EXPANSÍVEL */}
-      {showComments && (
-        <div
-          className={`
-          mt-4 transition-all duration-300 ease-out
-          ${
-            showComments
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 -translate-y-4"
-          }
-        `}
-        >
+      {/* 💬 SEÇÃO DE COMENTÁRIOS (COLAPSÍVEL) */}
+      {showComments && canComment && (
+        <div className="mt-4">
           <CommentSection
             postId={post.id}
             postAuthorId={post.author.id}
             postAuthorName={post.author.name}
-            initialCommentsCount={post.comments}
             canComment={canComment}
-            className="backdrop-blur-xl bg-white/30 border border-white/20"
+            className="border-t border-gray-200"
           />
         </div>
       )}
