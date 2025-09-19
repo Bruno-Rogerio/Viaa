@@ -1,20 +1,14 @@
 // src/components/dashboard/shared/feed/CommentSection.tsx
-// 🔥 SEÇÃO DE COMENTÁRIOS RENOVADA - Sistema Completo LinkedIn-Style
+// 🎯 SEÇÃO DE COMENTÁRIOS SIMPLIFICADA PARA MVP - ARQUIVO COMPLETO
 
 "use client";
-import { useState, useCallback, useMemo } from "react";
-import {
-  ChevronDownIcon,
-  ChevronUpIcon,
-  FunnelIcon,
-  ArrowPathIcon,
-} from "@heroicons/react/24/outline";
-import CommentComposer from "./CommentComposer";
-import CommentThread from "./CommentThread";
+import { useState, useCallback } from "react";
+import { HeartIcon, ChatBubbleLeftIcon } from "@heroicons/react/24/outline";
+import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import { useComments } from "@/hooks/dashboard/useComments";
 import { useAuth } from "@/contexts/AuthContext";
 import { LoadingSpinner } from "../../common";
-import type { CommentFilters } from "@/types/comments";
+import Avatar from "../../common/Avatar";
 
 interface CommentSectionProps {
   postId: string;
@@ -22,7 +16,6 @@ interface CommentSectionProps {
   postAuthorName?: string;
   initialCommentsCount?: number;
   canComment?: boolean;
-  maxDepth?: number;
   className?: string;
 }
 
@@ -32,323 +25,163 @@ export default function CommentSection({
   postAuthorName = "Autor",
   initialCommentsCount = 0,
   canComment = true,
-  maxDepth = 2,
   className = "",
 }: CommentSectionProps) {
-  const { user } = useAuth(); // Adicionar useAuth
+  const { user } = useAuth();
 
   // Estados locais
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [sortBy, setSortBy] = useState<"most_relevant" | "newest" | "oldest">(
-    "most_relevant"
-  );
+  const [newComment, setNewComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  // Hook de comentários
+  // Hook simplificado
   const {
     comments,
     loading,
     error,
-    hasMore,
     createComment,
-    loadComments,
-    loadReplies,
-    addReaction,
-    removeReaction,
+    toggleLike,
+    userLikes,
     refresh,
-    userLikes, // Adicionar userLikes do hook
-  } = useComments(postId, { sort_by: sortBy });
+  } = useComments(postId);
 
-  // Dados derivados
-  const totalComments = comments.reduce(
-    (total, thread) => total + 1 + thread.total_replies,
-    0
+  // 🔧 CRIAR COMENTÁRIO
+  const handleCreateComment = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+
+      if (!newComment.trim() || submitting) return;
+
+      setSubmitting(true);
+      try {
+        const success = await createComment(newComment.trim());
+        if (success) {
+          setNewComment("");
+          if (!isExpanded) setIsExpanded(true);
+        }
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [newComment, submitting, createComment, isExpanded]
   );
+
+  // 🔧 FORMATAÇÃO DE TEMPO
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return "agora";
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}min`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
+    return `${Math.floor(diffInSeconds / 86400)}d`;
+  };
 
   const hasComments = comments.length > 0;
-  const showLoadMore = hasMore && hasComments;
-
-  // 🔧 MANIPULAR CRIAÇÃO DE COMENTÁRIO
-  const handleCreateComment = useCallback(
-    async (content: string): Promise<boolean> => {
-      const success = await createComment(content);
-
-      if (success && !isExpanded) {
-        setIsExpanded(true); // Expandir automaticamente após criar comentário
-      }
-
-      return success;
-    },
-    [createComment, isExpanded]
-  );
-
-  // 🔧 MANIPULAR RESPOSTA
-  const handleReply = useCallback(
-    async (commentId: string, content: string): Promise<boolean> => {
-      console.log("📝 CommentSection: Criando resposta", {
-        commentId,
-        content,
-      });
-
-      // Criar comentário como resposta
-      const success = await createComment(content, commentId);
-      console.log("✅ Resposta criada:", success);
-
-      return success;
-    },
-    [createComment]
-  );
-
-  // 🔧 MANIPULAR REAÇÕES
-  const handleReaction = useCallback(
-    async (commentId: string, reactionType: string) => {
-      if (reactionType) {
-        await addReaction(commentId, reactionType);
-      } else {
-        await removeReaction(commentId);
-      }
-    },
-    [addReaction, removeReaction]
-  );
-
-  // 🔧 CARREGAR MAIS COMENTÁRIOS
-  const handleLoadMore = useCallback(async () => {
-    await loadComments(false);
-  }, [loadComments]);
-
-  // 🔧 ATUALIZAR ORDENAÇÃO
-  const handleSortChange = useCallback((newSort: typeof sortBy) => {
-    setSortBy(newSort);
-    // O useComments vai recarregar automaticamente quando filters mudarem
-  }, []);
-
-  // 🔧 OPÇÕES DE ORDENAÇÃO
-  const sortOptions = [
-    { value: "most_relevant", label: "Mais relevantes", icon: "🔥" },
-    { value: "newest", label: "Mais recentes", icon: "⏰" },
-    { value: "oldest", label: "Mais antigos", icon: "📅" },
-  ] as const;
 
   return (
     <div className={`bg-white border border-gray-200 rounded-xl ${className}`}>
-      {/* Header da seção */}
+      {/* Header */}
       <div className="p-4 border-b border-gray-100">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <h3 className="font-semibold text-gray-900">
-              Comentários {totalComments > 0 && `(${totalComments})`}
-            </h3>
+          <h3 className="font-semibold text-gray-900">
+            Comentários {hasComments && `(${comments.length})`}
+          </h3>
 
-            {/* Botão expandir/colapsar */}
-            {hasComments && (
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
-                {isExpanded ? (
-                  <>
-                    <ChevronUpIcon className="w-4 h-4" />
-                    <span>Ocultar</span>
-                  </>
-                ) : (
-                  <>
-                    <ChevronDownIcon className="w-4 h-4" />
-                    <span>Ver todos</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
+          {hasComments && (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              {isExpanded ? "Ocultar" : "Ver todos"}
+            </button>
+          )}
+        </div>
+      </div>
 
-          {/* Ações do header */}
-          <div className="flex items-center space-x-2">
-            {/* Filtros */}
-            {hasComments && (
-              <div className="relative">
+      {/* Composer */}
+      {canComment && (
+        <div className="p-4 border-b border-gray-100">
+          <form onSubmit={handleCreateComment} className="flex space-x-3">
+            <Avatar
+              src={user?.user_metadata?.avatar_url}
+              alt="Seu avatar"
+              size="sm"
+              className="flex-shrink-0"
+            />
+            <div className="flex-1">
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder={`Comentar no post de ${postAuthorName}...`}
+                className="w-full p-3 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows={2}
+                disabled={submitting}
+              />
+              <div className="mt-2 flex justify-between items-center">
+                <span className="text-xs text-gray-500">
+                  {newComment.length}/500 caracteres
+                </span>
                 <button
-                  onClick={() => setShowFilters(!showFilters)}
+                  type="submit"
+                  disabled={
+                    !newComment.trim() || submitting || newComment.length > 500
+                  }
                   className={`
-                    p-2 rounded-lg transition-colors
+                    px-4 py-2 rounded-lg text-sm font-medium transition-colors
                     ${
-                      showFilters
-                        ? "bg-blue-50 text-blue-600"
-                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                      !newComment.trim() ||
+                      submitting ||
+                      newComment.length > 500
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
                     }
                   `}
                 >
-                  <FunnelIcon className="w-4 h-4" />
+                  {submitting ? "Enviando..." : "Comentar"}
                 </button>
-
-                {/* Dropdown de filtros */}
-                {showFilters && (
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
-                    <div className="p-2">
-                      <div className="text-xs font-medium text-gray-700 mb-2">
-                        Ordenar por:
-                      </div>
-                      {sortOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => {
-                            handleSortChange(option.value);
-                            setShowFilters(false);
-                          }}
-                          className={`
-                            w-full flex items-center space-x-2 px-2 py-2 rounded text-sm
-                            transition-colors text-left
-                            ${
-                              sortBy === option.value
-                                ? "bg-blue-50 text-blue-700"
-                                : "text-gray-700 hover:bg-gray-50"
-                            }
-                          `}
-                        >
-                          <span>{option.icon}</span>
-                          <span>{option.label}</span>
-                          {sortBy === option.value && (
-                            <span className="ml-auto text-blue-600">✓</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
-            )}
-
-            {/* Refresh */}
-            <button
-              onClick={refresh}
-              disabled={loading}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
-              title="Atualizar comentários"
-            >
-              <ArrowPathIcon
-                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* Estatísticas rápidas */}
-        {hasComments && isExpanded && (
-          <div className="mt-3 flex items-center space-x-4 text-xs text-gray-600">
-            <span>
-              {comments.length} comentário{comments.length !== 1 ? "s" : ""}
-            </span>
-            {totalComments > comments.length && (
-              <span>
-                {totalComments - comments.length} resposta
-                {totalComments - comments.length !== 1 ? "s" : ""}
-              </span>
-            )}
-            {comments.some((thread) => thread.participants.length > 1) && (
-              <span>
-                {Math.max(
-                  ...comments.map((thread) => thread.participants.length)
-                )}{" "}
-                participante
-                {Math.max(
-                  ...comments.map((thread) => thread.participants.length)
-                ) !== 1
-                  ? "s"
-                  : ""}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Composer para novos comentários */}
-      {canComment && (
-        <div className="p-4 border-b border-gray-100">
-          <CommentComposer
-            postId={postId}
-            placeholder={`Comentar no post de ${postAuthorName}...`}
-            onSubmit={handleCreateComment}
-            maxLength={2000}
-          />
+            </div>
+          </form>
         </div>
       )}
 
-      {/* Estado de erro */}
+      {/* Error state */}
       {error && (
         <div className="p-4 bg-red-50 border-b border-red-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="text-red-600">⚠️</span>
-              <span className="text-red-800 text-sm font-medium">
-                Erro ao carregar comentários
-              </span>
-            </div>
-            <button
-              onClick={refresh}
-              className="text-red-600 hover:text-red-700 text-sm font-medium"
-            >
-              Tentar novamente
-            </button>
-          </div>
-          {process.env.NODE_ENV === "development" && (
-            <p className="text-red-600 text-xs mt-1">{error}</p>
-          )}
+          <p className="text-red-800 text-sm">{error}</p>
+          <button
+            onClick={refresh}
+            className="mt-2 text-red-600 hover:text-red-700 text-sm font-medium"
+          >
+            Tentar novamente
+          </button>
         </div>
       )}
 
-      {/* Loading inicial */}
+      {/* Loading */}
       {loading && !hasComments && (
         <div className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <LoadingSpinner size="md" />
-            <p className="mt-2 text-sm text-gray-600">
-              Carregando comentários...
-            </p>
-          </div>
+          <LoadingSpinner size="md" />
         </div>
       )}
 
-      {/* Lista de comentários */}
-      {isExpanded && hasComments && (
-        <div className="divide-y divide-gray-100">
-          {comments.map((thread, index) => (
-            <CommentThread
-              key={thread.root_comment.id}
-              thread={thread}
-              maxDepth={maxDepth}
-              postAuthorId={postAuthorId}
-              currentUserId={user?.id}
-              onReply={handleReply}
-              onReaction={handleReaction}
-              onLoadReplies={loadReplies}
-              userLikes={userLikes}
-              isFirst={index === 0}
-              isLast={index === comments.length - 1}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Preview de comentários (quando colapsado) */}
+      {/* Preview (collapsed) */}
       {!isExpanded && hasComments && (
         <div className="p-4">
           <div className="space-y-3">
-            {comments.slice(0, 2).map((thread) => (
-              <div
-                key={thread.root_comment.id}
-                className="flex items-center space-x-3"
-              >
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                    <span className="text-xs font-medium text-gray-600">
-                      {thread.root_comment.author.nome.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                </div>
+            {comments.slice(0, 2).map((comment) => (
+              <div key={comment.id} className="flex items-start space-x-3">
+                <Avatar
+                  src={comment.author.foto_perfil_url}
+                  alt={`${comment.author.nome} ${comment.author.sobrenome}`}
+                  size="sm"
+                />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-900 truncate">
-                    <span className="font-medium">
-                      {thread.root_comment.author.nome}:
-                    </span>{" "}
-                    {thread.root_comment.content}
+                  <p className="text-sm text-gray-900 line-clamp-2">
+                    <span className="font-medium">{comment.author.nome}:</span>{" "}
+                    {comment.content}
                   </p>
                 </div>
               </div>
@@ -367,30 +200,99 @@ export default function CommentSection({
         </div>
       )}
 
-      {/* Carregar mais */}
-      {isExpanded && showLoadMore && (
-        <div className="p-4 border-t border-gray-100">
-          <button
-            onClick={handleLoadMore}
-            disabled={loading}
-            className="w-full py-2 text-sm text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <div className="flex items-center justify-center space-x-2">
-                <LoadingSpinner size="sm" />
-                <span>Carregando mais comentários...</span>
+      {/* Full list (expanded) */}
+      {isExpanded && hasComments && (
+        <div className="divide-y divide-gray-100">
+          {comments.map((comment) => {
+            const isLiked = userLikes.has(comment.id);
+
+            return (
+              <div key={comment.id} className="p-4">
+                <div className="flex space-x-3">
+                  <Avatar
+                    src={comment.author.foto_perfil_url}
+                    alt={`${comment.author.nome} ${comment.author.sobrenome}`}
+                    size="md"
+                  />
+
+                  <div className="flex-1 min-w-0">
+                    {/* Header */}
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="font-semibold text-gray-900 text-sm">
+                        {`${comment.author.nome} ${comment.author.sobrenome}`.trim()}
+                      </span>
+
+                      {comment.author.verificado && (
+                        <svg
+                          className="w-4 h-4 text-blue-500"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+
+                      <span className="text-xs text-gray-600">
+                        {comment.author.especialidades}
+                      </span>
+
+                      <span className="text-xs text-gray-500">
+                        • {formatTimeAgo(comment.created_at)}
+                      </span>
+                    </div>
+
+                    {/* Content */}
+                    <p className="text-gray-900 text-sm leading-relaxed mb-3 whitespace-pre-wrap">
+                      {comment.content}
+                    </p>
+
+                    {/* Actions - só curtir */}
+                    <div className="flex items-center">
+                      <button
+                        onClick={() => toggleLike(comment.id)}
+                        disabled={!user}
+                        className={`
+                          flex items-center space-x-1 px-2 py-1 rounded-lg text-xs font-medium
+                          transition-all duration-200 hover:bg-gray-50
+                          ${
+                            isLiked
+                              ? "text-red-600 bg-red-50"
+                              : "text-gray-600 hover:text-red-600"
+                          }
+                          ${
+                            !user
+                              ? "opacity-50 cursor-not-allowed"
+                              : "cursor-pointer"
+                          }
+                        `}
+                      >
+                        {isLiked ? (
+                          <HeartSolidIcon className="w-4 h-4" />
+                        ) : (
+                          <HeartIcon className="w-4 h-4" />
+                        )}
+                        <span>
+                          {comment.likes_count > 0 && comment.likes_count}
+                          {isLiked ? " Curtido" : " Curtir"}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-            ) : (
-              "Carregar mais comentários"
-            )}
-          </button>
+            );
+          })}
         </div>
       )}
 
       {/* Empty state */}
       {!loading && !hasComments && !error && (
         <div className="text-center py-8">
-          <div className="text-4xl mb-3">💬</div>
+          <ChatBubbleLeftIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <h4 className="text-lg font-medium text-gray-900 mb-2">
             Ainda não há comentários
           </h4>
@@ -401,18 +303,6 @@ export default function CommentSection({
           </p>
         </div>
       )}
-
-      {/* Debug info (desenvolvimento) */}
-      {process.env.NODE_ENV === "development" && hasComments && (
-        <div className="p-2 bg-gray-50 border-t text-xs text-gray-600">
-          <div className="flex justify-between">
-            <span>📊 Threads: {comments.length}</span>
-            <span>💬 Total: {totalComments}</span>
-            <span>🔄 Loading: {loading ? "Sim" : "Não"}</span>
-            <span>📄 Mais: {hasMore ? "Sim" : "Não"}</span>
-          </div>
-        </div>
-      )}
     </div>
   );
-} //oi
+}
