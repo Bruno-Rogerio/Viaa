@@ -139,8 +139,8 @@ export const useComments = (
         tipo_usuario: "profissional",
       },
 
-      // Estatísticas (simplificadas - sem tabela de reações ainda)
-      reactions_count: 0, // TODO: Implementar quando tiver tabela de reações
+      // Estatísticas (usar campos reais da tabela)
+      reactions_count: rawComment.likes_count || 0, // Usar likes_count que existe
       replies_count: 0, // Será calculado na transformToThreads
 
       // Reação do usuário (não implementado ainda)
@@ -266,24 +266,17 @@ export const useComments = (
       try {
         setError(null);
 
-        const newComment: CreateCommentRequest = {
+        // Dados simples baseados no schema real
+        const commentData = {
           content: content.trim(),
           post_id: postId,
-          parent_comment_id: parentId,
-          mentions: [], // Implementar depois
+          profissional_id: user.id,
+          parent_comment_id: parentId || null,
         };
 
         const { data, error } = await supabase
           .from("post_comments")
-          .insert([
-            {
-              ...newComment,
-              profissional_id: user.id, // Usar profissional_id em vez de author_id
-              thread_root_id: parentId
-                ? commentsCache.get(parentId)?.thread_root_id
-                : undefined,
-            },
-          ])
+          .insert([commentData])
           .select(
             `
           *,
@@ -340,16 +333,103 @@ export const useComments = (
     [user, postId, commentsCache]
   );
 
-  // 🔧 SISTEMA DE REAÇÕES (SIMPLIFICADO - SEM TABELA DE REAÇÕES AINDA)
-  const addReaction = useCallback(async (commentId: string, type: string) => {
-    // TODO: Implementar quando tiver tabela comment_reactions
-    console.log("TODO: Implementar reação", commentId, type);
-  }, []);
+  // 🔧 SISTEMA DE LIKES (USAR CAMPO EXISTENTE)
+  const addReaction = useCallback(
+    async (commentId: string, type: string) => {
+      if (!user) return;
 
-  const removeReaction = useCallback(async (commentId: string) => {
-    // TODO: Implementar quando tiver tabela comment_reactions
-    console.log("TODO: Remover reação", commentId);
-  }, []);
+      try {
+        // Primeiro buscar o valor atual
+        const { data: currentComment } = await supabase
+          .from("post_comments")
+          .select("likes_count")
+          .eq("id", commentId)
+          .single();
+
+        const newCount = (currentComment?.likes_count || 0) + 1;
+
+        // Atualizar com o novo valor
+        const { error } = await supabase
+          .from("post_comments")
+          .update({ likes_count: newCount })
+          .eq("id", commentId);
+
+        if (error) throw error;
+
+        // Optimistic update
+        setComments((prev) =>
+          prev.map((thread) => ({
+            ...thread,
+            root_comment: updateCommentLikes(thread.root_comment, commentId, 1),
+          }))
+        );
+      } catch (err: any) {
+        console.error("❌ Erro ao curtir comentário:", err);
+      }
+    },
+    [user]
+  );
+
+  const removeReaction = useCallback(
+    async (commentId: string) => {
+      if (!user) return;
+
+      try {
+        // Primeiro buscar o valor atual
+        const { data: currentComment } = await supabase
+          .from("post_comments")
+          .select("likes_count")
+          .eq("id", commentId)
+          .single();
+
+        const newCount = Math.max(0, (currentComment?.likes_count || 0) - 1);
+
+        // Atualizar com o novo valor
+        const { error } = await supabase
+          .from("post_comments")
+          .update({ likes_count: newCount })
+          .eq("id", commentId);
+
+        if (error) throw error;
+
+        // Optimistic update
+        setComments((prev) =>
+          prev.map((thread) => ({
+            ...thread,
+            root_comment: updateCommentLikes(
+              thread.root_comment,
+              commentId,
+              -1
+            ),
+          }))
+        );
+      } catch (err: any) {
+        console.error("❌ Erro ao descurtir comentário:", err);
+      }
+    },
+    [user]
+  );
+
+  // Helper para atualizar likes
+  const updateCommentLikes = (
+    comment: CommentWithReplies,
+    targetId: string,
+    delta: number
+  ): CommentWithReplies => {
+    if (comment.id === targetId) {
+      return {
+        ...comment,
+        reactions_count: Math.max(0, comment.reactions_count + delta),
+      };
+    }
+
+    return {
+      ...comment,
+      replies: comment.replies.map((reply) =>
+        updateCommentLikes(reply, targetId, delta)
+      ),
+    };
+  };
 
   // Implementações futuras
   const editComment = useCallback(
