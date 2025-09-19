@@ -261,10 +261,19 @@ export const useComments = (
   // 🔧 CRIAR NOVO COMENTÁRIO
   const createComment = useCallback(
     async (content: string, parentId?: string): Promise<boolean> => {
-      if (!user || !content.trim()) return false;
+      if (!user || !content.trim()) {
+        console.warn("❌ Usuário não autenticado ou conteúdo vazio");
+        return false;
+      }
 
       try {
         setError(null);
+
+        console.log("📝 Criando comentário:", {
+          content: content.trim(),
+          parentId,
+          userId: user.id,
+        });
 
         // Dados simples baseados no schema real
         const commentData = {
@@ -273,6 +282,8 @@ export const useComments = (
           profissional_id: user.id,
           parent_comment_id: parentId || null,
         };
+
+        console.log("📊 Dados do comentário:", commentData);
 
         const { data, error } = await supabase
           .from("post_comments")
@@ -287,17 +298,28 @@ export const useComments = (
           )
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error("❌ Erro ao inserir comentário:", error);
+          throw error;
+        }
+
+        if (!data) {
+          throw new Error("Erro ao criar comentário - sem dados retornados");
+        }
+
+        console.log("✅ Comentário criado:", data);
 
         const transformedComment = transformComment(data);
+        console.log("🔄 Comentário transformado:", transformedComment);
 
         // Optimistic update
         if (parentId) {
+          console.log("📎 Adicionando resposta ao comentário pai:", parentId);
           // Adicionar resposta ao comentário pai
           setComments((prev) =>
             prev.map((thread) => {
               if (thread.root_comment.id === parentId) {
-                return {
+                const updatedThread = {
                   ...thread,
                   root_comment: {
                     ...thread.root_comment,
@@ -309,17 +331,24 @@ export const useComments = (
                   },
                   total_replies: thread.total_replies + 1,
                 };
+                console.log(
+                  "✅ Thread atualizada com resposta:",
+                  updatedThread
+                );
+                return updatedThread;
               }
               return thread;
             })
           );
         } else {
+          console.log("💬 Adicionando comentário principal");
           // Adicionar novo comentário raiz
           const newThread: CommentThread = {
             root_comment: transformedComment,
             total_replies: 0,
             participants: [transformedComment.author],
           };
+          console.log("✅ Nova thread criada:", newThread);
           setComments((prev) => [newThread, ...prev]);
         }
 
@@ -333,13 +362,14 @@ export const useComments = (
     [user, postId, commentsCache]
   );
 
-  // 🔧 SISTEMA DE LIKES (USAR CAMPO EXISTENTE)
+  // 🔧 SISTEMA DE LIKES SIMPLIFICADO (SEM TABELA DE COMMENT_LIKES)
   const addReaction = useCallback(
     async (commentId: string, type: string) => {
       if (!user) return;
 
       try {
-        // Primeiro buscar o valor atual
+        // Por enquanto, apenas incrementar likes_count diretamente
+        // TODO: Criar tabela comment_likes se necessário
         const { data: currentComment } = await supabase
           .from("post_comments")
           .select("likes_count")
@@ -348,7 +378,6 @@ export const useComments = (
 
         const newCount = (currentComment?.likes_count || 0) + 1;
 
-        // Atualizar com o novo valor
         const { error } = await supabase
           .from("post_comments")
           .update({ likes_count: newCount })
@@ -363,8 +392,11 @@ export const useComments = (
             root_comment: updateCommentLikes(thread.root_comment, commentId, 1),
           }))
         );
+
+        console.log("✅ Comentário curtido");
       } catch (err: any) {
         console.error("❌ Erro ao curtir comentário:", err);
+        setError("Erro ao curtir comentário");
       }
     },
     [user]
@@ -375,7 +407,7 @@ export const useComments = (
       if (!user) return;
 
       try {
-        // Primeiro buscar o valor atual
+        // Decrementar likes_count
         const { data: currentComment } = await supabase
           .from("post_comments")
           .select("likes_count")
@@ -384,7 +416,6 @@ export const useComments = (
 
         const newCount = Math.max(0, (currentComment?.likes_count || 0) - 1);
 
-        // Atualizar com o novo valor
         const { error } = await supabase
           .from("post_comments")
           .update({ likes_count: newCount })
@@ -403,8 +434,11 @@ export const useComments = (
             ),
           }))
         );
+
+        console.log("✅ Curtida removida");
       } catch (err: any) {
         console.error("❌ Erro ao descurtir comentário:", err);
+        setError("Erro ao descurtir comentário");
       }
     },
     [user]
