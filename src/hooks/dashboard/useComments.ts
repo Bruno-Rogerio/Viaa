@@ -362,14 +362,29 @@ export const useComments = (
     [user, postId, commentsCache]
   );
 
-  // 🔧 SISTEMA DE LIKES SIMPLIFICADO (SEM TABELA DE COMMENT_LIKES)
+  // 🔧 SISTEMA DE LIKES MELHORADO (COM CONTROLE DE USUÁRIO)
+  const [userLikes, setUserLikes] = useState<Set<string>>(new Set()); // IDs dos comentários curtidos pelo usuário
+
   const addReaction = useCallback(
     async (commentId: string, type: string) => {
       if (!user) return;
 
+      // Verificar se já curtiu
+      if (userLikes.has(commentId)) {
+        console.log("❌ Usuário já curtiu este comentário");
+        return;
+      }
+
       try {
-        // Por enquanto, apenas incrementar likes_count diretamente
-        // TODO: Criar tabela comment_likes se necessário
+        // Optimistic update ANTES da requisição
+        setUserLikes((prev) => new Set([...prev, commentId]));
+        setComments((prev) =>
+          prev.map((thread) => ({
+            ...thread,
+            root_comment: updateCommentLikes(thread.root_comment, commentId, 1),
+          }))
+        );
+
         const { data: currentComment } = await supabase
           .from("post_comments")
           .select("likes_count")
@@ -385,29 +400,55 @@ export const useComments = (
 
         if (error) throw error;
 
-        // Optimistic update
+        console.log("✅ Comentário curtido com sucesso");
+      } catch (err: any) {
+        console.error("❌ Erro ao curtir comentário:", err);
+
+        // Rollback em caso de erro
+        setUserLikes((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(commentId);
+          return newSet;
+        });
         setComments((prev) =>
           prev.map((thread) => ({
             ...thread,
-            root_comment: updateCommentLikes(thread.root_comment, commentId, 1),
+            root_comment: updateCommentLikes(
+              thread.root_comment,
+              commentId,
+              -1
+            ),
           }))
         );
 
-        console.log("✅ Comentário curtido");
-      } catch (err: any) {
-        console.error("❌ Erro ao curtir comentário:", err);
         setError("Erro ao curtir comentário");
       }
     },
-    [user]
+    [user, userLikes]
   );
 
   const removeReaction = useCallback(
     async (commentId: string) => {
-      if (!user) return;
+      if (!user || !userLikes.has(commentId)) return;
 
       try {
-        // Decrementar likes_count
+        // Optimistic update
+        setUserLikes((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(commentId);
+          return newSet;
+        });
+        setComments((prev) =>
+          prev.map((thread) => ({
+            ...thread,
+            root_comment: updateCommentLikes(
+              thread.root_comment,
+              commentId,
+              -1
+            ),
+          }))
+        );
+
         const { data: currentComment } = await supabase
           .from("post_comments")
           .select("likes_count")
@@ -423,25 +464,23 @@ export const useComments = (
 
         if (error) throw error;
 
-        // Optimistic update
+        console.log("✅ Curtida removida com sucesso");
+      } catch (err: any) {
+        console.error("❌ Erro ao descurtir comentário:", err);
+
+        // Rollback
+        setUserLikes((prev) => new Set([...prev, commentId]));
         setComments((prev) =>
           prev.map((thread) => ({
             ...thread,
-            root_comment: updateCommentLikes(
-              thread.root_comment,
-              commentId,
-              -1
-            ),
+            root_comment: updateCommentLikes(thread.root_comment, commentId, 1),
           }))
         );
 
-        console.log("✅ Curtida removida");
-      } catch (err: any) {
-        console.error("❌ Erro ao descurtir comentário:", err);
         setError("Erro ao descurtir comentário");
       }
     },
-    [user]
+    [user, userLikes]
   );
 
   // Helper para atualizar likes
@@ -533,5 +572,6 @@ export const useComments = (
     findComment,
     getCommentPath,
     refresh,
+    userLikes, // Exportar userLikes
   };
 };

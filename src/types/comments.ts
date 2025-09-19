@@ -84,12 +84,13 @@ export interface CommentItemProps {
   maxDepth: number;
   postAuthorId: string;
   currentUserId?: string;
-  onReply: (commentId: string, authorName: string) => void;
+  onReply: (commentId: string, content: string) => Promise<boolean>;
   onReaction: (commentId: string, reactionType: string) => Promise<void>;
   onLoadReplies: (commentId: string) => Promise<void>;
   onEdit?: (commentId: string, newContent: string) => Promise<void>;
   onDelete?: (commentId: string) => Promise<void>;
   isHighlighted?: boolean;
+  userLikes?: Set<string>; // Adicionar prop para controle de curtidas
 }
 
 export interface CommentComposerProps {
@@ -123,6 +124,9 @@ export interface UseCommentsReturn {
   findComment: (commentId: string) => CommentWithReplies | null;
   getCommentPath: (commentId: string) => string[];
   refresh: () => Promise<void>;
+
+  // Estado de curtidas do usuário
+  userLikes: Set<string>;
 }
 
 export interface CommentFilters {

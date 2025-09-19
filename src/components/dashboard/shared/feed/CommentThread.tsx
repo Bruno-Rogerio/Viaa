@@ -17,11 +17,13 @@ interface CommentThreadProps {
   thread: CommentThreadType;
   maxDepth: number;
   postAuthorId: string;
-  onReply: (commentId: string, authorName: string) => void;
+  currentUserId?: string;
+  onReply: (commentId: string, content: string) => Promise<boolean>;
   onReaction: (commentId: string, reactionType: string) => Promise<void>;
   onLoadReplies: (commentId: string) => Promise<void>;
   onEdit?: (commentId: string, content: string) => Promise<void>;
   onDelete?: (commentId: string) => Promise<void>;
+  userLikes: Set<string>;
   isFirst?: boolean;
   isLast?: boolean;
   className?: string;
@@ -31,11 +33,13 @@ const CommentThread = memo(function CommentThread({
   thread,
   maxDepth,
   postAuthorId,
+  currentUserId,
   onReply,
   onReaction,
   onLoadReplies,
   onEdit,
   onDelete,
+  userLikes,
   isFirst = false,
   isLast = false,
   className = "",
@@ -56,7 +60,8 @@ const CommentThread = memo(function CommentThread({
   } = thread;
   const hasReplies = total_replies > 0;
   const hasUnloadedReplies = hasReplies && !rootComment.replies_loaded;
-  const currentUserId = user?.id;
+  // Usar currentUserId da prop em vez de duplicar
+  const userId = currentUserId || user?.id;
 
   // 🔧 REPLIES VISÍVEIS (LAZY LOADING)
   const visibleReplies = useMemo(() => {
@@ -232,12 +237,13 @@ const CommentThread = memo(function CommentThread({
               depth={0}
               maxDepth={maxDepth}
               postAuthorId={postAuthorId}
-              currentUserId={currentUserId}
+              currentUserId={userId}
               onReply={onReply}
               onReaction={handleReaction}
               onLoadReplies={onLoadReplies}
               onEdit={onEdit}
               onDelete={onDelete}
+              userLikes={userLikes}
             />
           </div>
 
@@ -286,13 +292,14 @@ const CommentThread = memo(function CommentThread({
                         depth={1}
                         maxDepth={maxDepth}
                         postAuthorId={postAuthorId}
-                        currentUserId={currentUserId}
+                        currentUserId={userId}
                         onReply={onReply}
                         onReaction={handleReaction}
                         onLoadReplies={onLoadReplies}
                         onEdit={onEdit}
                         onDelete={onDelete}
                         isHighlighted={reply.is_highlighted}
+                        userLikes={userLikes}
                       />
                     </div>
                   ))}

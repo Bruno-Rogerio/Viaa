@@ -12,6 +12,7 @@ import {
 import CommentComposer from "./CommentComposer";
 import CommentThread from "./CommentThread";
 import { useComments } from "@/hooks/dashboard/useComments";
+import { useAuth } from "@/contexts/AuthContext";
 import { LoadingSpinner } from "../../common";
 import type { CommentFilters } from "@/types/comments";
 
@@ -34,6 +35,8 @@ export default function CommentSection({
   maxDepth = 2,
   className = "",
 }: CommentSectionProps) {
+  const { user } = useAuth(); // Adicionar useAuth
+
   // Estados locais
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -53,6 +56,7 @@ export default function CommentSection({
     addReaction,
     removeReaction,
     refresh,
+    userLikes, // Adicionar userLikes do hook
   } = useComments(postId, { sort_by: sortBy });
 
   // Dados derivados
@@ -79,10 +83,21 @@ export default function CommentSection({
   );
 
   // 🔧 MANIPULAR RESPOSTA
-  const handleReply = useCallback((commentId: string, authorName: string) => {
-    console.log(`Respondendo ao comentário ${commentId} de ${authorName}`);
-    // A lógica de resposta é gerenciada pelo CommentItem
-  }, []);
+  const handleReply = useCallback(
+    async (commentId: string, content: string): Promise<boolean> => {
+      console.log("📝 CommentSection: Criando resposta", {
+        commentId,
+        content,
+      });
+
+      // Criar comentário como resposta
+      const success = await createComment(content, commentId);
+      console.log("✅ Resposta criada:", success);
+
+      return success;
+    },
+    [createComment]
+  );
 
   // 🔧 MANIPULAR REAÇÕES
   const handleReaction = useCallback(
@@ -300,9 +315,11 @@ export default function CommentSection({
               thread={thread}
               maxDepth={maxDepth}
               postAuthorId={postAuthorId}
+              currentUserId={user?.id}
               onReply={handleReply}
               onReaction={handleReaction}
               onLoadReplies={loadReplies}
+              userLikes={userLikes}
               isFirst={index === 0}
               isLast={index === comments.length - 1}
             />

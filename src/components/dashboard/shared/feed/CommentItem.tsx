@@ -28,6 +28,7 @@ export default function CommentItem({
   onEdit,
   onDelete,
   isHighlighted = false,
+  userLikes = new Set(),
 }: CommentItemProps) {
   // Estados locais
   const [showReplyForm, setShowReplyForm] = useState(false);
@@ -65,14 +66,14 @@ export default function CommentItem({
     setShowReactionPicker(false);
 
     try {
-      // Se já tem a mesma reação, remove. Senão, adiciona a nova
-      if (comment.user_reaction?.type === reactionType) {
+      if (hasUserLiked) {
         await onReaction(comment.id, ""); // Remove reação
       } else {
         await onReaction(comment.id, reactionType);
       }
+      console.log("✅ Reação processada");
     } catch (error) {
-      console.error("Erro ao reagir:", error);
+      console.error("❌ Erro ao reagir:", error);
     } finally {
       setIsReacting(false);
     }
@@ -81,14 +82,24 @@ export default function CommentItem({
   // 🔧 MANIPULAR RESPOSTA
   const handleReplyClick = () => {
     if (!canReply) return;
+    console.log("🔄 Iniciando resposta para:", comment.id, authorName);
     setShowReplyForm(true);
-    onReply(comment.id, authorName);
+    // onReply é só para notificar, não para criar comentário
   };
 
   const handleReplySubmit = async (content: string): Promise<boolean> => {
-    // Esta função será conectada ao hook useComments
-    setShowReplyForm(false);
-    return true;
+    console.log("📝 Enviando resposta:", { content, commentId: comment.id });
+
+    try {
+      // Conectar com o hook createComment passando o ID do comentário pai
+      const success = await onReply(comment.id, content);
+      setShowReplyForm(false); // Fechar formulário após sucesso
+      console.log("✅ Resposta enviada:", success);
+      return success;
+    } catch (error) {
+      console.error("❌ Erro ao enviar resposta:", error);
+      return false;
+    }
   };
 
   const handleReplyCancel = () => {
@@ -118,11 +129,9 @@ export default function CommentItem({
     }
   };
 
-  // 🔧 REAÇÃO ATIVA
-  const activeReaction = comment.user_reaction?.type;
-  const reactionData = activeReaction
-    ? COMMENT_REACTIONS[activeReaction as keyof typeof COMMENT_REACTIONS]
-    : null;
+  // 🔧 REAÇÃO ATIVA (BASEADA NO CONTROLE LOCAL)
+  const hasUserLiked = userLikes.has(comment.id);
+  const displayLikes = comment.reactions_count + (hasUserLiked ? 1 : 0);
 
   return (
     <div
@@ -230,8 +239,8 @@ export default function CommentItem({
                   flex items-center space-x-1 px-2 py-1 rounded-lg text-xs font-medium
                   transition-all duration-200 hover:bg-gray-100
                   ${
-                    activeReaction
-                      ? `${reactionData?.color} bg-gray-50`
+                    hasUserLiked
+                      ? "text-blue-600 bg-blue-50"
                       : "text-gray-600 hover:text-gray-900"
                   }
                   ${
@@ -241,10 +250,10 @@ export default function CommentItem({
                   }
                 `}
               >
-                {activeReaction ? (
+                {hasUserLiked ? (
                   <>
-                    <span>{reactionData?.emoji}</span>
-                    <span>{reactionData?.label}</span>
+                    <span>👍</span>
+                    <span>Curtido</span>
                   </>
                 ) : (
                   <>
@@ -252,8 +261,8 @@ export default function CommentItem({
                     <span>Curtir</span>
                   </>
                 )}
-                {comment.reactions_count > 0 && (
-                  <span className="ml-1">({comment.reactions_count})</span>
+                {displayLikes > 0 && (
+                  <span className="ml-1">({displayLikes})</span>
                 )}
               </button>
 
