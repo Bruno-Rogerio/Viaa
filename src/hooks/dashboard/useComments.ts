@@ -32,7 +32,7 @@ export const useComments = (
     Map<string, CommentWithReplies>
   >(new Map());
 
-  // 🔧 QUERY BUILDER - Comentários com aninhamento correto
+  // 🔧 QUERY BUILDER - Comentários SIMPLES (sem reações por enquanto)
   const buildCommentsQuery = useCallback(() => {
     let query = supabase
       .from("post_comments")
@@ -46,15 +46,6 @@ export const useComments = (
           especialidades,
           foto_perfil_url,
           verificado
-        ),
-        user_reaction:comment_reactions!comment_reactions_comment_id_fkey (
-          id,
-          type,
-          created_at
-        ),
-        reactions_summary:comment_reactions(
-          type,
-          count
         )
       `
       )
@@ -70,11 +61,8 @@ export const useComments = (
         query = query.order("created_at", { ascending: true });
         break;
       case "most_relevant":
-        // Ordenar por: reações + replies + recente
-        query = query
-          .order("reactions_count", { ascending: false })
-          .order("replies_count", { ascending: false })
-          .order("created_at", { ascending: false });
+        // Por enquanto, só por data (sem reactions_count que não existe)
+        query = query.order("created_at", { ascending: false });
         break;
     }
 
@@ -129,21 +117,16 @@ export const useComments = (
 
   // 🔧 TRANSFORMAR COMENTÁRIO INDIVIDUAL
   const transformComment = (rawComment: any): CommentWithReplies => {
-    // Processar reações do usuário atual
-    const userReaction = rawComment.user_reaction?.find(
-      (r: any) => r.user_id === user?.id
-    );
-
     return {
       id: rawComment.id,
       content: rawComment.content,
       post_id: rawComment.post_id,
-      author_id: rawComment.author_id,
+      author_id: rawComment.profissional_id, // Usar profissional_id como author_id
       created_at: rawComment.created_at,
       updated_at: rawComment.updated_at,
-      edited: rawComment.edited || false,
+      edited: false, // Campo não existe ainda
       parent_comment_id: rawComment.parent_comment_id,
-      thread_root_id: rawComment.thread_root_id || rawComment.id,
+      thread_root_id: rawComment.parent_comment_id || rawComment.id, // Se tem pai, usa pai como root
 
       // Dados do autor
       author: {
@@ -153,28 +136,15 @@ export const useComments = (
         especialidades: rawComment.author.especialidades,
         foto_perfil_url: rawComment.author.foto_perfil_url,
         verificado: rawComment.author.verificado || false,
-        tipo_usuario: "profissional", // Sempre profissional na tabela perfis_profissionais
+        tipo_usuario: "profissional",
       },
 
-      // Estatísticas
-      reactions_count: rawComment.reactions_count || 0,
-      replies_count: rawComment.replies_count || 0,
+      // Estatísticas (simplificadas - sem tabela de reações ainda)
+      reactions_count: 0, // TODO: Implementar quando tiver tabela de reações
+      replies_count: 0, // Será calculado na transformToThreads
 
-      // Reação do usuário
-      user_reaction: userReaction
-        ? {
-            id: userReaction.id,
-            comment_id: userReaction.comment_id || rawComment.id,
-            user_id: userReaction.user_id || user?.id || "",
-            type: userReaction.type as
-              | "like"
-              | "love"
-              | "insightful"
-              | "support"
-              | "celebrate",
-            created_at: userReaction.created_at,
-          }
-        : undefined,
+      // Reação do usuário (não implementado ainda)
+      user_reaction: undefined,
 
       // Menções (implementar depois)
       mentions: [],
@@ -253,9 +223,6 @@ export const useComments = (
           *,
           author:perfis_profissionais!post_comments_profissional_id_fkey (
             id, nome, sobrenome, especialidades, foto_perfil_url, verificado
-          ),
-          user_reaction:comment_reactions!comment_reactions_comment_id_fkey (
-            id, type, created_at
           )
         `
           )
@@ -373,117 +340,22 @@ export const useComments = (
     [user, postId, commentsCache]
   );
 
-  // 🔧 SISTEMA DE REAÇÕES
-  const addReaction = useCallback(
-    async (commentId: string, type: string) => {
-      if (!user) return;
+  // 🔧 SISTEMA DE REAÇÕES (SIMPLIFICADO - SEM TABELA DE REAÇÕES AINDA)
+  const addReaction = useCallback(async (commentId: string, type: string) => {
+    // TODO: Implementar quando tiver tabela comment_reactions
+    console.log("TODO: Implementar reação", commentId, type);
+  }, []);
 
-      try {
-        const { error } = await supabase.from("comment_reactions").insert([
-          {
-            comment_id: commentId,
-            user_id: user.id,
-            type,
-          },
-        ]);
-
-        if (error) throw error;
-
-        // Optimistic update
-        setComments((prev) =>
-          prev.map((thread) => ({
-            ...thread,
-            root_comment: updateCommentReaction(
-              thread.root_comment,
-              commentId,
-              type,
-              "add"
-            ),
-          }))
-        );
-      } catch (err: any) {
-        console.error("❌ Erro ao adicionar reação:", err);
-      }
-    },
-    [user]
-  );
-
-  const removeReaction = useCallback(
-    async (commentId: string) => {
-      if (!user) return;
-
-      try {
-        const { error } = await supabase
-          .from("comment_reactions")
-          .delete()
-          .eq("comment_id", commentId)
-          .eq("user_id", user.id);
-
-        if (error) throw error;
-
-        // Optimistic update
-        setComments((prev) =>
-          prev.map((thread) => ({
-            ...thread,
-            root_comment: updateCommentReaction(
-              thread.root_comment,
-              commentId,
-              "",
-              "remove"
-            ),
-          }))
-        );
-      } catch (err: any) {
-        console.error("❌ Erro ao remover reação:", err);
-      }
-    },
-    [user]
-  );
-
-  // Helper para atualizar reações
-  const updateCommentReaction = (
-    comment: CommentWithReplies,
-    targetId: string,
-    type: string,
-    action: "add" | "remove"
-  ): CommentWithReplies => {
-    if (comment.id === targetId) {
-      return {
-        ...comment,
-        reactions_count:
-          action === "add"
-            ? comment.reactions_count + 1
-            : Math.max(0, comment.reactions_count - 1),
-        user_reaction:
-          action === "add"
-            ? {
-                id: "temp",
-                comment_id: targetId,
-                user_id: user?.id || "",
-                type: type as
-                  | "like"
-                  | "love"
-                  | "insightful"
-                  | "support"
-                  | "celebrate",
-                created_at: new Date().toISOString(),
-              }
-            : undefined,
-      };
-    }
-
-    return {
-      ...comment,
-      replies: comment.replies.map((reply) =>
-        updateCommentReaction(reply, targetId, type, action)
-      ),
-    };
-  };
+  const removeReaction = useCallback(async (commentId: string) => {
+    // TODO: Implementar quando tiver tabela comment_reactions
+    console.log("TODO: Remover reação", commentId);
+  }, []);
 
   // Implementações futuras
   const editComment = useCallback(
     async (commentId: string, content: string): Promise<boolean> => {
       // TODO: Implementar edição
+      console.log("TODO: Editar comentário", commentId, content);
       return false;
     },
     []
@@ -492,6 +364,7 @@ export const useComments = (
   const deleteComment = useCallback(
     async (commentId: string): Promise<boolean> => {
       // TODO: Implementar exclusão
+      console.log("TODO: Deletar comentário", commentId);
       return false;
     },
     []
