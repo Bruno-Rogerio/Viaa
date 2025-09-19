@@ -214,7 +214,7 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
     [user, postId]
   );
 
-  // 🔧 CURTIR/DESCURTIR (MANTIDO IGUAL)
+  // 🔧 CURTIR/DESCURTIR COMENTÁRIOS (IMPLEMENTADO)
   const toggleLike = useCallback(
     async (commentId: string) => {
       if (!user) return;
@@ -222,7 +222,7 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
       const isLiked = userLikes.has(commentId);
 
       try {
-        // Optimistic update
+        // Optimistic update no frontend
         if (isLiked) {
           setUserLikes((prev) => {
             const newSet = new Set(prev);
@@ -233,7 +233,7 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
           setUserLikes((prev) => new Set([...prev, commentId]));
         }
 
-        // Atualizar contador local
+        // Atualizar contador local otimisticamente
         setComments((prev) =>
           prev.map((comment) =>
             comment.id === commentId
@@ -245,39 +245,58 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
           )
         );
 
-        // Chamar API (implementação simples)
-        const { error } = await supabase.rpc("toggle_comment_like", {
+        console.log(
+          `${isLiked ? "💔" : "❤️"} Toggle curtida comentário:`,
+          commentId
+        );
+
+        // Chamar função RPC do Supabase
+        const { data, error } = await supabase.rpc("toggle_comment_like", {
           comment_id: commentId,
           user_id: user.id,
         });
 
-        if (error) {
-          // Reverter em caso de erro
-          if (isLiked) {
-            setUserLikes((prev) => new Set([...prev, commentId]));
-          } else {
-            setUserLikes((prev) => {
-              const newSet = new Set(prev);
-              newSet.delete(commentId);
-              return newSet;
-            });
-          }
+        if (error) throw error;
 
+        console.log("✅ Resposta curtida:", data);
+
+        // Atualizar com dados reais do servidor
+        if (data && typeof data.likes_count === "number") {
           setComments((prev) =>
             prev.map((comment) =>
               comment.id === commentId
                 ? {
                     ...comment,
-                    likes_count: comment.likes_count + (isLiked ? 1 : -1),
+                    likes_count: data.likes_count,
                   }
                 : comment
             )
           );
-
-          throw error;
         }
       } catch (err: any) {
         console.error("❌ Erro ao curtir comentário:", err);
+
+        // Reverter mudanças otimistas em caso de erro
+        if (isLiked) {
+          setUserLikes((prev) => new Set([...prev, commentId]));
+        } else {
+          setUserLikes((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(commentId);
+            return newSet;
+          });
+        }
+
+        setComments((prev) =>
+          prev.map((comment) =>
+            comment.id === commentId
+              ? {
+                  ...comment,
+                  likes_count: comment.likes_count + (isLiked ? 1 : -1),
+                }
+              : comment
+          )
+        );
       }
     },
     [user, userLikes]
@@ -288,10 +307,46 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
     await loadComments();
   }, [loadComments]);
 
+  // 🔧 CARREGAR CURTIDAS DO USUÁRIO
+  const loadUserLikes = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      console.log("🔍 Carregando curtidas do usuário para post:", postId);
+
+      const { data, error } = await supabase
+        .from("comment_likes")
+        .select("comment_id")
+        .eq("profissional_id", user.id)
+        .in(
+          "comment_id",
+          comments.map((c) => c.id)
+        );
+
+      if (error) throw error;
+
+      const likedCommentIds = new Set(
+        data?.map((like) => like.comment_id) || []
+      );
+      setUserLikes(likedCommentIds);
+
+      console.log("✅ Curtidas carregadas:", likedCommentIds.size);
+    } catch (err: any) {
+      console.error("❌ Erro ao carregar curtidas:", err);
+    }
+  }, [user, postId, comments]);
+
   // Carregar comentários na inicialização
   useEffect(() => {
     loadComments();
   }, [loadComments]);
+
+  // Carregar curtidas quando comentários mudam
+  useEffect(() => {
+    if (comments.length > 0) {
+      loadUserLikes();
+    }
+  }, [comments.length > 0]); // Só quando houver comentários
 
   return {
     comments,
