@@ -1,5 +1,5 @@
 // src/hooks/dashboard/useComments.ts
-// 🎯 HOOK DE COMENTÁRIOS SIMPLES PARA MVP - COMPLETO
+// 🎯 HOOK DE COMENTÁRIOS SIMPLES PARA MVP - VERSÃO CORRIGIDA
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
@@ -44,7 +44,7 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
   const [error, setError] = useState<string | null>(null);
   const [userLikes, setUserLikes] = useState<Set<string>>(new Set());
 
-  // 🔧 CARREGAR COMENTÁRIOS (SIMPLES)
+  // 🔧 CARREGAR COMENTÁRIOS (CORRIGIDO)
   const loadComments = useCallback(async () => {
     try {
       setLoading(true);
@@ -81,12 +81,46 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
 
       if (queryError) throw queryError;
 
-      const validComments = (data || []).filter(
-        (comment) => comment && comment.author && comment.author.nome
-      );
+      // 🔧 CORREÇÃO: Transformar a resposta do Supabase
+      const transformedComments: SimpleComment[] = [];
 
-      console.log("✅ Comentários carregados:", validComments.length);
-      setComments(validComments);
+      for (const item of data || []) {
+        // Verificar se author é um array e pegar o primeiro item
+        const authorData = Array.isArray(item.author)
+          ? item.author[0]
+          : item.author;
+
+        // Validar se todos os dados necessários existem
+        if (!authorData || !authorData.nome || !authorData.id) {
+          console.warn("Comentário com author inválido:", item);
+          continue; // Pular este comentário
+        }
+
+        // Criar comentário válido
+        const validComment: SimpleComment = {
+          id: item.id,
+          content: item.content,
+          post_id: item.post_id,
+          profissional_id: item.profissional_id,
+          likes_count: item.likes_count || 0,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          is_active: item.is_active,
+          author: {
+            id: authorData.id,
+            nome: authorData.nome,
+            sobrenome: authorData.sobrenome || "",
+            especialidades: authorData.especialidades || "",
+            foto_perfil_url: authorData.foto_perfil_url || undefined,
+            verificado: authorData.verificado || false,
+          },
+        };
+
+        transformedComments.push(validComment);
+      }
+
+      console.log("✅ Comentários transformados:", transformedComments.length);
+      setComments(transformedComments);
     } catch (err: any) {
       console.error("❌ Erro ao carregar comentários:", err);
       setError(err.message || "Erro ao carregar comentários");
@@ -95,7 +129,7 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
     }
   }, [postId]);
 
-  // 🔧 CRIAR COMENTÁRIO (SIMPLES)
+  // 🔧 CRIAR COMENTÁRIO (CORRIGIDO)
   const createComment = useCallback(
     async (content: string): Promise<boolean> => {
       if (!user || !content.trim()) return false;
@@ -138,10 +172,38 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
 
         if (error) throw error;
 
-        console.log("✅ Comentário criado:", data);
+        // 🔧 CORREÇÃO: Transformar a resposta antes de adicionar
+        const authorData = Array.isArray(data.author)
+          ? data.author[0]
+          : data.author;
+
+        if (!authorData || !authorData.nome) {
+          throw new Error("Dados do autor inválidos");
+        }
+
+        const transformedComment: SimpleComment = {
+          id: data.id,
+          content: data.content,
+          post_id: data.post_id,
+          profissional_id: data.profissional_id,
+          likes_count: data.likes_count || 0,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          is_active: data.is_active,
+          author: {
+            id: authorData.id,
+            nome: authorData.nome,
+            sobrenome: authorData.sobrenome || "",
+            especialidades: authorData.especialidades || "",
+            foto_perfil_url: authorData.foto_perfil_url || undefined,
+            verificado: authorData.verificado || false,
+          },
+        };
+
+        console.log("✅ Comentário criado e transformado:", transformedComment);
 
         // Adicionar no início da lista
-        setComments((prev) => [data, ...prev]);
+        setComments((prev) => [transformedComment, ...prev]);
         return true;
       } catch (err: any) {
         console.error("❌ Erro ao criar comentário:", err);
@@ -152,7 +214,7 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
     [user, postId]
   );
 
-  // 🔧 CURTIR/DESCURTIR (SIMPLES)
+  // 🔧 CURTIR/DESCURTIR (MANTIDO IGUAL)
   const toggleLike = useCallback(
     async (commentId: string) => {
       if (!user) return;
@@ -183,49 +245,39 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
           )
         );
 
-        // Atualizar no banco
-        const { data: currentComment } = await supabase
-          .from("post_comments")
-          .select("likes_count")
-          .eq("id", commentId)
-          .single();
+        // Chamar API (implementação simples)
+        const { error } = await supabase.rpc("toggle_comment_like", {
+          comment_id: commentId,
+          user_id: user.id,
+        });
 
-        const newCount = isLiked
-          ? Math.max(0, (currentComment?.likes_count || 0) - 1)
-          : (currentComment?.likes_count || 0) + 1;
+        if (error) {
+          // Reverter em caso de erro
+          if (isLiked) {
+            setUserLikes((prev) => new Set([...prev, commentId]));
+          } else {
+            setUserLikes((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(commentId);
+              return newSet;
+            });
+          }
 
-        const { error } = await supabase
-          .from("post_comments")
-          .update({ likes_count: newCount })
-          .eq("id", commentId);
+          setComments((prev) =>
+            prev.map((comment) =>
+              comment.id === commentId
+                ? {
+                    ...comment,
+                    likes_count: comment.likes_count + (isLiked ? 1 : -1),
+                  }
+                : comment
+            )
+          );
 
-        if (error) throw error;
-
-        console.log("✅ Like atualizado:", isLiked ? "removido" : "adicionado");
-      } catch (err: any) {
-        console.error("❌ Erro ao atualizar like:", err);
-
-        // Rollback em caso de erro
-        if (isLiked) {
-          setUserLikes((prev) => new Set([...prev, commentId]));
-        } else {
-          setUserLikes((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(commentId);
-            return newSet;
-          });
+          throw error;
         }
-
-        setComments((prev) =>
-          prev.map((comment) =>
-            comment.id === commentId
-              ? {
-                  ...comment,
-                  likes_count: comment.likes_count + (isLiked ? 1 : -1),
-                }
-              : comment
-          )
-        );
+      } catch (err: any) {
+        console.error("❌ Erro ao curtir comentário:", err);
       }
     },
     [user, userLikes]
@@ -236,7 +288,7 @@ export const useComments = (postId: string): UseSimpleCommentsReturn => {
     await loadComments();
   }, [loadComments]);
 
-  // Carregar comentários no mount
+  // Carregar comentários na inicialização
   useEffect(() => {
     loadComments();
   }, [loadComments]);
