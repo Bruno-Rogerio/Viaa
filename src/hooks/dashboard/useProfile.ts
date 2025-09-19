@@ -1,23 +1,18 @@
 // src/hooks/dashboard/useProfile.ts
-// Hook para gerenciar perfil profissional - VERSÃO LIMPA E FUNCIONAL
+// 🔧 VERSÃO CORRIGIDA - Apenas campos editáveis permitidos
 
-import { useState, useCallback, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
-import type { PerfilProfissional, TipoProfissional } from "@/types/database";
+import { useAuth } from "@/contexts/AuthContext";
+import type { PerfilProfissional } from "@/types/database";
 
-// Interface expandida com TODOS os campos do schema Supabase
+// 🔧 INTERFACE APENAS COM CAMPOS EDITÁVEIS
 interface ProfileFormData {
-  // Dados pessoais básicos
-  nome: string;
-  sobrenome: string;
+  // 📧 CONTATO (editável)
   email: string;
   telefone: string;
-  data_nascimento: string;
-  cpf: string;
 
-  // Dados profissionais
-  tipo: TipoProfissional;
+  // 💼 PROFISSIONAL (editável)
   especialidades: string;
   bio_profissional: string;
   formacao_principal: string;
@@ -25,38 +20,51 @@ interface ProfileFormData {
   valor_sessao: number;
   abordagem_terapeutica: string;
 
-  // Credenciais profissionais
-  crp: string;
-  conselho_tipo: string;
-  conselho_numero: string;
-  registro_profissional: string;
-
-  // Status profissional (readonly - só para exibição)
-  verificado: boolean;
-  status_verificacao: "pendente" | "aprovado" | "rejeitado";
-
-  // Localização completa
+  // 📍 ENDEREÇO (editável)
+  endereco_cidade: string;
+  endereco_estado: string;
   endereco_cep: string;
   endereco_logradouro: string;
   endereco_numero: string;
   endereco_bairro: string;
-  endereco_cidade: string;
-  endereco_estado: string;
   endereco_complemento: string;
 
-  // Links sociais
+  // 🔗 REDES SOCIAIS (editável)
   link_linkedin: string;
   link_instagram: string;
   link_youtube: string;
   site_pessoal: string;
 
-  // Foto de perfil
+  // 📸 FOTO (editável)
   foto_perfil_url: string;
+}
+
+// 🔧 DADOS READONLY SEPARADOS
+interface ReadOnlyProfileData {
+  // 👤 IDENTIDADE (não editável)
+  nome: string;
+  sobrenome: string;
+  cpf: string;
+  data_nascimento: string;
+
+  // 🏆 CATEGORIA (não editável)
+  tipo: string;
+
+  // 🏅 CREDENCIAIS (não editável - requer verificação manual)
+  crp: string;
+  conselho_tipo: string;
+  conselho_numero: string;
+  registro_profissional: string;
+
+  // ✅ STATUS (controlado pelo sistema)
+  verificado: boolean;
+  status_verificacao: string;
 }
 
 interface UseProfileReturn {
   // Estados principais
   profileData: PerfilProfissional | null;
+  readOnlyData: ReadOnlyProfileData | null;
   formData: ProfileFormData;
   isEditing: boolean;
   loading: boolean;
@@ -71,10 +79,7 @@ interface UseProfileReturn {
 
   // Actions principais
   toggleEditing: () => void;
-  updateField: (
-    field: keyof ProfileFormData,
-    value: string | number | boolean
-  ) => void;
+  updateField: (field: keyof ProfileFormData, value: string | number) => void;
   saveProfile: () => Promise<boolean>;
   uploadPhoto: (file: File) => Promise<boolean>;
   refreshProfile: () => Promise<void>;
@@ -83,7 +88,6 @@ interface UseProfileReturn {
   // Actions utilitárias
   validateForm: () => boolean;
   getFieldError: (field: keyof ProfileFormData) => string | undefined;
-  clearFieldError: (field: keyof ProfileFormData) => void;
 }
 
 export const useProfile = (): UseProfileReturn => {
@@ -93,17 +97,15 @@ export const useProfile = (): UseProfileReturn => {
   const [profileData, setProfileData] = useState<PerfilProfissional | null>(
     null
   );
+  const [readOnlyData, setReadOnlyData] = useState<ReadOnlyProfileData | null>(
+    null
+  );
   const [formData, setFormData] = useState<ProfileFormData>({
-    // Dados pessoais
-    nome: "",
-    sobrenome: "",
+    // Contato
     email: "",
     telefone: "",
-    data_nascimento: "",
-    cpf: "",
 
-    // Dados profissionais
-    tipo: "psicologo",
+    // Profissional
     especialidades: "",
     bio_profissional: "",
     formacao_principal: "",
@@ -111,17 +113,7 @@ export const useProfile = (): UseProfileReturn => {
     valor_sessao: 0,
     abordagem_terapeutica: "",
 
-    // Credenciais
-    crp: "",
-    conselho_tipo: "",
-    conselho_numero: "",
-    registro_profissional: "",
-
-    // Status (readonly)
-    verificado: false,
-    status_verificacao: "pendente",
-
-    // Localização
+    // Endereço
     endereco_cep: "",
     endereco_logradouro: "",
     endereco_numero: "",
@@ -130,7 +122,7 @@ export const useProfile = (): UseProfileReturn => {
     endereco_estado: "",
     endereco_complemento: "",
 
-    // Links sociais
+    // Redes sociais
     link_linkedin: "",
     link_instagram: "",
     link_youtube: "",
@@ -141,267 +133,193 @@ export const useProfile = (): UseProfileReturn => {
   });
 
   const [isEditing, setIsEditing] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Carregar dados do perfil do contexto de auth
+  // 🔧 CARREGAR DADOS DO PERFIL
   useEffect(() => {
-    if (profile?.dados) {
-      const dados = profile.dados as PerfilProfissional;
-      setProfileData(dados);
+    const loadProfile = async () => {
+      if (!profile?.dados) {
+        setLoading(false);
+        return;
+      }
 
-      // Preencher formulário com dados existentes
-      setFormData({
-        // Dados pessoais
-        nome: dados.nome || "",
-        sobrenome: dados.sobrenome || "",
-        email: dados.email || "",
-        telefone: dados.telefone || "",
-        data_nascimento: dados.data_nascimento || "",
-        cpf: dados.cpf || "",
+      const data = profile.dados as PerfilProfissional;
+      setProfileData(data);
 
-        // Dados profissionais
-        tipo: dados.tipo || "psicologo",
-        especialidades: dados.especialidades || "",
-        bio_profissional: dados.bio_profissional || "",
-        formacao_principal: dados.formacao_principal || "",
-        experiencia_anos: dados.experiencia_anos || 0,
-        valor_sessao: dados.valor_sessao || 0,
-        abordagem_terapeutica: dados.abordagem_terapeutica || "",
-
-        // Credenciais
-        crp: dados.crp || "",
-        conselho_tipo: dados.conselho_tipo || "",
-        conselho_numero: dados.conselho_numero || "",
-        registro_profissional: dados.registro_profissional || "",
-
-        // Status (readonly)
-        verificado: dados.verificado || false,
-        status_verificacao: dados.status_verificacao || "pendente",
-
-        // Localização
-        endereco_cep: dados.endereco_cep || "",
-        endereco_logradouro: dados.endereco_logradouro || "",
-        endereco_numero: dados.endereco_numero || "",
-        endereco_bairro: dados.endereco_bairro || "",
-        endereco_cidade: dados.endereco_cidade || "",
-        endereco_estado: dados.endereco_estado || "",
-        endereco_complemento: dados.endereco_complemento || "",
-
-        // Links sociais
-        link_linkedin: dados.link_linkedin || "",
-        link_instagram: dados.link_instagram || "",
-        link_youtube: dados.link_youtube || "",
-        site_pessoal: dados.site_pessoal || "",
-
-        // Foto
-        foto_perfil_url: dados.foto_perfil_url || "",
+      // Separar dados readonly dos editáveis
+      setReadOnlyData({
+        nome: data.nome || "",
+        sobrenome: data.sobrenome || "",
+        cpf: data.cpf || "",
+        data_nascimento: data.data_nascimento || "",
+        tipo: data.tipo || "",
+        crp: data.crp || "",
+        conselho_tipo: data.conselho_tipo || "",
+        conselho_numero: data.conselho_numero || "",
+        registro_profissional: data.registro_profissional || "",
+        verificado: data.verificado || false,
+        status_verificacao: data.status_verificacao || "pendente",
       });
-    }
+
+      // Carregar apenas campos editáveis no formulário
+      setFormData({
+        email: data.email || "",
+        telefone: data.telefone || "",
+        especialidades: data.especialidades || "",
+        bio_profissional: data.bio_profissional || "",
+        formacao_principal: data.formacao_principal || "",
+        experiencia_anos: data.experiencia_anos || 0,
+        valor_sessao: data.valor_sessao || 0,
+        abordagem_terapeutica: data.abordagem_terapeutica || "",
+        endereco_cep: data.endereco_cep || "",
+        endereco_logradouro: data.endereco_logradouro || "",
+        endereco_numero: data.endereco_numero || "",
+        endereco_bairro: data.endereco_bairro || "",
+        endereco_cidade: data.endereco_cidade || "",
+        endereco_estado: data.endereco_estado || "",
+        endereco_complemento: data.endereco_complemento || "",
+        link_linkedin: data.link_linkedin || "",
+        link_instagram: data.link_instagram || "",
+        link_youtube: data.link_youtube || "",
+        site_pessoal: data.site_pessoal || "",
+        foto_perfil_url: data.foto_perfil_url || "",
+      });
+
+      setLoading(false);
+    };
+
+    loadProfile();
   }, [profile]);
 
-  // Calcular completude do perfil
+  // 🔧 CALCULAR COMPLETUDE DO PERFIL
   const profileCompleteness = useCallback((): number => {
+    if (!formData) return 0;
+
     const requiredFields = [
-      "nome",
-      "sobrenome",
       "telefone",
       "especialidades",
+      "formacao_principal",
+      "experiencia_anos",
+      "valor_sessao",
       "endereco_cidade",
       "endereco_estado",
     ];
 
+    const filledRequired = requiredFields.filter(
+      (field) =>
+        formData[field as keyof ProfileFormData] &&
+        String(formData[field as keyof ProfileFormData]).trim() !== ""
+    ).length;
+
     const optionalFields = [
-      "email",
-      "data_nascimento",
       "bio_profissional",
-      "formacao_principal",
-      "valor_sessao",
+      "abordagem_terapeutica",
       "endereco_cep",
-      "endereco_logradouro",
+      "link_linkedin",
       "foto_perfil_url",
     ];
 
-    const professionalFields =
-      formData.tipo === "psicologo" ? ["crp"] : ["registro_profissional"];
+    const filledOptional = optionalFields.filter(
+      (field) =>
+        formData[field as keyof ProfileFormData] &&
+        String(formData[field as keyof ProfileFormData]).trim() !== ""
+    ).length;
 
-    const allFields = [
-      ...requiredFields,
-      ...optionalFields,
-      ...professionalFields,
-    ];
+    const totalFields = requiredFields.length + optionalFields.length;
+    const filledFields = filledRequired + filledOptional;
 
-    let filledFields = 0;
-    allFields.forEach((field) => {
-      const value = formData[field as keyof ProfileFormData];
-      if (value && value.toString().trim() !== "" && value !== 0) {
-        filledFields++;
-      }
-    });
-
-    return Math.round((filledFields / allFields.length) * 100);
+    return Math.round((filledFields / totalFields) * 100);
   }, [formData]);
 
-  // Campos obrigatórios faltando
+  // 🔧 CAMPOS OBRIGATÓRIOS FALTANDO
   const missingFields = useCallback((): string[] => {
-    const missing: string[] = [];
-    const requiredFields = [
-      { key: "nome", label: "Nome" },
-      { key: "sobrenome", label: "Sobrenome" },
-      { key: "telefone", label: "Telefone" },
-      { key: "especialidades", label: "Especialidades" },
+    const required = [
+      { field: "telefone", label: "Telefone" },
+      { field: "especialidades", label: "Especialidades" },
+      { field: "formacao_principal", label: "Formação Principal" },
+      { field: "endereco_cidade", label: "Cidade" },
+      { field: "endereco_estado", label: "Estado" },
     ];
 
-    requiredFields.forEach((field) => {
-      const value = formData[field.key as keyof ProfileFormData];
-      if (!value || value.toString().trim() === "") {
-        missing.push(field.label);
-      }
-    });
-
-    return missing;
+    return required
+      .filter(
+        ({ field }) =>
+          !formData[field as keyof ProfileFormData] ||
+          String(formData[field as keyof ProfileFormData]).trim() === ""
+      )
+      .map(({ label }) => label);
   }, [formData]);
 
-  // Verificar se pode salvar
+  // 🔧 PODE SALVAR?
   const canSave = useCallback((): boolean => {
     return missingFields().length === 0 && Object.keys(errors).length === 0;
   }, [missingFields, errors]);
 
-  // Toggle modo edição
+  // 🔧 TOGGLE EDIÇÃO
   const toggleEditing = useCallback(() => {
+    setIsEditing((prev) => !prev);
     if (isEditing) {
-      resetForm(); // Se estava editando, resetar form
+      setErrors({});
     }
-    setIsEditing(!isEditing);
-    setErrors({});
   }, [isEditing]);
 
-  // Atualizar campo do formulário
+  // 🔧 ATUALIZAR CAMPO
   const updateField = useCallback(
-    (field: keyof ProfileFormData, value: string | number | boolean) => {
+    (field: keyof ProfileFormData, value: string | number) => {
       setFormData((prev) => ({
         ...prev,
         [field]: value,
       }));
 
-      // Limpar erro do campo quando usuário digita
+      // Limpar erro do campo
       if (errors[field]) {
-        setErrors((prev) => ({
-          ...prev,
-          [field]: "",
-        }));
+        setErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors[field];
+          return newErrors;
+        });
       }
     },
     [errors]
   );
 
-  // Resetar formulário para dados originais
-  const resetForm = useCallback(() => {
-    if (profileData) {
-      setFormData({
-        // Dados pessoais
-        nome: profileData.nome || "",
-        sobrenome: profileData.sobrenome || "",
-        email: profileData.email || "",
-        telefone: profileData.telefone || "",
-        data_nascimento: profileData.data_nascimento || "",
-        cpf: profileData.cpf || "",
-
-        // Dados profissionais
-        tipo: profileData.tipo || "psicologo",
-        especialidades: profileData.especialidades || "",
-        bio_profissional: profileData.bio_profissional || "",
-        formacao_principal: profileData.formacao_principal || "",
-        experiencia_anos: profileData.experiencia_anos || 0,
-        valor_sessao: profileData.valor_sessao || 0,
-        abordagem_terapeutica: profileData.abordagem_terapeutica || "",
-
-        // Credenciais
-        crp: profileData.crp || "",
-        conselho_tipo: profileData.conselho_tipo || "",
-        conselho_numero: profileData.conselho_numero || "",
-        registro_profissional: profileData.registro_profissional || "",
-
-        // Status
-        verificado: profileData.verificado || false,
-        status_verificacao: profileData.status_verificacao || "pendente",
-
-        // Localização
-        endereco_cep: profileData.endereco_cep || "",
-        endereco_logradouro: profileData.endereco_logradouro || "",
-        endereco_numero: profileData.endereco_numero || "",
-        endereco_bairro: profileData.endereco_bairro || "",
-        endereco_cidade: profileData.endereco_cidade || "",
-        endereco_estado: profileData.endereco_estado || "",
-        endereco_complemento: profileData.endereco_complemento || "",
-
-        // Links sociais
-        link_linkedin: profileData.link_linkedin || "",
-        link_instagram: profileData.link_instagram || "",
-        link_youtube: profileData.link_youtube || "",
-        site_pessoal: profileData.site_pessoal || "",
-
-        // Foto
-        foto_perfil_url: profileData.foto_perfil_url || "",
-      });
-    }
-    setErrors({});
-  }, [profileData]);
-
-  // Validar formulário completo
+  // 🔧 VALIDAR FORMULÁRIO
   const validateForm = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
 
-    // Campos obrigatórios
-    if (!formData.nome.trim()) {
-      newErrors.nome = "Nome é obrigatório";
-    }
-    if (!formData.sobrenome.trim()) {
-      newErrors.sobrenome = "Sobrenome é obrigatório";
-    }
-    if (!formData.especialidades.trim()) {
-      newErrors.especialidades = "Especialidades são obrigatórias";
-    }
-    if (!formData.telefone.trim()) {
+    // Telefone obrigatório
+    if (!formData.telefone?.trim()) {
       newErrors.telefone = "Telefone é obrigatório";
     }
 
-    // Validar email se preenchido
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "E-mail inválido";
+    // Especialidades obrigatório
+    if (!formData.especialidades?.trim()) {
+      newErrors.especialidades = "Especialidades são obrigatórias";
     }
 
-    // Validar CPF se preenchido
-    if (formData.cpf) {
-      const cpfNumbers = formData.cpf.replace(/\D/g, "");
-      if (cpfNumbers.length !== 11) {
-        newErrors.cpf = "CPF deve ter 11 dígitos";
-      }
+    // Formação obrigatória
+    if (!formData.formacao_principal?.trim()) {
+      newErrors.formacao_principal = "Formação principal é obrigatória";
     }
 
-    // Validar telefone
-    if (formData.telefone) {
-      const phoneNumbers = formData.telefone.replace(/\D/g, "");
-      if (phoneNumbers.length < 10 || phoneNumbers.length > 11) {
-        newErrors.telefone = "Telefone inválido";
-      }
+    // Localização obrigatória
+    if (!formData.endereco_cidade?.trim()) {
+      newErrors.endereco_cidade = "Cidade é obrigatória";
+    }
+    if (!formData.endereco_estado?.trim()) {
+      newErrors.endereco_estado = "Estado é obrigatório";
     }
 
-    // Validar credenciais profissionais
-    if (formData.tipo === "psicologo" && !formData.crp.trim()) {
-      newErrors.crp = "CRP é obrigatório para psicólogos";
-    }
-
-    // Validar experiência
+    // Validar valores numéricos
     if (formData.experiencia_anos < 0 || formData.experiencia_anos > 50) {
-      newErrors.experiencia_anos = "Experiência deve estar entre 0 e 50 anos";
+      newErrors.experiencia_anos = "Experiência deve ser entre 0 e 50 anos";
     }
 
-    // Validar valor da sessão
-    if (formData.valor_sessao < 0 || formData.valor_sessao > 10000) {
-      newErrors.valor_sessao = "Valor da sessão inválido";
+    if (formData.valor_sessao < 0) {
+      newErrors.valor_sessao = "Valor da sessão deve ser positivo";
     }
 
     // Validar CEP se preenchido
@@ -430,7 +348,7 @@ export const useProfile = (): UseProfileReturn => {
     return Object.keys(newErrors).length === 0;
   }, [formData]);
 
-  // Função auxiliar para validar URL
+  // 🔧 VALIDAR URL
   const isValidUrl = (url: string): boolean => {
     try {
       new URL(url);
@@ -440,7 +358,7 @@ export const useProfile = (): UseProfileReturn => {
     }
   };
 
-  // Salvar perfil no Supabase
+  // 🔧 SALVAR PERFIL
   const saveProfile = useCallback(async (): Promise<boolean> => {
     if (!user || !profileData?.id) {
       console.error("Usuário não autenticado ou perfil não encontrado");
@@ -454,13 +372,43 @@ export const useProfile = (): UseProfileReturn => {
 
     setSaving(true);
     try {
-      // Preparar dados para atualização (excluir campos readonly)
-      const { verificado, status_verificacao, ...updateData } = formData;
+      console.log("💾 Salvando perfil...", formData);
 
+      // 🔧 ATUALIZAR APENAS CAMPOS EDITÁVEIS
       const { data, error } = await supabase
         .from("perfis_profissionais")
         .update({
-          ...updateData,
+          // Contato
+          email: formData.email || null,
+          telefone: formData.telefone,
+
+          // Profissional
+          especialidades: formData.especialidades,
+          bio_profissional: formData.bio_profissional || null,
+          formacao_principal: formData.formacao_principal || null,
+          experiencia_anos: formData.experiencia_anos || null,
+          valor_sessao: formData.valor_sessao || null,
+          abordagem_terapeutica: formData.abordagem_terapeutica || null,
+
+          // Endereço
+          endereco_cep: formData.endereco_cep || null,
+          endereco_logradouro: formData.endereco_logradouro || null,
+          endereco_numero: formData.endereco_numero || null,
+          endereco_bairro: formData.endereco_bairro || null,
+          endereco_cidade: formData.endereco_cidade || null,
+          endereco_estado: formData.endereco_estado || null,
+          endereco_complemento: formData.endereco_complemento || null,
+
+          // Redes sociais
+          link_linkedin: formData.link_linkedin || null,
+          link_instagram: formData.link_instagram || null,
+          link_youtube: formData.link_youtube || null,
+          site_pessoal: formData.site_pessoal || null,
+
+          // Foto
+          foto_perfil_url: formData.foto_perfil_url || null,
+
+          // Timestamp
           updated_at: new Date().toISOString(),
         })
         .eq("id", profileData.id)
@@ -468,9 +416,11 @@ export const useProfile = (): UseProfileReturn => {
         .single();
 
       if (error) {
-        console.error("Erro ao salvar perfil:", error);
+        console.error("❌ Erro ao salvar perfil:", error);
         return false;
       }
+
+      console.log("✅ Perfil salvo com sucesso:", data);
 
       // Atualizar dados locais
       setProfileData(data);
@@ -480,14 +430,14 @@ export const useProfile = (): UseProfileReturn => {
 
       return true;
     } catch (error) {
-      console.error("Erro inesperado ao salvar:", error);
+      console.error("❌ Erro inesperado ao salvar:", error);
       return false;
     } finally {
       setSaving(false);
     }
   }, [user, profileData, formData, validateForm, refreshAuthProfile]);
 
-  // Upload de foto
+  // 🔧 UPLOAD DE FOTO
   const uploadPhoto = useCallback(
     async (file: File): Promise<boolean> => {
       if (!user || !profileData?.id) {
@@ -497,12 +447,12 @@ export const useProfile = (): UseProfileReturn => {
 
       setUploadingPhoto(true);
       try {
-        // Gerar nome único para arquivo
+        // Gerar nome único
         const fileExt = file.name.split(".").pop();
         const fileName = `${profileData.id}_${Date.now()}.${fileExt}`;
         const filePath = `perfil-profissionais/${fileName}`;
 
-        // Upload para storage
+        // Upload
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("avatars")
           .upload(filePath, file);
@@ -512,7 +462,7 @@ export const useProfile = (): UseProfileReturn => {
           return false;
         }
 
-        // Obter URL pública
+        // Obter URL
         const { data: urlData } = supabase.storage
           .from("avatars")
           .getPublicUrl(filePath);
@@ -522,7 +472,7 @@ export const useProfile = (): UseProfileReturn => {
           return false;
         }
 
-        // Atualizar perfil com nova URL
+        // Atualizar banco
         const { error: updateError } = await supabase
           .from("perfis_profissionais")
           .update({
@@ -536,7 +486,7 @@ export const useProfile = (): UseProfileReturn => {
           return false;
         }
 
-        // Atualizar formulário local
+        // Atualizar local
         updateField("foto_perfil_url", urlData.publicUrl);
         await refreshAuthProfile();
 
@@ -551,12 +501,41 @@ export const useProfile = (): UseProfileReturn => {
     [user, profileData, updateField, refreshAuthProfile]
   );
 
-  // Recarregar perfil
+  // 🔧 RESETAR FORMULÁRIO
+  const resetForm = useCallback(() => {
+    if (profileData) {
+      setFormData({
+        email: profileData.email || "",
+        telefone: profileData.telefone || "",
+        especialidades: profileData.especialidades || "",
+        bio_profissional: profileData.bio_profissional || "",
+        formacao_principal: profileData.formacao_principal || "",
+        experiencia_anos: profileData.experiencia_anos || 0,
+        valor_sessao: profileData.valor_sessao || 0,
+        abordagem_terapeutica: profileData.abordagem_terapeutica || "",
+        endereco_cep: profileData.endereco_cep || "",
+        endereco_logradouro: profileData.endereco_logradouro || "",
+        endereco_numero: profileData.endereco_numero || "",
+        endereco_bairro: profileData.endereco_bairro || "",
+        endereco_cidade: profileData.endereco_cidade || "",
+        endereco_estado: profileData.endereco_estado || "",
+        endereco_complemento: profileData.endereco_complemento || "",
+        link_linkedin: profileData.link_linkedin || "",
+        link_instagram: profileData.link_instagram || "",
+        link_youtube: profileData.link_youtube || "",
+        site_pessoal: profileData.site_pessoal || "",
+        foto_perfil_url: profileData.foto_perfil_url || "",
+      });
+      setErrors({});
+    }
+  }, [profileData]);
+
+  // 🔧 REFRESH
   const refreshProfile = useCallback(async (): Promise<void> => {
     await refreshAuthProfile();
   }, [refreshAuthProfile]);
 
-  // Funções utilitárias
+  // 🔧 GET ERROR
   const getFieldError = useCallback(
     (field: keyof ProfileFormData): string | undefined => {
       return errors[field];
@@ -564,22 +543,10 @@ export const useProfile = (): UseProfileReturn => {
     [errors]
   );
 
-  const clearFieldError = useCallback(
-    (field: keyof ProfileFormData): void => {
-      if (errors[field]) {
-        setErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors[field];
-          return newErrors;
-        });
-      }
-    },
-    [errors]
-  );
-
   return {
     // Estados principais
     profileData,
+    readOnlyData,
     formData,
     isEditing,
     loading,
@@ -603,6 +570,5 @@ export const useProfile = (): UseProfileReturn => {
     // Actions utilitárias
     validateForm,
     getFieldError,
-    clearFieldError,
   };
 };
