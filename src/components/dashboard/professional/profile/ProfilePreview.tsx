@@ -1,58 +1,44 @@
 // src/components/dashboard/professional/profile/ProfilePreview.tsx
-// 🎨 PROFILE PREVIEW REDESENHADO - Design moderno e atrativo
+// 🎨 PROFILE PREVIEW - Design limpo e profissional
 
 "use client";
 import React from "react";
 import {
   MapPinIcon,
-  StarIcon,
   ClockIcon,
   CurrencyDollarIcon,
-  LinkIcon,
-  CheckBadgeIcon,
-  CalendarDaysIcon,
   AcademicCapIcon,
   ShieldCheckIcon,
-  GlobeAmericasIcon,
+  PencilIcon,
+  HeartIcon,
   UserGroupIcon,
   SparklesIcon,
-  PencilIcon,
-  PhoneIcon,
-  EnvelopeIcon,
-  HeartIcon,
 } from "@heroicons/react/24/outline";
-import {
-  CheckBadgeIcon as CheckBadgeSolidIcon,
-  StarIcon as StarSolidIcon,
-} from "@heroicons/react/24/solid";
+import { CheckBadgeIcon as CheckBadgeSolidIcon } from "@heroicons/react/24/solid";
 
 interface ProfilePreviewProps {
   formData: any;
   readOnlyData: any;
   onStartEdit: () => void;
+  profileCompleteness: number;
 }
 
 export default function ProfilePreview({
   formData,
   readOnlyData,
   onStartEdit,
+  profileCompleteness,
 }: ProfilePreviewProps) {
   // Funções utilitárias
   const getTipoDisplay = (tipo: string) => {
     const tipos = {
-      psicologo: { label: "Psicólogo(a)", icon: "🧠", color: "blue" },
-      psicanalista: { label: "Psicanalista", icon: "🔍", color: "purple" },
-      heike: { label: "Terapeuta Reiki", icon: "✨", color: "pink" },
-      holistico: { label: "Terapeuta Holístico", icon: "🌿", color: "green" },
-      coach_mentor: { label: "Coach/Mentor", icon: "🎯", color: "orange" },
+      psicologo: "Psicólogo(a)",
+      psicanalista: "Psicanalista",
+      heike: "Terapeuta Reiki",
+      holistico: "Terapeuta Holístico",
+      coach_mentor: "Coach/Mentor",
     };
-    return (
-      tipos[tipo as keyof typeof tipos] || {
-        label: tipo,
-        icon: "👨‍⚕️",
-        color: "gray",
-      }
-    );
+    return tipos[tipo as keyof typeof tipos] || tipo;
   };
 
   const getInitials = (nome: string, sobrenome: string) => {
@@ -72,7 +58,41 @@ export default function ProfilePreview({
     }).format(valor);
   };
 
-  const tipoInfo = getTipoDisplay(readOnlyData?.tipo || "");
+  const getStatusInfo = (verificado: boolean, status: string) => {
+    if (verificado) {
+      return {
+        label: "Perfil Verificado",
+        bgColor: "bg-green-50",
+        textColor: "text-green-700",
+        borderColor: "border-green-200",
+      };
+    }
+
+    switch (status) {
+      case "pendente":
+        return {
+          label: "Em Análise",
+          bgColor: "bg-blue-50",
+          textColor: "text-blue-700",
+          borderColor: "border-blue-200",
+        };
+      case "rejeitado":
+        return {
+          label: "Requer Atenção",
+          bgColor: "bg-amber-50",
+          textColor: "text-amber-700",
+          borderColor: "border-amber-200",
+        };
+      default:
+        return {
+          label: "Em Análise",
+          bgColor: "bg-gray-50",
+          textColor: "text-gray-700",
+          borderColor: "border-gray-200",
+        };
+    }
+  };
+
   const nomeCompleto = `${readOnlyData?.nome || ""} ${
     readOnlyData?.sobrenome || ""
   }`;
@@ -80,24 +100,20 @@ export default function ProfilePreview({
     formData.endereco_cidade && formData.endereco_estado
       ? `${formData.endereco_cidade}, ${formData.endereco_estado}`
       : null;
+  const statusInfo = getStatusInfo(
+    readOnlyData?.verificado,
+    readOnlyData?.status_verificacao
+  );
 
   return (
     <div className="space-y-6">
-      {/* 🎨 HERO SECTION - Header Principal */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-3xl shadow-2xl">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 bg-black/10"></div>
-        <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent"></div>
-
-        {/* Floating Elements */}
-        <div className="absolute top-10 right-10 w-20 h-20 bg-white/10 rounded-full blur-xl"></div>
-        <div className="absolute bottom-10 left-10 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
-
-        <div className="relative z-10 p-8 md:p-12">
+      {/* 🎨 HERO SECTION - Mais limpo e suave */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl border border-slate-200">
+        <div className="relative z-10 p-8">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
-            {/* Avatar Premium */}
+            {/* Avatar Limpo */}
             <div className="relative">
-              <div className="w-32 h-32 md:w-40 md:h-40 rounded-3xl overflow-hidden bg-white/20 backdrop-blur-sm border-4 border-white/30 shadow-2xl">
+              <div className="w-32 h-32 md:w-36 md:h-36 rounded-2xl overflow-hidden bg-white shadow-lg border border-slate-200">
                 {formData.foto_perfil_url ? (
                   <img
                     src={formData.foto_perfil_url}
@@ -105,7 +121,7 @@ export default function ProfilePreview({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/30 to-white/10 text-white text-4xl md:text-5xl font-bold">
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 text-3xl md:text-4xl font-semibold">
                     {getInitials(
                       readOnlyData?.nome || "",
                       readOnlyData?.sobrenome || ""
@@ -116,66 +132,95 @@ export default function ProfilePreview({
 
               {/* Status Badge */}
               {readOnlyData?.verificado && (
-                <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-2 border-4 border-white shadow-lg">
-                  <CheckBadgeSolidIcon className="w-6 h-6 text-white" />
+                <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1.5 border-3 border-white shadow-md">
+                  <CheckBadgeSolidIcon className="w-4 h-4 text-white" />
                 </div>
               )}
             </div>
 
             {/* Info Principal */}
-            <div className="flex-1 text-center md:text-left text-white">
-              <h1 className="text-3xl md:text-4xl font-bold mb-2 drop-shadow-sm">
+            <div className="flex-1 text-center md:text-left">
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">
                 {nomeCompleto}
               </h1>
 
               {/* Tipo Profissional */}
-              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 mb-4">
-                <span className="text-2xl">{tipoInfo.icon}</span>
-                <span className="font-semibold text-lg">{tipoInfo.label}</span>
-              </div>
+              <p className="text-lg text-slate-600 mb-3 font-medium">
+                {getTipoDisplay(readOnlyData?.tipo || "")}
+              </p>
 
               {/* Localização */}
               {localizacao && (
-                <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
-                  <MapPinIcon className="w-5 h-5 text-white/80" />
-                  <span className="text-white/90">{localizacao}</span>
+                <div className="flex items-center justify-center md:justify-start gap-2 mb-3">
+                  <MapPinIcon className="w-4 h-4 text-slate-500" />
+                  <span className="text-slate-600">{localizacao}</span>
                 </div>
               )}
 
-              {/* CRP se tiver */}
-              {readOnlyData?.crp && (
-                <div className="flex items-center justify-center md:justify-start gap-2">
-                  <ShieldCheckIcon className="w-5 h-5 text-white/80" />
-                  <span className="text-white/90">CRP: {readOnlyData.crp}</span>
-                </div>
-              )}
+              {/* Status */}
+              <div
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border ${statusInfo.bgColor} ${statusInfo.textColor} ${statusInfo.borderColor}`}
+              >
+                <ShieldCheckIcon className="w-4 h-4" />
+                {statusInfo.label}
+              </div>
             </div>
 
-            {/* Botão Editar */}
-            <div className="flex flex-col gap-3">
+            {/* Botão Editar e Progresso */}
+            <div className="flex flex-col gap-4 items-center">
               <button
                 onClick={onStartEdit}
-                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:scale-105 border border-white/30 flex items-center gap-2"
+                className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center gap-2 shadow-sm"
               >
-                <PencilIcon className="w-5 h-5" />
+                <PencilIcon className="w-4 h-4" />
                 Editar Perfil
               </button>
+
+              {/* Progresso do Perfil */}
+              <div className="text-center">
+                <div className="w-16 h-16 relative">
+                  <svg
+                    className="w-16 h-16 transform -rotate-90"
+                    viewBox="0 0 36 36"
+                  >
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="#e2e8f0"
+                      strokeWidth="2"
+                    />
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="#3b82f6"
+                      strokeWidth="2"
+                      strokeDasharray={`${profileCompleteness}, 100`}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs font-semibold text-slate-700">
+                      {profileCompleteness}%
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Completo</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 📊 CARDS DE ESTATÍSTICAS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* 📊 CARDS DE ESTATÍSTICAS - Cores mais suaves */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Experiência */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-              <ClockIcon className="w-6 h-6 text-blue-600" />
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+              <ClockIcon className="w-5 h-5 text-slate-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">Experiência</h3>
-              <p className="text-blue-600 font-medium">
+              <h3 className="font-medium text-slate-900">Experiência</h3>
+              <p className="text-slate-600 text-sm">
                 {formatExperiencia(formData.experiencia_anos || 0)}
               </p>
             </div>
@@ -184,14 +229,14 @@ export default function ProfilePreview({
 
         {/* Valor */}
         {formData.valor_sessao > 0 && (
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                <CurrencyDollarIcon className="w-6 h-6 text-green-600" />
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <CurrencyDollarIcon className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">Valor da Sessão</h3>
-                <p className="text-green-600 font-medium text-lg">
+                <h3 className="font-medium text-slate-900">Valor da Sessão</h3>
+                <p className="text-emerald-600 font-semibold">
                   {formatValor(formData.valor_sessao)}
                 </p>
               </div>
@@ -199,82 +244,70 @@ export default function ProfilePreview({
           </div>
         )}
 
-        {/* Status */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
-          <div className="flex items-center gap-3 mb-3">
-            <div
-              className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                readOnlyData?.verificado ? "bg-green-100" : "bg-yellow-100"
-              }`}
-            >
-              <ShieldCheckIcon
-                className={`w-6 h-6 ${
-                  readOnlyData?.verificado
-                    ? "text-green-600"
-                    : "text-yellow-600"
-                }`}
-              />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Status</h3>
-              <p
-                className={`font-medium ${
-                  readOnlyData?.verificado
-                    ? "text-green-600"
-                    : "text-yellow-600"
-                }`}
-              >
-                {readOnlyData?.verificado ? "Verificado" : "Pendente"}
-              </p>
+        {/* CRP se tiver */}
+        {readOnlyData?.crp && (
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <ShieldCheckIcon className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-slate-900">Registro</h3>
+                <p className="text-blue-600 font-medium text-sm">
+                  CRP: {readOnlyData.crp}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* 🎯 SEÇÕES DE INFORMAÇÕES */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sobre Mim */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-              <UserGroupIcon className="w-5 h-5 text-purple-600" />
+            <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+              <UserGroupIcon className="w-4 h-4 text-slate-600" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900">Sobre Mim</h3>
+            <h3 className="text-lg font-semibold text-slate-900">Sobre Mim</h3>
           </div>
 
           {formData.bio_profissional ? (
-            <p className="text-gray-700 leading-relaxed">
+            <p className="text-slate-700 leading-relaxed">
               {formData.bio_profissional}
             </p>
           ) : (
-            <p className="text-gray-500 italic">Biografia não preenchida</p>
+            <p className="text-slate-400 italic">Biografia não preenchida</p>
           )}
         </div>
 
-        {/* Especialidades */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+        {/* Especialidades - Design limpo sem ícones */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-              <SparklesIcon className="w-5 h-5 text-indigo-600" />
+            <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+              <SparklesIcon className="w-4 h-4 text-slate-600" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900">Especialidades</h3>
+            <h3 className="text-lg font-semibold text-slate-900">
+              Especialidades
+            </h3>
           </div>
 
           {formData.especialidades ? (
-            <div className="flex flex-wrap gap-2">
+            <div className="space-y-2">
               {formData.especialidades
                 .split(",")
                 .map((especialidade: string, index: number) => (
-                  <span
+                  <div
                     key={index}
-                    className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium border border-indigo-200"
+                    className="bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium border border-slate-200 hover:bg-slate-100 transition-colors"
                   >
                     {especialidade.trim()}
-                  </span>
+                  </div>
                 ))}
             </div>
           ) : (
-            <p className="text-gray-500 italic">
+            <p className="text-slate-400 italic">
               Especialidades não preenchidas
             </p>
           )}
@@ -285,116 +318,31 @@ export default function ProfilePreview({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Formação */}
         {formData.formacao_principal && (
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                <AcademicCapIcon className="w-5 h-5 text-blue-600" />
+              <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+                <AcademicCapIcon className="w-4 h-4 text-slate-600" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900">Formação</h3>
+              <h3 className="text-lg font-semibold text-slate-900">Formação</h3>
             </div>
-            <p className="text-gray-700">{formData.formacao_principal}</p>
+            <p className="text-slate-700">{formData.formacao_principal}</p>
           </div>
         )}
 
         {/* Abordagem */}
         {formData.abordagem_terapeutica && (
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center">
-                <HeartIcon className="w-5 h-5 text-pink-600" />
+              <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+                <HeartIcon className="w-4 h-4 text-slate-600" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900">Abordagem</h3>
+              <h3 className="text-lg font-semibold text-slate-900">
+                Abordagem
+              </h3>
             </div>
-            <p className="text-gray-700">{formData.abordagem_terapeutica}</p>
+            <p className="text-slate-700">{formData.abordagem_terapeutica}</p>
           </div>
         )}
-      </div>
-
-      {/* 📞 CONTATO E REDES SOCIAIS */}
-      <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-            <LinkIcon className="w-5 h-5 text-emerald-600" />
-          </div>
-          <h3 className="text-xl font-bold text-gray-900">Contato e Redes</h3>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Email */}
-          {formData.email && (
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-              <EnvelopeIcon className="w-5 h-5 text-gray-600" />
-              <span className="text-sm text-gray-700 truncate">
-                {formData.email}
-              </span>
-            </div>
-          )}
-
-          {/* Telefone */}
-          {formData.telefone && (
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-              <PhoneIcon className="w-5 h-5 text-gray-600" />
-              <span className="text-sm text-gray-700">{formData.telefone}</span>
-            </div>
-          )}
-
-          {/* LinkedIn */}
-          {formData.link_linkedin && (
-            <a
-              href={formData.link_linkedin}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors"
-            >
-              <div className="w-5 h-5 bg-blue-600 rounded text-white text-xs flex items-center justify-center font-bold">
-                in
-              </div>
-              <span className="text-sm text-blue-700">LinkedIn</span>
-            </a>
-          )}
-
-          {/* Instagram */}
-          {formData.link_instagram && (
-            <a
-              href={formData.link_instagram}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-3 bg-pink-50 rounded-xl hover:bg-pink-100 transition-colors"
-            >
-              <div className="w-5 h-5 bg-gradient-to-r from-purple-500 to-pink-500 rounded text-white text-xs flex items-center justify-center font-bold">
-                📷
-              </div>
-              <span className="text-sm text-pink-700">Instagram</span>
-            </a>
-          )}
-
-          {/* Site Pessoal */}
-          {formData.site_pessoal && (
-            <a
-              href={formData.site_pessoal}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-colors"
-            >
-              <GlobeAmericasIcon className="w-5 h-5 text-emerald-600" />
-              <span className="text-sm text-emerald-700">Site Pessoal</span>
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* 🎨 FOOTER CALL TO ACTION */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-center text-white">
-        <h3 className="text-2xl font-bold mb-2">Perfil em Construção</h3>
-        <p className="text-blue-100 mb-4">
-          Continue preenchendo suas informações para ter um perfil mais completo
-        </p>
-        <button
-          onClick={onStartEdit}
-          className="bg-white text-blue-600 px-8 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors"
-        >
-          Completar Perfil
-        </button>
       </div>
     </div>
   );

@@ -142,6 +142,7 @@ export default function PerfilPage() {
               formData={formData}
               readOnlyData={readOnlyData}
               onStartEdit={handleStartEdit}
+              profileCompleteness={profileCompleteness}
             />
           )}
 
