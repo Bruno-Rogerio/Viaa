@@ -1,5 +1,5 @@
 // src/components/auth/LoginForm.tsx
-// 🔧 VERSÃO CORRIGIDA - Melhor validação e redirecionamento
+// 🔧 VERSÃO CORRIGIDA - Schema correto para diferentes tabelas
 
 "use client";
 import { useState } from "react";
@@ -84,22 +84,27 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
         return;
       }
 
-      // 4. Verificar perfil baseado no tipo
+      // 4. Verificar perfil baseado no tipo - SCHEMA CORRETO
       let tabelaPerfil: string;
+      let camposSelect: string;
       let rotaDestino = "/dashboard";
 
       switch (tipoUsuario) {
         case "paciente":
           tabelaPerfil = "perfis_pacientes";
+          camposSelect = "id, verificado"; // ✅ Pacientes só têm 'verificado'
           break;
         case "profissional":
           tabelaPerfil = "perfis_profissionais";
+          camposSelect = "id, status_verificacao, verificado"; // ✅ Profissionais têm 'status_verificacao'
           break;
         case "clinica":
           tabelaPerfil = "perfis_clinicas";
+          camposSelect = "id, status_verificacao, verificado"; // ✅ Clínicas têm 'status_verificacao'
           break;
         case "empresa":
           tabelaPerfil = "perfis_empresas";
+          camposSelect = "id, status_verificacao, verificado"; // ✅ Empresas têm 'status_verificacao'
           break;
         default:
           setError(`Tipo de usuário inválido: ${tipoUsuario}`);
@@ -111,7 +116,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
 
       const { data: perfilData, error: perfilError } = await supabase
         .from(tabelaPerfil)
-        .select("id, status_verificacao")
+        .select(camposSelect)
         .eq("user_id", authData.user.id)
         .maybeSingle();
 
@@ -122,28 +127,37 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
         return;
       }
 
-      // 5. Redirecionamento baseado no perfil
+      // 5. Redirecionamento baseado no perfil e tipo
       if (!perfilData) {
         console.log("📝 Perfil não encontrado, redirecionando para onboarding");
         rotaDestino = "/onboarding";
-      } else if (tipoUsuario === "profissional") {
-        // Verificações específicas para profissionais
-        if (perfilData.status_verificacao === "pendente") {
-          console.log("⏳ Profissional aguardando aprovação");
-          rotaDestino = "/dashboard/professional/waiting";
-        } else if (perfilData.status_verificacao === "rejeitado") {
-          console.log("❌ Profissional rejeitado");
-          setError(
-            "Seu perfil foi rejeitado. Entre em contato com o suporte para mais informações."
-          );
-          setLoading(false);
-          return;
-        } else if (perfilData.status_verificacao === "aprovado") {
-          console.log("✅ Profissional aprovado");
+      } else {
+        // Lógica específica por tipo de usuário
+        if (tipoUsuario === "paciente") {
+          // ✅ Pacientes: Apenas verificar se tem perfil (já verificamos acima)
+          console.log("✅ Paciente com perfil encontrado");
           rotaDestino = "/dashboard";
         } else {
-          console.log("❓ Status desconhecido, indo para dashboard padrão");
-          rotaDestino = "/dashboard";
+          // ✅ Profissionais, Clínicas, Empresas: Verificar status_verificacao
+          const statusVerificacao = (perfilData as any).status_verificacao;
+
+          if (statusVerificacao === "pendente") {
+            console.log("⏳ Aguardando aprovação");
+            rotaDestino = "/dashboard/waiting"; // Página de aguardando aprovação
+          } else if (statusVerificacao === "rejeitado") {
+            console.log("❌ Perfil rejeitado");
+            setError(
+              "Seu perfil foi rejeitado. Entre em contato com o suporte para mais informações."
+            );
+            setLoading(false);
+            return;
+          } else if (statusVerificacao === "aprovado") {
+            console.log("✅ Perfil aprovado");
+            rotaDestino = "/dashboard";
+          } else {
+            console.log("❓ Status desconhecido, indo para dashboard padrão");
+            rotaDestino = "/dashboard";
+          }
         }
       }
 

@@ -1,5 +1,5 @@
 // src/app/auth/confirm/page.tsx
-// 🔧 VERSÃO CORRIGIDA - Processamento completo de confirmação
+// 🔧 VERSÃO CORRIGIDA - Tratamento robusto de tokens expirados
 
 "use client";
 import { useEffect, useState, Suspense } from "react";
@@ -7,11 +7,14 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
 function ConfirmContent() {
-  const [status, setStatus] = useState<"loading" | "success" | "error">(
-    "loading"
-  );
+  const [status, setStatus] = useState<
+    "loading" | "success" | "error" | "expired"
+  >("loading");
   const [message, setMessage] = useState("");
   const [debugInfo, setDebugInfo] = useState("");
+  const [showResendOption, setShowResendOption] = useState(false);
+  const [resendEmail, setResendEmail] = useState("");
+  const [resending, setResending] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -20,9 +23,37 @@ function ConfirmContent() {
         setStatus("loading");
         setMessage("Processando confirmação de email...");
 
-        console.log("🔍 Iniciando processo de confirmação...");
+        const fullUrl = window.location.href;
+        const hash = window.location.hash;
 
-        // 1. Verificar se usuário já está autenticado
+        console.log("🔍 Analisando confirmação:", { fullUrl, hash });
+
+        // 1. Verificar se há erro na URL
+        const urlParams = new URLSearchParams(hash.substring(1));
+        const error = urlParams.get("error");
+        const errorCode = urlParams.get("error_code");
+        const errorDescription = urlParams.get("error_description");
+
+        if (error) {
+          console.error("❌ Erro detectado na URL:", {
+            error,
+            errorCode,
+            errorDescription,
+          });
+
+          if (errorCode === "otp_expired" || error === "access_denied") {
+            setStatus("expired");
+            setMessage("O link de confirmação expirou ou é inválido.");
+            setShowResendOption(true);
+            return;
+          } else {
+            setStatus("error");
+            setMessage(`Erro na confirmação: ${errorDescription || error}`);
+            return;
+          }
+        }
+
+        // 2. Verificar se usuário já está autenticado (pode ter vindo do callback)
         const {
           data: { user: currentUser },
           error: userError,
@@ -34,29 +65,30 @@ function ConfirmContent() {
         }
 
         if (!currentUser) {
-          console.error(
-            "❌ Usuário não encontrado, pode não estar confirmado ainda"
+          console.warn("⚠️ Usuário não encontrado após callback");
+          setStatus("expired");
+          setMessage(
+            "Sessão expirada. Faça login novamente ou solicite um novo link de confirmação."
           );
-          throw new Error(
-            "Usuário não encontrado. Verifique se clicou no link correto do email."
-          );
+          setShowResendOption(true);
+          return;
         }
 
         console.log("✅ Usuário autenticado encontrado:", currentUser.id);
-        console.log(
-          "📧 Email confirmado:",
-          currentUser.email_confirmed_at ? "Sim" : "Não"
-        );
 
-        // 2. Verificar se email foi confirmado
+        // 3. Verificar se email foi confirmado
         if (!currentUser.email_confirmed_at) {
           console.warn("⚠️ Email ainda não confirmado");
-          throw new Error(
-            "Email ainda não foi confirmado. Verifique sua caixa de entrada."
+          setStatus("expired");
+          setMessage(
+            "Email ainda não foi confirmado. Solicite um novo link de confirmação."
           );
+          setShowResendOption(true);
+          setResendEmail(currentUser.email || "");
+          return;
         }
 
-        // 3. Detectar tipo de usuário
+        // 4. Detectar tipo de usuário
         const tipoUsuario =
           currentUser.user_metadata?.tipo_usuario ||
           (typeof window !== "undefined"
@@ -67,25 +99,33 @@ function ConfirmContent() {
 
         if (!tipoUsuario) {
           console.warn("⚠️ Tipo de usuário não encontrado");
-          throw new Error(
-            "Tipo de usuário não identificado. Entre em contato com o suporte."
-          );
+          // Não é erro crítico, pode continuar para onboarding
+          setStatus("success");
+          setMessage("Email confirmado! Vamos configurar seu perfil.");
+          setTimeout(() => router.push("/onboarding"), 2000);
+          return;
         }
 
-        // 4. Verificar se já tem perfil criado
+        // 5. Verificar perfil baseado no tipo - SCHEMA CORRETO
         let tabelaPerfil: string;
+        let camposSelect: string;
+
         switch (tipoUsuario) {
           case "paciente":
             tabelaPerfil = "perfis_pacientes";
+            camposSelect = "id, verificado";
             break;
           case "profissional":
             tabelaPerfil = "perfis_profissionais";
+            camposSelect = "id, status_verificacao, verificado";
             break;
           case "clinica":
             tabelaPerfil = "perfis_clinicas";
+            camposSelect = "id, status_verificacao, verificado";
             break;
           case "empresa":
             tabelaPerfil = "perfis_empresas";
+            camposSelect = "id, status_verificacao, verificado";
             break;
           default:
             throw new Error(`Tipo de usuário inválido: ${tipoUsuario}`);
@@ -95,75 +135,69 @@ function ConfirmContent() {
 
         const { data: perfilExistente, error: perfilError } = await supabase
           .from(tabelaPerfil)
-          .select("id, status_verificacao")
+          .select(camposSelect)
           .eq("user_id", currentUser.id)
           .maybeSingle();
 
-        if (perfilError) {
+        if (perfilError && perfilError.code !== "PGRST116") {
           console.error("❌ Erro ao verificar perfil:", perfilError);
           // Não é erro crítico, pode continuar para onboarding
         }
 
-        // 5. Decidir redirecionamento baseado no perfil
+        // 6. Decidir redirecionamento
         if (perfilExistente) {
           console.log("✅ Perfil já existe:", perfilExistente);
 
-          if (tipoUsuario === "profissional") {
-            // Para profissionais, verificar status
-            if (perfilExistente.status_verificacao === "pendente") {
+          if (tipoUsuario === "paciente") {
+            setStatus("success");
+            setMessage("Email confirmado! Bem-vindo de volta.");
+            setTimeout(() => router.push("/dashboard"), 2000);
+          } else {
+            // Profissionais, clínicas, empresas
+            const statusVerificacao = (perfilExistente as any)
+              .status_verificacao;
+
+            if (statusVerificacao === "pendente") {
               setStatus("success");
               setMessage(
                 "Email confirmado! Seu perfil está aguardando aprovação."
               );
-              setTimeout(() => {
-                router.push("/dashboard/professional/waiting");
-              }, 2000);
-              return;
-            } else if (perfilExistente.status_verificacao === "aprovado") {
+              setTimeout(() => router.push("/dashboard/waiting"), 2000);
+            } else if (statusVerificacao === "aprovado") {
               setStatus("success");
               setMessage("Email confirmado! Bem-vindo de volta.");
-              setTimeout(() => {
-                router.push("/dashboard");
-              }, 2000);
-              return;
+              setTimeout(() => router.push("/dashboard"), 2000);
+            } else {
+              setStatus("success");
+              setMessage("Email confirmado! Redirecionando...");
+              setTimeout(() => router.push("/dashboard"), 2000);
             }
-          } else {
-            // Para outros tipos, ir direto para dashboard
-            setStatus("success");
-            setMessage("Email confirmado! Redirecionando para seu dashboard.");
-            setTimeout(() => {
-              router.push("/dashboard");
-            }, 2000);
-            return;
           }
+        } else {
+          // Perfil não existe, ir para onboarding
+          console.log(
+            "📝 Perfil não encontrado, redirecionando para onboarding"
+          );
+
+          // Limpar localStorage após uso
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("signup_user_type");
+          }
+
+          setStatus("success");
+          setMessage("Email confirmado! Vamos finalizar seu cadastro.");
+          setTimeout(() => router.push("/onboarding"), 2000);
         }
-
-        // 6. Se não tem perfil, ir para onboarding
-        console.log("📝 Perfil não encontrado, redirecionando para onboarding");
-
-        // Limpar localStorage após uso
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("signup_user_type");
-        }
-
-        setStatus("success");
-        setMessage("Email confirmado! Vamos finalizar seu cadastro.");
-        setTimeout(() => {
-          router.push("/onboarding");
-        }, 2000);
       } catch (error: any) {
         console.error("❌ Erro na confirmação:", error);
 
         setStatus("error");
         setMessage(error.message || "Erro inesperado na confirmação");
 
-        // Adicionar informações de debug
         const debugData = {
           timestamp: new Date().toISOString(),
           error: error.message,
           url: typeof window !== "undefined" ? window.location.href : "N/A",
-          userAgent:
-            typeof window !== "undefined" ? navigator.userAgent : "N/A",
         };
         setDebugInfo(JSON.stringify(debugData, null, 2));
       }
@@ -173,6 +207,36 @@ function ConfirmContent() {
     const timer = setTimeout(handleEmailConfirmation, 1000);
     return () => clearTimeout(timer);
   }, [router]);
+
+  // Reenviar email de confirmação
+  const handleResendEmail = async () => {
+    if (!resendEmail) {
+      alert("Por favor, digite seu email.");
+      return;
+    }
+
+    setResending(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: resendEmail,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      alert(
+        "✅ Email de confirmação reenviado! Verifique sua caixa de entrada."
+      );
+      setShowResendOption(false);
+    } catch (error: any) {
+      console.error("❌ Erro ao reenviar email:", error);
+      alert(`Erro ao reenviar email: ${error.message}`);
+    } finally {
+      setResending(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50 flex items-center justify-center p-4">
@@ -185,9 +249,6 @@ function ConfirmContent() {
               Confirmando email...
             </h2>
             <p className="text-gray-600">{message}</p>
-            <div className="mt-4 text-xs text-gray-400">
-              <p>Verificando autenticação e configurando seu perfil</p>
-            </div>
           </>
         )}
 
@@ -207,6 +268,49 @@ function ConfirmContent() {
           </>
         )}
 
+        {/* Expired Token State */}
+        {status === "expired" && (
+          <>
+            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="text-yellow-500 text-2xl">⚠</div>
+            </div>
+            <h2 className="text-xl font-semibold mb-2 text-yellow-700">
+              Link Expirado
+            </h2>
+            <p className="text-gray-600 mb-4">{message}</p>
+
+            {showResendOption && (
+              <div className="space-y-4">
+                <div>
+                  <input
+                    type="email"
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    placeholder="Digite seu email"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  onClick={handleResendEmail}
+                  disabled={resending}
+                  className="w-full bg-blue-500 text-white px-4 py-2 rounded-xl hover:bg-blue-600 transition-colors disabled:opacity-50"
+                >
+                  {resending ? "Enviando..." : "Reenviar Email de Confirmação"}
+                </button>
+              </div>
+            )}
+
+            <div className="mt-4">
+              <button
+                onClick={() => router.push("/auth")}
+                className="text-blue-600 hover:text-blue-700 text-sm"
+              >
+                Voltar para Login
+              </button>
+            </div>
+          </>
+        )}
+
         {/* Error State */}
         {status === "error" && (
           <>
@@ -218,7 +322,6 @@ function ConfirmContent() {
             </h2>
             <p className="text-gray-600 mb-4">{message}</p>
 
-            {/* Debug Info */}
             {debugInfo && (
               <details className="mb-4 text-left">
                 <summary className="text-xs text-gray-400 cursor-pointer">
@@ -230,13 +333,12 @@ function ConfirmContent() {
               </details>
             )}
 
-            {/* Action Buttons */}
             <div className="flex gap-2">
               <button
                 onClick={() => router.push("/auth")}
                 className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-xl hover:bg-blue-600 transition-colors"
               >
-                Fazer Login Manual
+                Fazer Login
               </button>
               <button
                 onClick={() => window.location.reload()}
