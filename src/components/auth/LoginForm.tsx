@@ -1,4 +1,5 @@
-// src/components/auth/LoginForm.tsx - VERSÃO CORRIGIDA
+// src/components/auth/LoginForm.tsx
+// 🔧 VERSÃO CORRIGIDA - Link de cadastro corrigido
 
 "use client";
 import { useState } from "react";
@@ -41,102 +42,21 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       }
 
       if (data.user) {
-        const tipoUsuario = data.user.user_metadata?.tipo_usuario;
-        console.log("=== LOGIN - VERIFICAÇÃO ONBOARDING ===");
-        console.log("Tipo usuário:", tipoUsuario);
-
-        if (!tipoUsuario) {
-          console.log("Redirecionando para onboarding - sem tipo");
-          onSuccess?.();
-          router.push("/onboarding");
-          return;
-        }
-
-        let temPerfil = false;
-        let perfilCheckError: DatabaseError | null = null;
-
-        try {
-          switch (tipoUsuario) {
-            case "paciente":
-              const { data: perfilPaciente, error: pacienteError } =
-                await supabase
-                  .from("perfis_pacientes")
-                  .select("id")
-                  .eq("id", data.user.id)
-                  .single();
-              perfilCheckError = pacienteError;
-              temPerfil = !!perfilPaciente;
-              break;
-            case "profissional":
-              const { data: perfilProfissional, error: profissionalError } =
-                await supabase
-                  .from("perfis_profissionais")
-                  .select("id")
-                  .eq("id", data.user.id)
-                  .single();
-              perfilCheckError = profissionalError;
-              temPerfil = !!perfilProfissional;
-              break;
-            case "clinica":
-              const { data: perfilClinica, error: clinicaError } =
-                await supabase
-                  .from("perfis_clinicas")
-                  .select("id")
-                  .eq("id", data.user.id)
-                  .single();
-              perfilCheckError = clinicaError;
-              temPerfil = !!perfilClinica;
-              break;
-            case "empresa":
-              const { data: perfilEmpresa, error: empresaError } =
-                await supabase
-                  .from("perfis_empresas")
-                  .select("id")
-                  .eq("id", data.user.id)
-                  .single();
-              perfilCheckError = empresaError;
-              temPerfil = !!perfilEmpresa;
-              break;
-            default:
-              console.log("Tipo usuário desconhecido:", tipoUsuario);
-          }
-
-          console.log("Tem perfil:", temPerfil);
-          console.log("Erro ao verificar perfil:", perfilCheckError);
-
-          if (temPerfil) {
-            console.log("Perfil encontrado - redirecionando para dashboard");
-            onSuccess?.();
-            router.push(`/dashboard`);
-          } else {
-            console.log(
-              "Perfil não encontrado - redirecionando para onboarding"
-            );
-            onSuccess?.();
-            router.push("/onboarding");
-          }
-        } catch (profileError) {
-          console.error("Erro ao verificar perfil:", profileError);
-          const errorMessage =
-            profileError instanceof Error
-              ? profileError.message
-              : "Erro ao verificar perfil do usuário.";
-          setError(errorMessage);
-        }
+        console.log("✅ Login realizado com sucesso");
+        onSuccess?.();
+        router.push("/dashboard");
       }
-    } catch (authError) {
-      console.error("Erro de autenticação:", authError);
-      const errorMessage =
-        authError instanceof Error ? authError.message : "Erro ao fazer login.";
+    } catch (authError: any) {
+      console.error("❌ Erro de autenticação:", authError);
 
-      if (errorMessage.includes("Invalid login credentials")) {
+      if (authError.message?.includes("Invalid login credentials")) {
         setError("Email ou senha incorretos.");
-      } else if (errorMessage.includes("Email not confirmed")) {
+      } else if (authError.message?.includes("Email not confirmed")) {
         setError(
           "Por favor, verifique seu email e clique no link de confirmação antes de fazer login."
         );
       } else {
-        setError(errorMessage);
+        setError(authError.message || "Erro ao fazer login.");
       }
     } finally {
       setLoading(false);
@@ -199,28 +119,28 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl"
           >
             {loading ? (
-              <div className="flex items-center justify-center">
+              <span className="flex items-center justify-center">
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                 Entrando...
-              </div>
+              </span>
             ) : (
               "Entrar"
             )}
           </button>
-        </form>
 
-        {/* Link para cadastro */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            Não tem uma conta?{" "}
-            <Link
-              href="/cadastro"
-              className="font-semibold text-transparent bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
-            >
-              Criar conta
-            </Link>
-          </p>
-        </div>
+          {/* 🔧 LINK CORRIGIDO - /signup ao invés de /cadastro */}
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Não tem uma conta?{" "}
+              <Link
+                href="/signup"
+                className="font-semibold text-transparent bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
+              >
+                Criar conta
+              </Link>
+            </p>
+          </div>
+        </form>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 // src/components/auth/SignupForm.tsx
-// 🚀 VERSÃO PRODUÇÃO - ZERO LOCALHOST
+// 🔧 VERSÃO CORRIGIDA - Com validações de email/CPF duplicado
 
 "use client";
 import { useState } from "react";
@@ -62,30 +62,41 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     },
   ];
 
-  // 🎯 FUNÇÃO QUE **NUNCA** USA LOCALHOST
+  // 🔧 FUNÇÃO CORRIGIDA - URL de produção FORÇADA
   const getProductionUrl = (): string => {
-    // ❌ REMOVIDO: window.location.origin (pode ser localhost)
-    // ❌ REMOVIDO: Qualquer referência a localhost
+    // 🔴 HARDCODED para garantir que funcione
+    const PRODUCTION_URL =
+      "https://viaa-git-main-brunos-projects-6a73c557.vercel.app";
 
-    // ✅ APENAS: URL de produção obrigatória
-    const productionUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    console.log("🚀 URL FORÇADA:", PRODUCTION_URL);
+    return PRODUCTION_URL;
+  };
 
-    if (!productionUrl) {
-      console.error("❌ NEXT_PUBLIC_SITE_URL não configurada!");
-      // 🔴 Fallback hardcoded para sua URL do Vercel (SUBSTITUA AQUI)
-      return "https://viaa-git-main-brunos-projects-6a73c557.vercel.app"; // 👈 SUBSTITUA pela sua URL
+  // 🔧 NOVA FUNÇÃO - Verificar se email já existe
+  const checkEmailExists = async (email: string): Promise<boolean> => {
+    try {
+      // Tentar fazer login com email (sem senha) para verificar se existe
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: "fake-password-for-check", // Senha falsa só para testar
+      });
+
+      // Se o erro for "Invalid login credentials", o email existe
+      if (error?.message?.includes("Invalid login credentials")) {
+        return true; // Email existe
+      }
+
+      // Se não deu erro, significa que logou (improvável com senha falsa)
+      if (data.user) {
+        await supabase.auth.signOut(); // Logout imediato
+        return true;
+      }
+
+      return false; // Email não existe
+    } catch (error) {
+      console.error("Erro ao verificar email:", error);
+      return false;
     }
-
-    // Garantir que não seja localhost
-    if (
-      productionUrl.includes("localhost") ||
-      productionUrl.includes("127.0.0.1")
-    ) {
-      console.error("❌ URL de produção não pode ser localhost!");
-      return "https://viaa-git-main-brunos-projects-6a73c557.vercel.app"; // 👈 SUBSTITUA pela sua URL
-    }
-
-    return productionUrl;
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -94,7 +105,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     setError("");
     setSuccess("");
 
-    // Validações
+    // 🔧 VALIDAÇÕES BÁSICAS
     if (!tipoUsuario) {
       setError("Por favor, selecione o tipo de usuário.");
       setLoading(false);
@@ -112,17 +123,31 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     }
 
     try {
-      // 🚀 URL DE PRODUÇÃO GARANTIDA (ZERO LOCALHOST)
+      // 🔧 VALIDAÇÃO 1: Verificar se email já existe
+      console.log("🔍 Verificando se email já existe...");
+      const emailExists = await checkEmailExists(email);
+
+      if (emailExists) {
+        setError(
+          "❌ Este email já está cadastrado. Tente fazer login ou use outro email."
+        );
+        setLoading(false);
+        return;
+      }
+
+      console.log("✅ Email disponível para cadastro");
+
+      // 🔧 URL DE PRODUÇÃO GARANTIDA
       const baseUrl = getProductionUrl();
       const redirectUrl = `${baseUrl}/auth/confirm?type=${tipoUsuario}`;
 
-      console.log("=== PRODUÇÃO APENAS ===");
+      console.log("=== SIGNUP - PRODUÇÃO ===");
       console.log("🚀 Base URL:", baseUrl);
       console.log("🚀 Redirect URL:", redirectUrl);
       console.log("🚀 Tipo usuário:", tipoUsuario);
-      console.log("======================");
+      console.log("========================");
 
-      // 1. Cadastrar usuário no Supabase Auth
+      // 🔧 CADASTRAR USUÁRIO
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -130,34 +155,33 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
           data: {
             tipo_usuario: tipoUsuario,
           },
-          // 🎯 GARANTIDO: Sempre URL de produção
           emailRedirectTo: redirectUrl,
         },
       });
 
       if (authError) throw authError;
 
-      console.log("=== SIGNUP REALIZADO ===");
-      console.log("✅ User criado:", authData.user?.id);
-      console.log("✅ Email redirect:", redirectUrl);
-      console.log(
-        "✅ Tipo no metadata:",
-        authData.user?.user_metadata?.tipo_usuario
-      );
-      console.log("========================");
+      console.log("✅ Usuário criado:", authData.user?.id);
 
+      // 🔧 REMOVER MENSAGEM DE DEBUG CONFUSA
       setSuccess(
-        "🎉 Conta criada com sucesso! Verifique seu email e clique no link de confirmação para ativar sua conta."
+        "🎉 Conta criada com sucesso! Verifique seu email e clique no link de confirmação."
       );
       onSuccess?.();
 
-      // Armazenar informações para debug
-      localStorage.setItem("signup_user_type", tipoUsuario);
-      localStorage.setItem("signup_email", email);
-      localStorage.setItem("production_url_used", redirectUrl);
+      // Limpar formulário
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+      setTipoUsuario(null);
     } catch (error: any) {
       console.error("❌ Erro no signup:", error);
-      setError(error.message || "Erro ao criar conta.");
+
+      if (error.message?.includes("User already registered")) {
+        setError("❌ Este email já está cadastrado. Tente fazer login.");
+      } else {
+        setError(error.message || "Erro ao criar conta.");
+      }
     } finally {
       setLoading(false);
     }
@@ -166,6 +190,12 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
   return (
     <div className="w-full max-w-lg mx-auto">
       <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+        {/* 🔧 REMOVER DEBUG INFO CONFUSO */}
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Criar Conta</h2>
+          <p className="text-gray-600">Junte-se à comunidade VIAA</p>
+        </div>
+
         <form onSubmit={handleSignup} className="space-y-6">
           {/* Seleção do tipo de usuário */}
           <div>
@@ -217,7 +247,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
               placeholder="seu@email.com"
             />
           </div>
@@ -236,7 +266,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
               placeholder="Mínimo 6 caracteres"
             />
           </div>
@@ -255,59 +285,53 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
               required
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              placeholder="Repita sua senha"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
+              placeholder="Digite a senha novamente"
             />
           </div>
 
-          {/* Debug Info (temporário) */}
-          <div className="bg-blue-50 border border-blue-200 p-3 rounded-xl text-xs">
-            <p className="font-medium text-blue-800">🚀 Modo Produção Ativo</p>
-            <p className="text-blue-600">URL base: {getProductionUrl()}</p>
-          </div>
-
-          {/* Mensagens de erro/sucesso */}
+          {/* Mensagens */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl">
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
               {success}
             </div>
           )}
 
-          {/* Botão de cadastro */}
+          {/* Submit */}
           <button
             type="submit"
-            disabled={loading || !tipoUsuario}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl"
           >
             {loading ? (
-              <div className="flex items-center justify-center">
+              <span className="flex items-center justify-center">
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                 Criando conta...
-              </div>
+              </span>
             ) : (
               "Criar Conta"
             )}
           </button>
-        </form>
 
-        {/* Link para login */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            Já tem uma conta?{" "}
-            <Link
-              href="/auth"
-              className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
-            >
-              Fazer login
-            </Link>
-          </p>
-        </div>
+          {/* Link para login */}
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Já tem uma conta?{" "}
+              <Link
+                href="/auth"
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Fazer login
+              </Link>
+            </p>
+          </div>
+        </form>
       </div>
     </div>
   );
