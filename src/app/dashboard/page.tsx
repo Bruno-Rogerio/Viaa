@@ -1,5 +1,5 @@
 // src/app/dashboard/page.tsx
-// 🎯 DASHBOARD INTELIGENTE - detecta tipo de usuário e renderiza layout correto
+// 🔧 DASHBOARD INTELIGENTE - detecta tipo de usuário e renderiza layout correto
 
 "use client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -310,6 +310,12 @@ function PatientDashboard() {
 export default function DashboardPage() {
   const { user, profile, loading } = useAuth();
 
+  console.log("🔍 DASHBOARD DEBUG:");
+  console.log("- User:", user?.id);
+  console.log("- Profile tipo:", profile?.tipo);
+  console.log("- Profile dados:", profile?.dados);
+  console.log("- Loading:", loading);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -322,6 +328,9 @@ export default function DashboardPage() {
   }
 
   if (!user || !profile) {
+    console.log(
+      "❌ DASHBOARD: Sem usuário ou perfil, redirecionando para auth"
+    );
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -342,9 +351,12 @@ export default function DashboardPage() {
     );
   }
 
-  // 🎯 RENDERIZAÇÃO INTELIGENTE BASEADA NO TIPO DE USUÁRIO
+  // 🔧 RENDERIZAÇÃO INTELIGENTE BASEADA NO TIPO DE USUÁRIO
+  console.log("🎯 DASHBOARD: Renderizando para tipo:", profile.tipo);
+
   switch (profile.tipo) {
     case "profissional":
+      console.log("✅ DASHBOARD: Renderizando ProfessionalLayout");
       return (
         <ProfessionalLayout>
           <ProfessionalDashboard />
@@ -352,6 +364,7 @@ export default function DashboardPage() {
       );
 
     case "paciente":
+      console.log("✅ DASHBOARD: Renderizando PatientLayout");
       return (
         <PatientLayout>
           <PatientDashboard />
@@ -359,7 +372,6 @@ export default function DashboardPage() {
       );
 
     case "clinica":
-      // TODO: Implementar layout para clínicas
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="text-center">
@@ -372,7 +384,6 @@ export default function DashboardPage() {
       );
 
     case "empresa":
-      // TODO: Implementar layout para empresas
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="text-center">
@@ -385,6 +396,7 @@ export default function DashboardPage() {
       );
 
     default:
+      console.log("❌ DASHBOARD: Tipo não reconhecido:", profile.tipo);
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="text-center">

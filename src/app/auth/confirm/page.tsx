@@ -1,4 +1,5 @@
-// src/app/auth/confirm/page.tsx - VERSÃO CORRIGIDA COM SUSPENSE
+// src/app/auth/confirm/page.tsx
+// 🔧 VERSÃO CORRIGIDA - Leitura correta de tokens do hash
 
 "use client";
 import { useEffect, useState, Suspense } from "react";
@@ -21,73 +22,96 @@ function ConfirmContent() {
         const hash = window.location.hash;
         const search = window.location.search;
 
+        console.log("🔍 Analisando URL de confirmação:");
         console.log("URL completa:", fullUrl);
         console.log("Hash:", hash);
         console.log("Search:", search);
-        console.log("SearchParams:", searchParams.toString());
 
         setDebugInfo(`URL: ${fullUrl}\nHash: ${hash}\nSearch: ${search}`);
 
-        let access_token, refresh_token, token_hash, urlTipoUsuario;
+        let access_token,
+          refresh_token,
+          token_hash,
+          error_description,
+          urlTipoUsuario;
 
-        // Tentar pegar parâmetros do hash primeiro
+        // 🔧 MÉTODO PRINCIPAL: Ler do HASH (Supabase Auth usa hash)
         if (hash) {
           const hashParams = new URLSearchParams(hash.substring(1));
           access_token = hashParams.get("access_token");
           refresh_token = hashParams.get("refresh_token");
           token_hash = hashParams.get("token_hash");
-          urlTipoUsuario = hashParams.get("type");
+          error_description = hashParams.get("error_description");
+
+          console.log("📋 Parâmetros do hash:", {
+            access_token: access_token ? "presente" : "ausente",
+            refresh_token: refresh_token ? "presente" : "ausente",
+            token_hash: token_hash ? "presente" : "ausente",
+            error_description,
+          });
         }
 
-        // Se não tiver no hash, pegar dos query params
+        // 🔧 MÉTODO SECUNDÁRIO: Ler dos query params
         if (!access_token && !token_hash) {
           access_token = searchParams.get("access_token");
           refresh_token = searchParams.get("refresh_token");
           token_hash = searchParams.get("token_hash");
-          urlTipoUsuario = searchParams.get("type");
+          error_description = searchParams.get("error_description");
+
+          console.log("📋 Parâmetros dos query params:", {
+            access_token: access_token ? "presente" : "ausente",
+            refresh_token: refresh_token ? "presente" : "ausente",
+            token_hash: token_hash ? "presente" : "ausente",
+          });
         }
 
-        console.log("Parâmetros encontrados:", {
-          access_token: access_token ? "presente" : "ausente",
-          refresh_token: refresh_token ? "presente" : "ausente",
-          token_hash: token_hash ? "presente" : "ausente",
-          urlTipoUsuario,
-        });
+        // 🔧 PEGAR TIPO DO USUÁRIO
+        urlTipoUsuario = searchParams.get("type");
+        console.log("👤 Tipo do usuário:", urlTipoUsuario);
+
+        // 🔧 VERIFICAR SE HÁ ERRO
+        if (error_description) {
+          throw new Error(`Erro de autenticação: ${error_description}`);
+        }
 
         let authenticatedUser = null;
 
+        // 🔧 PROCESSAR TOKENS
         if (access_token && refresh_token) {
+          console.log("🔑 Processando access_token e refresh_token...");
           const { data, error } = await supabase.auth.setSession({
             access_token,
             refresh_token,
           });
           if (error) throw error;
-          console.log("Sessão criada com sucesso:", data);
+          console.log("✅ Sessão criada com sucesso");
           authenticatedUser = data.user;
         } else if (token_hash) {
+          console.log("🔑 Processando token_hash...");
           const { data, error } = await supabase.auth.verifyOtp({
             token_hash,
             type: "signup",
           });
           if (error) throw error;
-          console.log("Token verificado com sucesso:", data);
+          console.log("✅ Token verificado com sucesso");
           authenticatedUser = data.user;
         } else {
-          throw new Error("Tokens de confirmação não encontrados na URL.");
+          throw new Error("Nenhum token de confirmação encontrado na URL");
         }
 
         if (authenticatedUser) {
-          console.log("Usuário autenticado:", authenticatedUser);
+          console.log("👤 Usuário autenticado:", authenticatedUser.id);
 
+          // 🔧 DETECTAR TIPO DO USUÁRIO
           const finalTipoUsuario =
             urlTipoUsuario ||
             authenticatedUser.user_metadata?.tipo_usuario ||
             localStorage.getItem("signup_user_type");
 
-          if (finalTipoUsuario) {
-            console.log("Tipo detectado:", finalTipoUsuario);
+          console.log("🎯 Tipo final detectado:", finalTipoUsuario);
 
-            // Verificar se já tem perfil criado
+          if (finalTipoUsuario) {
+            // 🔧 VERIFICAR SE JÁ TEM PERFIL
             let tabelaPerfil;
             switch (finalTipoUsuario) {
               case "paciente":
@@ -107,6 +131,8 @@ function ConfirmContent() {
             }
 
             if (tabelaPerfil) {
+              console.log("🔍 Verificando perfil na tabela:", tabelaPerfil);
+
               const { data: perfilExistente } = await supabase
                 .from(tabelaPerfil)
                 .select("id")
@@ -114,9 +140,7 @@ function ConfirmContent() {
                 .maybeSingle();
 
               if (!perfilExistente) {
-                console.log(
-                  "Perfil não existe, redirecionando para onboarding"
-                );
+                console.log("❌ Perfil não existe, indo para onboarding");
                 setStatus("success");
                 setMessage("Email confirmado! Vamos finalizar seu perfil.");
                 setTimeout(() => {
@@ -124,9 +148,9 @@ function ConfirmContent() {
                 }, 2000);
                 return;
               } else {
-                console.log("Perfil já existe, redirecionando para dashboard");
+                console.log("✅ Perfil já existe, indo para dashboard");
                 setStatus("success");
-                setMessage("Email confirmado e login realizado com sucesso!");
+                setMessage("Email confirmado! Redirecionando...");
                 setTimeout(() => {
                   router.push("/dashboard");
                 }, 2000);
@@ -135,16 +159,16 @@ function ConfirmContent() {
             }
           }
 
-          // Fallback - redirecionar para onboarding geral
-          console.log("Fallback - redirecionando para onboarding");
+          // 🔧 FALLBACK
+          console.log("⚠️ Fallback - indo para onboarding");
           setStatus("success");
-          setMessage("Email confirmado! Vamos configurar seu perfil.");
+          setMessage("Email confirmado! Configurando seu perfil...");
           setTimeout(() => {
             router.push("/onboarding");
           }, 2000);
         }
       } catch (error: unknown) {
-        console.error("Erro na confirmação:", error);
+        console.error("❌ Erro na confirmação:", error);
         const errorMessage =
           error instanceof Error ? error.message : "Erro desconhecido";
         setStatus("error");
@@ -152,6 +176,7 @@ function ConfirmContent() {
       }
     };
 
+    // Pequeno delay para garantir que a página carregou
     const timer = setTimeout(handleEmailConfirmation, 500);
     return () => clearTimeout(timer);
   }, [searchParams, router]);
@@ -224,7 +249,6 @@ function ConfirmContent() {
   );
 }
 
-// Componente principal exportado com Suspense
 export default function ConfirmPage() {
   return (
     <Suspense

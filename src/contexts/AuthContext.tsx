@@ -1,5 +1,5 @@
 // src/contexts/AuthContext.tsx
-// 🔧 VERSÃO CORRIGIDA - Detecção correta de tipo após onboarding
+// 🔧 VERSÃO ORIGINAL RESTAURADA - que funcionava antes
 
 "use client";
 import { createContext, useContext, useEffect, useState, useRef } from "react";
@@ -27,81 +27,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
   const initialized = useRef(false);
 
-  // 🔧 FUNÇÃO CORRIGIDA - Buscar perfil com fallback
+  // 🔧 FUNÇÃO ORIGINAL RESTAURADA
   const fetchUserProfile = async (
     userId: string
   ): Promise<UserProfile | null> => {
     try {
-      console.log("🔍 Buscando perfil para usuário:", userId);
-
       const {
         data: { user: authUser },
       } = await supabase.auth.getUser();
-      let tipoUsuario = authUser?.user_metadata?.tipo_usuario;
-
-      console.log("📋 Tipo detectado nos metadados:", tipoUsuario);
-
-      // 🔧 FALLBACK: Se não tem tipo nos metadados, buscar em todas as tabelas
-      if (!tipoUsuario) {
-        console.log(
-          "⚠️ Tipo não encontrado nos metadados, buscando nas tabelas..."
-        );
-
-        const tabelas = [
-          { nome: "perfis_pacientes", tipo: "paciente" },
-          { nome: "perfis_profissionais", tipo: "profissional" },
-          { nome: "perfis_clinicas", tipo: "clinica" },
-          { nome: "perfis_empresas", tipo: "empresa" },
-        ];
-
-        for (const tabela of tabelas) {
-          const { data, error } = await supabase
-            .from(tabela.nome)
-            .select("id")
-            .eq("user_id", userId)
-            .maybeSingle();
-
-          if (!error && data) {
-            console.log(`✅ Perfil encontrado na tabela ${tabela.nome}`);
-            tipoUsuario = tabela.tipo;
-
-            // 🔧 ATUALIZAR METADADOS DO USUÁRIO
-            try {
-              await supabase.auth.updateUser({
-                data: { tipo_usuario: tipoUsuario },
-              });
-              console.log("✅ Metadados atualizados com tipo:", tipoUsuario);
-            } catch (updateError) {
-              console.warn(
-                "⚠️ Não foi possível atualizar metadados:",
-                updateError
-              );
-            }
-            break;
-          }
-        }
-      }
+      const tipoUsuario = authUser?.user_metadata?.tipo_usuario;
 
       if (!tipoUsuario) {
-        console.log("❌ Tipo de usuário não encontrado em lugar nenhum");
+        console.log("Tipo de usuário não encontrado nos metadados");
         return null;
       }
 
-      // 🔧 BUSCAR DADOS DO PERFIL
-      const tabelas: Record<string, string> = {
-        paciente: "perfis_pacientes",
-        profissional: "perfis_profissionais",
-        clinica: "perfis_clinicas",
-        empresa: "perfis_empresas",
-      };
-
-      const tableName = tabelas[tipoUsuario];
-      if (!tableName) {
-        console.error("❌ Tipo de usuário inválido:", tipoUsuario);
-        return null;
+      let tableName: string;
+      switch (tipoUsuario) {
+        case "paciente":
+          tableName = "perfis_pacientes";
+          break;
+        case "profissional":
+          tableName = "perfis_profissionais";
+          break;
+        case "clinica":
+          tableName = "perfis_clinicas";
+          break;
+        case "empresa":
+          tableName = "perfis_empresas";
+          break;
+        default:
+          console.log("Tipo de usuário inválido:", tipoUsuario);
+          return null;
       }
-
-      console.log("🔍 Buscando dados na tabela:", tableName);
 
       const { data, error } = await supabase
         .from(tableName)
@@ -110,35 +68,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") {
-        console.error("❌ Erro ao buscar perfil:", error);
+        console.error("Erro ao buscar perfil:", error);
         return null;
       }
 
       if (!data) {
-        console.log("❌ Perfil não encontrado na tabela:", tableName);
+        console.log("Perfil não encontrado na tabela:", tableName);
         return null;
       }
 
-      console.log("✅ Perfil carregado:", tipoUsuario, data);
+      console.log("Perfil carregado:", tipoUsuario, data);
 
       return {
-        tipo: tipoUsuario as
-          | "paciente"
-          | "profissional"
-          | "clinica"
-          | "empresa",
+        tipo: tipoUsuario,
         dados: data,
         verificado: data.verificado || false,
       };
     } catch (error) {
-      console.error("❌ Erro ao buscar perfil do usuário:", error);
+      console.error("Erro ao buscar perfil do usuário:", error);
       return null;
     }
   };
 
   const refreshProfile = async () => {
     if (user) {
-      console.log("🔄 Refreshing profile...");
       const userProfile = await fetchUserProfile(user.id);
       setProfile(userProfile);
     }
@@ -160,7 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const initializeAuth = async () => {
       try {
-        console.log("🚀 Inicializando autenticação...");
+        console.log("Inicializando autenticação...");
 
         const {
           data: { session },
@@ -174,13 +127,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (session?.user) {
-          console.log("👤 Usuário encontrado na sessão:", session.user.email);
+          console.log("Usuário encontrado na sessão:", session.user.email);
           setUser(session.user);
 
           const userProfile = await fetchUserProfile(session.user.id);
           setProfile(userProfile);
         } else {
-          console.log("❌ Nenhuma sessão ativa encontrada");
+          console.log("Nenhuma sessão ativa encontrada");
         }
       } catch (error) {
         console.error("Erro na inicialização da auth:", error);
@@ -191,11 +144,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     initializeAuth();
 
-    // 🔧 LISTENER CORRIGIDO - Refresh profile em mudanças
+    // 🔧 LISTENER ORIGINAL RESTAURADO
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("🔄 Auth state changed:", event, session?.user?.email);
+      console.log("Auth state changed:", event, session?.user?.email);
 
       if (event === "SIGNED_IN" && session?.user) {
         setUser(session.user);
@@ -204,12 +157,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } else if (event === "SIGNED_OUT") {
         setUser(null);
         setProfile(null);
-      } else if (event === "USER_UPDATED" && session?.user) {
-        // 🔧 IMPORTANTE: Refresh profile quando usuário é atualizado
-        console.log("🔄 Usuário atualizado, refreshing profile...");
-        setUser(session.user);
-        const userProfile = await fetchUserProfile(session.user.id);
-        setProfile(userProfile);
       }
     });
 
