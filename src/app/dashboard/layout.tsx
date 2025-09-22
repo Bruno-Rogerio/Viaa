@@ -1,6 +1,5 @@
-// src/app/dashboard/layout.tsx
-// 🔧 LAYOUT SIMPLES - Sem forçar ProfessionalLayout
-
+// viaa\src\app\dashboard\layout.tsx
+import { ProfessionalLayout } from "@/components/dashboard/professional/layout/ProfessionalLayout";
 import { AuthProvider } from "@/contexts/AuthContext";
 
 export default function DashboardLayoutPage({
@@ -8,5 +7,9 @@ export default function DashboardLayoutPage({
 }: {
   children: React.ReactNode;
 }) {
-  return <AuthProvider>{children}</AuthProvider>;
+  return (
+    <AuthProvider>
+      <ProfessionalLayout>{children}</ProfessionalLayout>
+    </AuthProvider>
+  );
 }
