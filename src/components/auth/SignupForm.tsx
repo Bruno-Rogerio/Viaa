@@ -1,5 +1,5 @@
 // src/components/auth/SignupForm.tsx
-// 🔧 VERSÃO CORRIGIDA - Com validações de email/CPF duplicado
+// 🔧 VERSÃO SIMPLES - Sem validações complicadas
 
 "use client";
 import { useState } from "react";
@@ -29,7 +29,6 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
       label: "Sou Paciente",
       description: "Encontre seu terapeuta ideal",
       icon: "💚",
-      gradient: "from-rose-500 to-pink-500",
       borderColor: "border-rose-500",
       bgColor: "bg-rose-50",
     },
@@ -38,7 +37,6 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
       label: "Sou Profissional",
       description: "Conecte-se com pacientes",
       icon: "🩺",
-      gradient: "from-emerald-500 to-green-500",
       borderColor: "border-emerald-500",
       bgColor: "bg-emerald-50",
     },
@@ -47,7 +45,6 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
       label: "Sou Clínica",
       description: "Gerencie sua equipe",
       icon: "🏥",
-      gradient: "from-purple-500 to-indigo-500",
       borderColor: "border-purple-500",
       bgColor: "bg-purple-50",
     },
@@ -56,21 +53,10 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
       label: "Sou Empresa",
       description: "Cuide dos seus colaboradores",
       icon: "🏢",
-      gradient: "from-sky-500 to-blue-500",
       borderColor: "border-sky-500",
       bgColor: "bg-sky-50",
     },
   ];
-
-  // 🔧 FUNÇÃO CORRIGIDA - URL de produção FORÇADA
-  const getProductionUrl = (): string => {
-    // 🔴 HARDCODED para garantir que funcione
-    const PRODUCTION_URL =
-      "https://viaa-git-main-brunos-projects-6a73c557.vercel.app";
-
-    console.log("🚀 URL FORÇADA:", PRODUCTION_URL);
-    return PRODUCTION_URL;
-  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +64,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     setError("");
     setSuccess("");
 
-    // 🔧 VALIDAÇÕES BÁSICAS
+    // Validações básicas
     if (!tipoUsuario) {
       setError("Por favor, selecione o tipo de usuário.");
       setLoading(false);
@@ -96,17 +82,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     }
 
     try {
-      // 🔧 URL DE PRODUÇÃO GARANTIDA
-      const baseUrl = getProductionUrl();
-      const redirectUrl = `${baseUrl}/auth/confirm?type=${tipoUsuario}`;
-
-      console.log("=== SIGNUP - PRODUÇÃO ===");
-      console.log("🚀 Base URL:", baseUrl);
-      console.log("🚀 Redirect URL:", redirectUrl);
-      console.log("🚀 Tipo usuário:", tipoUsuario);
-      console.log("========================");
-
-      // 🔧 CADASTRAR USUÁRIO DIRETO (sem verificação prévia)
+      // 🔧 CADASTRO SIMPLES - Deixar Supabase gerenciar tudo
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -114,35 +90,36 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
           data: {
             tipo_usuario: tipoUsuario,
           },
-          emailRedirectTo: redirectUrl,
+          // 🔧 NÃO ESPECIFICAR emailRedirectTo - deixar Supabase usar as configurações dele
         },
       });
 
       if (authError) {
-        // 🔧 TRATAR ERROS ESPECÍFICOS
         if (authError.message?.includes("User already registered")) {
-          throw new Error(
-            "❌ Este email já está cadastrado. Tente fazer login ou use outro email."
-          );
+          setError("Este email já está cadastrado. Tente fazer login.");
+        } else {
+          setError(authError.message);
         }
-        throw authError;
+        setLoading(false);
+        return;
       }
 
       console.log("✅ Usuário criado:", authData.user?.id);
 
       setSuccess(
-        "🎉 Conta criada com sucesso! Verifique seu email e clique no link de confirmação."
+        "🎉 Conta criada! Verifique seu email e clique no link de confirmação."
       );
-      onSuccess?.();
 
       // Limpar formulário
       setEmail("");
       setPassword("");
       setConfirmPassword("");
       setTipoUsuario(null);
+
+      onSuccess?.();
     } catch (error: any) {
       console.error("❌ Erro no signup:", error);
-      setError(error.message || "Erro ao criar conta.");
+      setError("Erro ao criar conta. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -151,7 +128,6 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
   return (
     <div className="w-full max-w-lg mx-auto">
       <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
-        {/* 🔧 REMOVER DEBUG INFO CONFUSO */}
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Criar Conta</h2>
           <p className="text-gray-600">Junte-se à comunidade VIAA</p>
