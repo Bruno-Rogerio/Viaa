@@ -8,6 +8,7 @@ import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useProfile } from "@/hooks/dashboard/useProfile";
 import ProfileEditForm from "@/components/dashboard/professional/profile/ProfileEditForm";
 import ProfileHeader from "@/components/dashboard/professional/profile/ProfileHeader";
+import ProfilePreview from "@/components/dashboard/professional/profile/ProfilePreview";
 
 export default function PerfilPage() {
   const [activeTab, setActiveTab] = useState<"preview" | "edit">("preview");
@@ -137,80 +138,11 @@ export default function PerfilPage() {
         {/* Conteúdo baseado na aba ativa */}
         <div className="space-y-6">
           {activeTab === "preview" && profileData && readOnlyData && (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
-              <div className="text-center mb-8">
-                <div className="w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-                  {formData.foto_perfil_url ? (
-                    <img
-                      src={formData.foto_perfil_url}
-                      alt="Foto de perfil"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-4xl text-gray-400">👤</span>
-                  )}
-                </div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                  {readOnlyData.nome} {readOnlyData.sobrenome}
-                </h1>
-                <p className="text-lg text-gray-600 mb-2">
-                  {readOnlyData.tipo === "psicologo"
-                    ? "Psicólogo(a)"
-                    : readOnlyData.tipo === "psicanalista"
-                    ? "Psicanalista"
-                    : readOnlyData.tipo === "heike"
-                    ? "Terapeuta Reiki"
-                    : readOnlyData.tipo === "holistico"
-                    ? "Terapeuta Holístico"
-                    : "Coach/Mentor"}
-                </p>
-                {readOnlyData.verificado && (
-                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                    <span>✓</span> Perfil Verificado
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Especialidades
-                  </h3>
-                  <p className="text-gray-600">
-                    {formData.especialidades || "Não informado"}
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Localização
-                  </h3>
-                  <p className="text-gray-600">
-                    {formData.endereco_cidade && formData.endereco_estado
-                      ? `${formData.endereco_cidade}, ${formData.endereco_estado}`
-                      : "Não informado"}
-                  </p>
-                </div>
-
-                {formData.bio_profissional && (
-                  <div className="md:col-span-2">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Biografia
-                    </h3>
-                    <p className="text-gray-600">{formData.bio_profissional}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-8 pt-8 border-t border-gray-200">
-                <button
-                  onClick={handleStartEdit}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors"
-                >
-                  Editar Perfil
-                </button>
-              </div>
-            </div>
+            <ProfilePreview
+              formData={formData}
+              readOnlyData={readOnlyData}
+              onStartEdit={handleStartEdit}
+            />
           )}
 
           {activeTab === "edit" && (
