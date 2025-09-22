@@ -72,33 +72,6 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     return PRODUCTION_URL;
   };
 
-  // 🔧 NOVA FUNÇÃO - Verificar se email já existe
-  const checkEmailExists = async (email: string): Promise<boolean> => {
-    try {
-      // Tentar fazer login com email (sem senha) para verificar se existe
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: "fake-password-for-check", // Senha falsa só para testar
-      });
-
-      // Se o erro for "Invalid login credentials", o email existe
-      if (error?.message?.includes("Invalid login credentials")) {
-        return true; // Email existe
-      }
-
-      // Se não deu erro, significa que logou (improvável com senha falsa)
-      if (data.user) {
-        await supabase.auth.signOut(); // Logout imediato
-        return true;
-      }
-
-      return false; // Email não existe
-    } catch (error) {
-      console.error("Erro ao verificar email:", error);
-      return false;
-    }
-  };
-
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -123,20 +96,6 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     }
 
     try {
-      // 🔧 VALIDAÇÃO 1: Verificar se email já existe
-      console.log("🔍 Verificando se email já existe...");
-      const emailExists = await checkEmailExists(email);
-
-      if (emailExists) {
-        setError(
-          "❌ Este email já está cadastrado. Tente fazer login ou use outro email."
-        );
-        setLoading(false);
-        return;
-      }
-
-      console.log("✅ Email disponível para cadastro");
-
       // 🔧 URL DE PRODUÇÃO GARANTIDA
       const baseUrl = getProductionUrl();
       const redirectUrl = `${baseUrl}/auth/confirm?type=${tipoUsuario}`;
@@ -147,7 +106,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
       console.log("🚀 Tipo usuário:", tipoUsuario);
       console.log("========================");
 
-      // 🔧 CADASTRAR USUÁRIO
+      // 🔧 CADASTRAR USUÁRIO DIRETO (sem verificação prévia)
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -159,11 +118,18 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
         },
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        // 🔧 TRATAR ERROS ESPECÍFICOS
+        if (authError.message?.includes("User already registered")) {
+          throw new Error(
+            "❌ Este email já está cadastrado. Tente fazer login ou use outro email."
+          );
+        }
+        throw authError;
+      }
 
       console.log("✅ Usuário criado:", authData.user?.id);
 
-      // 🔧 REMOVER MENSAGEM DE DEBUG CONFUSA
       setSuccess(
         "🎉 Conta criada com sucesso! Verifique seu email e clique no link de confirmação."
       );
@@ -176,12 +142,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
       setTipoUsuario(null);
     } catch (error: any) {
       console.error("❌ Erro no signup:", error);
-
-      if (error.message?.includes("User already registered")) {
-        setError("❌ Este email já está cadastrado. Tente fazer login.");
-      } else {
-        setError(error.message || "Erro ao criar conta.");
-      }
+      setError(error.message || "Erro ao criar conta.");
     } finally {
       setLoading(false);
     }
