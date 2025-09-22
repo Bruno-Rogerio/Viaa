@@ -65,17 +65,11 @@ export async function GET(request: NextRequest) {
         new Date(sessionData.user.email_confirmed_at).getTime() >
           Date.now() - 60000; // Confirmado nos últimos 60 segundos
 
-      if (isEmailConfirmation) {
-        console.log(
-          "📧 Confirmação de email detectada, redirecionando para /auth/confirm"
-        );
-        return NextResponse.redirect(
-          new URL("/auth/confirm", requestUrl.origin)
-        );
-      } else {
-        console.log("🔐 Login normal detectado, redirecionando para dashboard");
-        return NextResponse.redirect(new URL("/dashboard", requestUrl.origin));
-      }
+      // ✅ SEMPRE redirecionar para confirm - deixar ela decidir o próximo passo
+      console.log(
+        "🔄 Redirecionando para página de confirmação para processamento"
+      );
+      return NextResponse.redirect(new URL("/auth/confirm", requestUrl.origin));
     } catch (error: any) {
       console.error("❌ Erro no processamento do callback:", error);
 

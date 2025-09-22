@@ -1,5 +1,5 @@
 // src/app/auth/confirm/page.tsx
-// 🔧 VERSÃO CORRIGIDA - Tratamento robusto de tokens expirados
+// 🔧 VERSÃO COMPLETA CORRIGIDA - Detecção de confirmação recente
 
 "use client";
 import { useEffect, useState, Suspense } from "react";
@@ -76,7 +76,18 @@ function ConfirmContent() {
 
         console.log("✅ Usuário autenticado encontrado:", currentUser.id);
 
-        // 3. Verificar se email foi confirmado
+        // 3. Verificar se email foi confirmado RECENTEMENTE (últimos 5 minutos)
+        const emailConfirmedRecently =
+          currentUser.email_confirmed_at &&
+          new Date(currentUser.email_confirmed_at).getTime() >
+            Date.now() - 5 * 60 * 1000;
+
+        console.log(
+          "📧 Email confirmado recentemente?",
+          emailConfirmedRecently
+        );
+        console.log("📅 Data de confirmação:", currentUser.email_confirmed_at);
+
         if (!currentUser.email_confirmed_at) {
           console.warn("⚠️ Email ainda não confirmado");
           setStatus("expired");
@@ -88,7 +99,16 @@ function ConfirmContent() {
           return;
         }
 
-        // 4. Detectar tipo de usuário
+        // 4. Se confirmação não é recente, usuário provavelmente já está logado
+        if (!emailConfirmedRecently) {
+          console.log("⏰ Confirmação antiga detectada, usuário já logado");
+          // Continuar para verificação de perfil sem mostrar "confirmado agora"
+        } else {
+          console.log("🎉 Confirmação recente! Mostrar feedback positivo");
+          // Definir flag para mostrar mensagem de sucesso
+        }
+
+        // 5. Detectar tipo de usuário
         const tipoUsuario =
           currentUser.user_metadata?.tipo_usuario ||
           (typeof window !== "undefined"
@@ -99,14 +119,19 @@ function ConfirmContent() {
 
         if (!tipoUsuario) {
           console.warn("⚠️ Tipo de usuário não encontrado");
-          // Não é erro crítico, pode continuar para onboarding
-          setStatus("success");
-          setMessage("Email confirmado! Vamos configurar seu perfil.");
-          setTimeout(() => router.push("/onboarding"), 2000);
+          // Se confirmação é recente, mostrar sucesso mesmo sem tipo
+          if (emailConfirmedRecently) {
+            setStatus("success");
+            setMessage("Email confirmado! Vamos configurar seu perfil.");
+            setTimeout(() => router.push("/onboarding"), 2000);
+          } else {
+            // Usuário já logado, ir direto para onboarding
+            router.push("/onboarding");
+          }
           return;
         }
 
-        // 5. Verificar perfil baseado no tipo - SCHEMA CORRETO
+        // 6. Verificar perfil baseado no tipo - SCHEMA CORRETO
         let tabelaPerfil: string;
         let camposSelect: string;
 
@@ -144,33 +169,49 @@ function ConfirmContent() {
           // Não é erro crítico, pode continuar para onboarding
         }
 
-        // 6. Decidir redirecionamento
+        // 7. Decidir redirecionamento - SEMPRE mostrar feedback se confirmação recente
         if (perfilExistente) {
           console.log("✅ Perfil já existe:", perfilExistente);
 
           if (tipoUsuario === "paciente") {
-            setStatus("success");
-            setMessage("Email confirmado! Bem-vindo de volta.");
-            setTimeout(() => router.push("/dashboard"), 2000);
+            if (emailConfirmedRecently) {
+              setStatus("success");
+              setMessage("Email confirmado! Bem-vindo de volta.");
+              setTimeout(() => router.push("/dashboard"), 2000);
+            } else {
+              router.push("/dashboard");
+            }
           } else {
             // Profissionais, clínicas, empresas
             const statusVerificacao = (perfilExistente as any)
               .status_verificacao;
 
             if (statusVerificacao === "pendente") {
-              setStatus("success");
-              setMessage(
-                "Email confirmado! Seu perfil está aguardando aprovação."
-              );
-              setTimeout(() => router.push("/dashboard/waiting"), 2000);
+              if (emailConfirmedRecently) {
+                setStatus("success");
+                setMessage(
+                  "Email confirmado! Seu perfil está aguardando aprovação."
+                );
+                setTimeout(() => router.push("/dashboard/waiting"), 2000);
+              } else {
+                router.push("/dashboard/waiting");
+              }
             } else if (statusVerificacao === "aprovado") {
-              setStatus("success");
-              setMessage("Email confirmado! Bem-vindo de volta.");
-              setTimeout(() => router.push("/dashboard"), 2000);
+              if (emailConfirmedRecently) {
+                setStatus("success");
+                setMessage("Email confirmado! Bem-vindo de volta.");
+                setTimeout(() => router.push("/dashboard"), 2000);
+              } else {
+                router.push("/dashboard");
+              }
             } else {
-              setStatus("success");
-              setMessage("Email confirmado! Redirecionando...");
-              setTimeout(() => router.push("/dashboard"), 2000);
+              if (emailConfirmedRecently) {
+                setStatus("success");
+                setMessage("Email confirmado! Redirecionando...");
+                setTimeout(() => router.push("/dashboard"), 2000);
+              } else {
+                router.push("/dashboard");
+              }
             }
           }
         } else {
@@ -184,9 +225,13 @@ function ConfirmContent() {
             localStorage.removeItem("signup_user_type");
           }
 
-          setStatus("success");
-          setMessage("Email confirmado! Vamos finalizar seu cadastro.");
-          setTimeout(() => router.push("/onboarding"), 2000);
+          if (emailConfirmedRecently) {
+            setStatus("success");
+            setMessage("Email confirmado! Vamos finalizar seu cadastro.");
+            setTimeout(() => router.push("/onboarding"), 2000);
+          } else {
+            router.push("/onboarding");
+          }
         }
       } catch (error: any) {
         console.error("❌ Erro na confirmação:", error);
@@ -249,6 +294,9 @@ function ConfirmContent() {
               Confirmando email...
             </h2>
             <p className="text-gray-600">{message}</p>
+            <div className="mt-4 text-xs text-gray-400">
+              <p>Verificando autenticação e configurando seu perfil</p>
+            </div>
           </>
         )}
 
@@ -265,6 +313,14 @@ function ConfirmContent() {
             <p className="text-sm text-gray-500">
               Redirecionando automaticamente...
             </p>
+            <div className="mt-4">
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-green-500 h-2 rounded-full animate-pulse"
+                  style={{ width: "100%" }}
+                ></div>
+              </div>
+            </div>
           </>
         )}
 
