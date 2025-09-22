@@ -1,20 +1,13 @@
 // src/components/auth/LoginForm.tsx
-// 🔧 VERSÃO CORRIGIDA - Link de cadastro corrigido
+// 🔧 VERSÃO CORRIGIDA - Melhor validação e redirecionamento
 
 "use client";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 
 interface LoginFormProps {
   onSuccess?: () => void;
-}
-
-interface DatabaseError {
-  message: string;
-  code?: string;
-  details?: string;
 }
 
 export default function LoginForm({ onSuccess }: LoginFormProps) {
@@ -30,34 +23,138 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
     setError("");
 
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword(
-        {
+      console.log("🔑 Tentando fazer login...");
+
+      // 1. Fazer login
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
           email,
           password,
-        }
-      );
+        });
 
       if (authError) {
-        throw authError;
+        console.error("❌ Erro de autenticação:", authError);
+
+        if (authError.message?.includes("Invalid login credentials")) {
+          setError("Email ou senha incorretos.");
+        } else if (authError.message?.includes("Email not confirmed")) {
+          setError(
+            "Por favor, confirme seu email antes de fazer login. Verifique sua caixa de entrada."
+          );
+        } else if (authError.message?.includes("Too many requests")) {
+          setError(
+            "Muitas tentativas de login. Aguarde alguns minutos e tente novamente."
+          );
+        } else {
+          setError(authError.message || "Erro ao fazer login.");
+        }
+        setLoading(false);
+        return;
       }
 
-      if (data.user) {
-        console.log("✅ Login realizado com sucesso");
-        onSuccess?.();
-        router.push("/dashboard");
+      if (!authData.user) {
+        setError("Dados de login inválidos.");
+        setLoading(false);
+        return;
       }
-    } catch (authError: any) {
-      console.error("❌ Erro de autenticação:", authError);
 
-      if (authError.message?.includes("Invalid login credentials")) {
-        setError("Email ou senha incorretos.");
-      } else if (authError.message?.includes("Email not confirmed")) {
+      console.log("✅ Login bem-sucedido para:", authData.user.email);
+
+      // 2. Verificar se email foi confirmado
+      if (!authData.user.email_confirmed_at) {
+        console.warn("⚠️ Email não confirmado");
         setError(
-          "Por favor, verifique seu email e clique no link de confirmação antes de fazer login."
+          "Por favor, confirme seu email antes de fazer login. Verifique sua caixa de entrada."
         );
-      } else {
-        setError(authError.message || "Erro ao fazer login.");
+
+        // Fazer logout para limpar sessão
+        await supabase.auth.signOut();
+        setLoading(false);
+        return;
       }
+
+      // 3. Detectar tipo de usuário
+      const tipoUsuario = authData.user.user_metadata?.tipo_usuario;
+      console.log("👤 Tipo de usuário:", tipoUsuario);
+
+      if (!tipoUsuario) {
+        console.warn("⚠️ Tipo de usuário não encontrado");
+        setError("Perfil incompleto. Entre em contato com o suporte.");
+        setLoading(false);
+        return;
+      }
+
+      // 4. Verificar perfil baseado no tipo
+      let tabelaPerfil: string;
+      let rotaDestino = "/dashboard";
+
+      switch (tipoUsuario) {
+        case "paciente":
+          tabelaPerfil = "perfis_pacientes";
+          break;
+        case "profissional":
+          tabelaPerfil = "perfis_profissionais";
+          break;
+        case "clinica":
+          tabelaPerfil = "perfis_clinicas";
+          break;
+        case "empresa":
+          tabelaPerfil = "perfis_empresas";
+          break;
+        default:
+          setError(`Tipo de usuário inválido: ${tipoUsuario}`);
+          setLoading(false);
+          return;
+      }
+
+      console.log("🔍 Verificando perfil na tabela:", tabelaPerfil);
+
+      const { data: perfilData, error: perfilError } = await supabase
+        .from(tabelaPerfil)
+        .select("id, status_verificacao")
+        .eq("user_id", authData.user.id)
+        .maybeSingle();
+
+      if (perfilError && perfilError.code !== "PGRST116") {
+        console.error("❌ Erro ao verificar perfil:", perfilError);
+        setError("Erro ao verificar perfil. Tente novamente.");
+        setLoading(false);
+        return;
+      }
+
+      // 5. Redirecionamento baseado no perfil
+      if (!perfilData) {
+        console.log("📝 Perfil não encontrado, redirecionando para onboarding");
+        rotaDestino = "/onboarding";
+      } else if (tipoUsuario === "profissional") {
+        // Verificações específicas para profissionais
+        if (perfilData.status_verificacao === "pendente") {
+          console.log("⏳ Profissional aguardando aprovação");
+          rotaDestino = "/dashboard/professional/waiting";
+        } else if (perfilData.status_verificacao === "rejeitado") {
+          console.log("❌ Profissional rejeitado");
+          setError(
+            "Seu perfil foi rejeitado. Entre em contato com o suporte para mais informações."
+          );
+          setLoading(false);
+          return;
+        } else if (perfilData.status_verificacao === "aprovado") {
+          console.log("✅ Profissional aprovado");
+          rotaDestino = "/dashboard";
+        } else {
+          console.log("❓ Status desconhecido, indo para dashboard padrão");
+          rotaDestino = "/dashboard";
+        }
+      }
+
+      console.log("🎯 Redirecionando para:", rotaDestino);
+
+      // 6. Callback de sucesso e redirecionamento
+      onSuccess?.();
+      router.push(rotaDestino);
+    } catch (error: any) {
+      console.error("❌ Erro inesperado no login:", error);
+      setError("Erro inesperado. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -66,6 +163,11 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Entrar</h2>
+          <p className="text-gray-600">Acesse sua conta VIAA</p>
+        </div>
+
         <form onSubmit={handleLogin} className="space-y-6">
           {/* Email */}
           <div>
@@ -112,6 +214,22 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
             </div>
           )}
 
+          {/* Esqueci a senha */}
+          <div className="text-right">
+            <button
+              type="button"
+              onClick={() => {
+                // TODO: Implementar reset de senha
+                alert(
+                  "Funcionalidade de reset de senha será implementada em breve."
+                );
+              }}
+              className="text-sm text-blue-600 hover:text-blue-700"
+            >
+              Esqueci minha senha
+            </button>
+          </div>
+
           {/* Submit */}
           <button
             type="submit"
@@ -119,28 +237,27 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl"
           >
             {loading ? (
-              <span className="flex items-center justify-center">
+              <div className="flex items-center justify-center">
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                 Entrando...
-              </span>
+              </div>
             ) : (
               "Entrar"
             )}
           </button>
-
-          {/* 🔧 LINK CORRIGIDO - /signup ao invés de /cadastro */}
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Não tem uma conta?{" "}
-              <Link
-                href="/signup"
-                className="font-semibold text-transparent bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
-              >
-                Criar conta
-              </Link>
-            </p>
-          </div>
         </form>
+
+        <div className="mt-6 text-center">
+          <p className="text-gray-600">
+            Não tem uma conta?{" "}
+            <button
+              onClick={() => router.push("/auth/signup")}
+              className="text-blue-600 hover:text-blue-700 font-semibold"
+            >
+              Criar conta
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );

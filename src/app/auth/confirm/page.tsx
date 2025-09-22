@@ -1,9 +1,9 @@
 // src/app/auth/confirm/page.tsx
-// 🔧 VERSÃO CORRIGIDA - Leitura correta de tokens do hash
+// 🔧 VERSÃO CORRIGIDA - Processamento completo de confirmação
 
 "use client";
 import { useEffect, useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
 function ConfirmContent() {
@@ -13,192 +13,185 @@ function ConfirmContent() {
   const [message, setMessage] = useState("");
   const [debugInfo, setDebugInfo] = useState("");
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
     const handleEmailConfirmation = async () => {
       try {
-        const fullUrl = window.location.href;
-        const hash = window.location.hash;
-        const search = window.location.search;
+        setStatus("loading");
+        setMessage("Processando confirmação de email...");
 
-        console.log("🔍 Analisando URL de confirmação:");
-        console.log("URL completa:", fullUrl);
-        console.log("Hash:", hash);
-        console.log("Search:", search);
+        console.log("🔍 Iniciando processo de confirmação...");
 
-        setDebugInfo(`URL: ${fullUrl}\nHash: ${hash}\nSearch: ${search}`);
+        // 1. Verificar se usuário já está autenticado
+        const {
+          data: { user: currentUser },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-        let access_token,
-          refresh_token,
-          token_hash,
-          error_description,
-          urlTipoUsuario;
-
-        // 🔧 MÉTODO PRINCIPAL: Ler do HASH (Supabase Auth usa hash)
-        if (hash) {
-          const hashParams = new URLSearchParams(hash.substring(1));
-          access_token = hashParams.get("access_token");
-          refresh_token = hashParams.get("refresh_token");
-          token_hash = hashParams.get("token_hash");
-          error_description = hashParams.get("error_description");
-
-          console.log("📋 Parâmetros do hash:", {
-            access_token: access_token ? "presente" : "ausente",
-            refresh_token: refresh_token ? "presente" : "ausente",
-            token_hash: token_hash ? "presente" : "ausente",
-            error_description,
-          });
+        if (userError) {
+          console.error("❌ Erro ao verificar usuário:", userError);
+          throw new Error("Erro ao verificar autenticação");
         }
 
-        // 🔧 MÉTODO SECUNDÁRIO: Ler dos query params
-        if (!access_token && !token_hash) {
-          access_token = searchParams.get("access_token");
-          refresh_token = searchParams.get("refresh_token");
-          token_hash = searchParams.get("token_hash");
-          error_description = searchParams.get("error_description");
-
-          console.log("📋 Parâmetros dos query params:", {
-            access_token: access_token ? "presente" : "ausente",
-            refresh_token: refresh_token ? "presente" : "ausente",
-            token_hash: token_hash ? "presente" : "ausente",
-          });
+        if (!currentUser) {
+          console.error(
+            "❌ Usuário não encontrado, pode não estar confirmado ainda"
+          );
+          throw new Error(
+            "Usuário não encontrado. Verifique se clicou no link correto do email."
+          );
         }
 
-        // 🔧 PEGAR TIPO DO USUÁRIO
-        urlTipoUsuario = searchParams.get("type");
-        console.log("👤 Tipo do usuário:", urlTipoUsuario);
+        console.log("✅ Usuário autenticado encontrado:", currentUser.id);
+        console.log(
+          "📧 Email confirmado:",
+          currentUser.email_confirmed_at ? "Sim" : "Não"
+        );
 
-        // 🔧 VERIFICAR SE HÁ ERRO
-        if (error_description) {
-          throw new Error(`Erro de autenticação: ${error_description}`);
+        // 2. Verificar se email foi confirmado
+        if (!currentUser.email_confirmed_at) {
+          console.warn("⚠️ Email ainda não confirmado");
+          throw new Error(
+            "Email ainda não foi confirmado. Verifique sua caixa de entrada."
+          );
         }
 
-        let authenticatedUser = null;
+        // 3. Detectar tipo de usuário
+        const tipoUsuario =
+          currentUser.user_metadata?.tipo_usuario ||
+          (typeof window !== "undefined"
+            ? localStorage.getItem("signup_user_type")
+            : null);
 
-        // 🔧 PROCESSAR TOKENS
-        if (access_token && refresh_token) {
-          console.log("🔑 Processando access_token e refresh_token...");
-          const { data, error } = await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          });
-          if (error) throw error;
-          console.log("✅ Sessão criada com sucesso");
-          authenticatedUser = data.user;
-        } else if (token_hash) {
-          console.log("🔑 Processando token_hash...");
-          const { data, error } = await supabase.auth.verifyOtp({
-            token_hash,
-            type: "signup",
-          });
-          if (error) throw error;
-          console.log("✅ Token verificado com sucesso");
-          authenticatedUser = data.user;
-        } else {
-          throw new Error("Nenhum token de confirmação encontrado na URL");
+        console.log("👤 Tipo de usuário detectado:", tipoUsuario);
+
+        if (!tipoUsuario) {
+          console.warn("⚠️ Tipo de usuário não encontrado");
+          throw new Error(
+            "Tipo de usuário não identificado. Entre em contato com o suporte."
+          );
         }
 
-        if (authenticatedUser) {
-          console.log("👤 Usuário autenticado:", authenticatedUser.id);
+        // 4. Verificar se já tem perfil criado
+        let tabelaPerfil: string;
+        switch (tipoUsuario) {
+          case "paciente":
+            tabelaPerfil = "perfis_pacientes";
+            break;
+          case "profissional":
+            tabelaPerfil = "perfis_profissionais";
+            break;
+          case "clinica":
+            tabelaPerfil = "perfis_clinicas";
+            break;
+          case "empresa":
+            tabelaPerfil = "perfis_empresas";
+            break;
+          default:
+            throw new Error(`Tipo de usuário inválido: ${tipoUsuario}`);
+        }
 
-          // 🔧 DETECTAR TIPO DO USUÁRIO
-          const finalTipoUsuario =
-            urlTipoUsuario ||
-            authenticatedUser.user_metadata?.tipo_usuario ||
-            localStorage.getItem("signup_user_type");
+        console.log("🔍 Verificando perfil na tabela:", tabelaPerfil);
 
-          console.log("🎯 Tipo final detectado:", finalTipoUsuario);
+        const { data: perfilExistente, error: perfilError } = await supabase
+          .from(tabelaPerfil)
+          .select("id, status_verificacao")
+          .eq("user_id", currentUser.id)
+          .maybeSingle();
 
-          if (finalTipoUsuario) {
-            // 🔧 VERIFICAR SE JÁ TEM PERFIL
-            let tabelaPerfil;
-            switch (finalTipoUsuario) {
-              case "paciente":
-                tabelaPerfil = "perfis_pacientes";
-                break;
-              case "profissional":
-                tabelaPerfil = "perfis_profissionais";
-                break;
-              case "clinica":
-                tabelaPerfil = "perfis_clinicas";
-                break;
-              case "empresa":
-                tabelaPerfil = "perfis_empresas";
-                break;
-              default:
-                tabelaPerfil = null;
+        if (perfilError) {
+          console.error("❌ Erro ao verificar perfil:", perfilError);
+          // Não é erro crítico, pode continuar para onboarding
+        }
+
+        // 5. Decidir redirecionamento baseado no perfil
+        if (perfilExistente) {
+          console.log("✅ Perfil já existe:", perfilExistente);
+
+          if (tipoUsuario === "profissional") {
+            // Para profissionais, verificar status
+            if (perfilExistente.status_verificacao === "pendente") {
+              setStatus("success");
+              setMessage(
+                "Email confirmado! Seu perfil está aguardando aprovação."
+              );
+              setTimeout(() => {
+                router.push("/dashboard/professional/waiting");
+              }, 2000);
+              return;
+            } else if (perfilExistente.status_verificacao === "aprovado") {
+              setStatus("success");
+              setMessage("Email confirmado! Bem-vindo de volta.");
+              setTimeout(() => {
+                router.push("/dashboard");
+              }, 2000);
+              return;
             }
-
-            if (tabelaPerfil) {
-              console.log("🔍 Verificando perfil na tabela:", tabelaPerfil);
-
-              const { data: perfilExistente } = await supabase
-                .from(tabelaPerfil)
-                .select("id")
-                .eq("user_id", authenticatedUser.id)
-                .maybeSingle();
-
-              if (!perfilExistente) {
-                console.log("❌ Perfil não existe, indo para onboarding");
-                setStatus("success");
-                setMessage("Email confirmado! Vamos finalizar seu perfil.");
-                setTimeout(() => {
-                  router.push("/onboarding");
-                }, 2000);
-                return;
-              } else {
-                console.log("✅ Perfil já existe, indo para dashboard");
-                setStatus("success");
-                setMessage("Email confirmado! Redirecionando...");
-                setTimeout(() => {
-                  router.push("/dashboard");
-                }, 2000);
-                return;
-              }
-            }
+          } else {
+            // Para outros tipos, ir direto para dashboard
+            setStatus("success");
+            setMessage("Email confirmado! Redirecionando para seu dashboard.");
+            setTimeout(() => {
+              router.push("/dashboard");
+            }, 2000);
+            return;
           }
-
-          // 🔧 FALLBACK
-          console.log("⚠️ Fallback - indo para onboarding");
-          setStatus("success");
-          setMessage("Email confirmado! Configurando seu perfil...");
-          setTimeout(() => {
-            router.push("/onboarding");
-          }, 2000);
         }
-      } catch (error: unknown) {
+
+        // 6. Se não tem perfil, ir para onboarding
+        console.log("📝 Perfil não encontrado, redirecionando para onboarding");
+
+        // Limpar localStorage após uso
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("signup_user_type");
+        }
+
+        setStatus("success");
+        setMessage("Email confirmado! Vamos finalizar seu cadastro.");
+        setTimeout(() => {
+          router.push("/onboarding");
+        }, 2000);
+      } catch (error: any) {
         console.error("❌ Erro na confirmação:", error);
-        const errorMessage =
-          error instanceof Error ? error.message : "Erro desconhecido";
+
         setStatus("error");
-        setMessage(errorMessage);
+        setMessage(error.message || "Erro inesperado na confirmação");
+
+        // Adicionar informações de debug
+        const debugData = {
+          timestamp: new Date().toISOString(),
+          error: error.message,
+          url: typeof window !== "undefined" ? window.location.href : "N/A",
+          userAgent:
+            typeof window !== "undefined" ? navigator.userAgent : "N/A",
+        };
+        setDebugInfo(JSON.stringify(debugData, null, 2));
       }
     };
 
-    // Pequeno delay para garantir que a página carregou
-    const timer = setTimeout(handleEmailConfirmation, 500);
+    // Executar após pequeno delay para garantir que a página carregou
+    const timer = setTimeout(handleEmailConfirmation, 1000);
     return () => clearTimeout(timer);
-  }, [searchParams, router]);
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50 flex items-center justify-center p-4">
       <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+        {/* Loading State */}
         {status === "loading" && (
           <>
             <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <h2 className="text-xl font-semibold mb-2">Confirmando email...</h2>
-            <p className="text-gray-600">Aguarde um momento</p>
-            <details className="mt-4 text-left">
-              <summary className="text-xs text-gray-400 cursor-pointer">
-                Debug Info
-              </summary>
-              <pre className="text-xs text-gray-400 mt-2 whitespace-pre-wrap">
-                {debugInfo}
-              </pre>
-            </details>
+            <h2 className="text-xl font-semibold mb-2 text-gray-900">
+              Confirmando email...
+            </h2>
+            <p className="text-gray-600">{message}</p>
+            <div className="mt-4 text-xs text-gray-400">
+              <p>Verificando autenticação e configurando seu perfil</p>
+            </div>
           </>
         )}
+
+        {/* Success State */}
         {status === "success" && (
           <>
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -207,10 +200,14 @@ function ConfirmContent() {
             <h2 className="text-xl font-semibold mb-2 text-green-700">
               Email Confirmado!
             </h2>
-            <p className="text-gray-600">{message}</p>
-            <p className="text-sm text-gray-500 mt-2">Redirecionando...</p>
+            <p className="text-gray-600 mb-2">{message}</p>
+            <p className="text-sm text-gray-500">
+              Redirecionando automaticamente...
+            </p>
           </>
         )}
+
+        {/* Error State */}
         {status === "error" && (
           <>
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -220,14 +217,20 @@ function ConfirmContent() {
               Erro na Confirmação
             </h2>
             <p className="text-gray-600 mb-4">{message}</p>
-            <details className="mb-4 text-left">
-              <summary className="text-xs text-gray-400 cursor-pointer">
-                Informações técnicas
-              </summary>
-              <pre className="text-xs text-gray-400 mt-2 whitespace-pre-wrap">
-                {debugInfo}
-              </pre>
-            </details>
+
+            {/* Debug Info */}
+            {debugInfo && (
+              <details className="mb-4 text-left">
+                <summary className="text-xs text-gray-400 cursor-pointer">
+                  ▼ Informações técnicas
+                </summary>
+                <pre className="text-xs text-gray-400 mt-2 whitespace-pre-wrap bg-gray-50 p-2 rounded">
+                  {debugInfo}
+                </pre>
+              </details>
+            )}
+
+            {/* Action Buttons */}
             <div className="flex gap-2">
               <button
                 onClick={() => router.push("/auth")}

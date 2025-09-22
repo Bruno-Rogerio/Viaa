@@ -1,11 +1,10 @@
 // src/components/auth/SignupForm.tsx
-// 🔧 VERSÃO SIMPLES - Sem validações complicadas
+// 🔧 VERSÃO CORRIGIDA - URL dinâmica e melhor tratamento de erros
 
 "use client";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 
 interface SignupFormProps {
   onSuccess?: () => void;
@@ -82,7 +81,21 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     }
 
     try {
-      // 🔧 ESPECIFICAR REDIRECT PARA CONFIRM PAGE
+      // 🔧 DETECTAR URL ATUAL DINAMICAMENTE
+      const currentOrigin =
+        typeof window !== "undefined"
+          ? window.location.origin
+          : "http://localhost:3000";
+
+      const redirectUrl = `${currentOrigin}/auth/callback`;
+
+      console.log("🔗 URL de redirecionamento:", redirectUrl);
+
+      // 🔧 SALVAR TIPO TEMPORARIAMENTE NO LOCALSTORAGE
+      if (typeof window !== "undefined") {
+        localStorage.setItem("signup_user_type", tipoUsuario);
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -90,14 +103,20 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
           data: {
             tipo_usuario: tipoUsuario,
           },
-          // 🎯 FORÇAR REDIRECT PARA /auth/confirm
-          emailRedirectTo: `https://viaa-git-main-brunos-projects-6a73c557.vercel.app/auth/confirm?type=${tipoUsuario}`,
+          // 🎯 URL DINÂMICA
+          emailRedirectTo: redirectUrl,
         },
       });
 
       if (authError) {
+        console.error("❌ Erro no signup:", authError);
+
         if (authError.message?.includes("User already registered")) {
           setError("Este email já está cadastrado. Tente fazer login.");
+        } else if (authError.message?.includes("Signup is disabled")) {
+          setError(
+            "Cadastro temporariamente desabilitado. Tente novamente mais tarde."
+          );
         } else {
           setError(authError.message);
         }
@@ -106,13 +125,10 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
       }
 
       console.log("✅ Usuário criado:", authData.user?.id);
-      console.log(
-        "🔗 Link será enviado para:",
-        `https://viaa-git-main-brunos-projects-6a73c557.vercel.app/auth/confirm?type=${tipoUsuario}`
-      );
+      console.log("📧 Email de confirmação enviado para:", email);
 
       setSuccess(
-        "🎉 Conta criada! Verifique seu email e clique no link de confirmação."
+        "🎉 Conta criada com sucesso! Verifique seu email e clique no link de confirmação para continuar."
       );
 
       // Limpar formulário
@@ -123,8 +139,8 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
 
       onSuccess?.();
     } catch (error: any) {
-      console.error("❌ Erro no signup:", error);
-      setError("Erro ao criar conta. Tente novamente.");
+      console.error("❌ Erro inesperado no signup:", error);
+      setError("Erro inesperado. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -152,24 +168,17 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
                   onClick={() => setTipoUsuario(type.value)}
                   className={`relative p-4 rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
                     tipoUsuario === type.value
-                      ? `${type.borderColor} ${type.bgColor} shadow-lg`
+                      ? `${type.borderColor} ${type.bgColor} ring-2 ring-offset-2 ring-current`
                       : "border-gray-200 hover:border-gray-300 bg-white"
                   }`}
                 >
-                  <div className="text-center">
-                    <div className="text-2xl mb-2">{type.icon}</div>
-                    <h3 className="font-semibold text-sm text-gray-800">
-                      {type.label}
-                    </h3>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {type.description}
-                    </p>
+                  <div className="text-2xl mb-2">{type.icon}</div>
+                  <div className="text-sm font-semibold text-gray-900">
+                    {type.label}
                   </div>
-                  {tipoUsuario === type.value && (
-                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                  )}
+                  <div className="text-xs text-gray-600 mt-1">
+                    {type.description}
+                  </div>
                 </button>
               ))}
             </div>
@@ -179,7 +188,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-gray-700 mb-2"
             >
               Email
             </label>
@@ -189,7 +198,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="seu@email.com"
             />
           </div>
@@ -198,7 +207,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-gray-700 mb-2"
             >
               Senha
             </label>
@@ -208,7 +217,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Mínimo 6 caracteres"
             />
           </div>
@@ -217,7 +226,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
           <div>
             <label
               htmlFor="confirmPassword"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-gray-700 mb-2"
             >
               Confirmar Senha
             </label>
@@ -227,18 +236,19 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
               required
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-              placeholder="Digite a senha novamente"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Repita sua senha"
             />
           </div>
 
-          {/* Mensagens */}
+          {/* Erro */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
               {error}
             </div>
           )}
 
+          {/* Sucesso */}
           {success && (
             <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
               {success}
@@ -252,28 +262,27 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl"
           >
             {loading ? (
-              <span className="flex items-center justify-center">
+              <div className="flex items-center justify-center">
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                 Criando conta...
-              </span>
+              </div>
             ) : (
               "Criar Conta"
             )}
           </button>
-
-          {/* Link para login */}
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Já tem uma conta?{" "}
-              <Link
-                href="/auth"
-                className="text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Fazer login
-              </Link>
-            </p>
-          </div>
         </form>
+
+        <div className="mt-6 text-center">
+          <p className="text-gray-600">
+            Já tem uma conta?{" "}
+            <button
+              onClick={() => router.push("/auth")}
+              className="text-blue-600 hover:text-blue-700 font-semibold"
+            >
+              Faça login
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );
