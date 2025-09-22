@@ -82,7 +82,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
     }
 
     try {
-      // 🔧 CADASTRO SIMPLES - Deixar Supabase gerenciar tudo
+      // 🔧 ESPECIFICAR REDIRECT PARA CONFIRM PAGE
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -90,7 +90,8 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
           data: {
             tipo_usuario: tipoUsuario,
           },
-          // 🔧 NÃO ESPECIFICAR emailRedirectTo - deixar Supabase usar as configurações dele
+          // 🎯 FORÇAR REDIRECT PARA /auth/confirm
+          emailRedirectTo: `https://viaa-git-main-brunos-projects-6a73c557.vercel.app/auth/confirm?type=${tipoUsuario}`,
         },
       });
 
@@ -105,6 +106,10 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
       }
 
       console.log("✅ Usuário criado:", authData.user?.id);
+      console.log(
+        "🔗 Link será enviado para:",
+        `https://viaa-git-main-brunos-projects-6a73c557.vercel.app/auth/confirm?type=${tipoUsuario}`
+      );
 
       setSuccess(
         "🎉 Conta criada! Verifique seu email e clique no link de confirmação."
