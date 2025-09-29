@@ -1,108 +1,104 @@
 // src/app/api/profissionais/route.ts
-// 🎯 API SIMPLIFICADA PARA DEBUG
-
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
-  console.log("🔍 === INÍCIO DA API DE PROFISSIONAIS ===");
-
   try {
-    // 1. Testar conexão básica
     const supabase = createRouteHandlerClient({ cookies });
-    console.log("✅ Cliente Supabase criado");
+    const { searchParams } = new URL(request.url);
 
-    // 2. Teste de query SUPER SIMPLES
-    console.log("🔍 Tentando buscar profissionais...");
-    console.log("Query params:", {
-      status_verificacao: "aprovado",
-      limit: 10,
-    });
+    // 📋 PARÂMETROS DE FILTRO
+    const tipo = searchParams.get("tipo"); // psicologo, psicanalista, etc
+    const especialidade = searchParams.get("especialidade");
+    const cidade = searchParams.get("cidade");
+    const estado = searchParams.get("estado");
+    const busca = searchParams.get("busca"); // busca por nome
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "12");
 
-    const { data, error, count } = await supabase
+    // Calcular offset para paginação
+    const offset = (page - 1) * limit;
+
+    // 🔍 CONSTRUIR QUERY COM FILTROS
+    let query = supabase
       .from("perfis_profissionais")
-      .select("id, nome, sobrenome, especialidades, valor_sessao, verificado", {
-        count: "exact",
-      })
-      .eq("status_verificacao", "aprovado")
-      .limit(10);
+      .select(
+        `
+        id,
+        nome,
+        sobrenome,
+        tipo,
+        especialidades,
+        bio_profissional,
+        foto_perfil_url,
+        valor_sessao,
+        experiencia_anos,
+        endereco_cidade,
+        endereco_estado,
+        crp,
+        verificado
+      `,
+        { count: "exact" }
+      )
+      .eq("verificado", true) // Apenas profissionais verificados
+      .eq("status_verificacao", "aprovado"); // Status aprovado
 
-    console.log("📊 Resultado da query:", {
-      encontrados: data?.length || 0,
-      total: count,
-      erro: error?.message || "nenhum",
-    });
-
-    if (data && data.length > 0) {
-      console.log("✅ Primeiro profissional:", data[0]);
+    // Aplicar filtros condicionalmente
+    if (tipo) {
+      query = query.eq("tipo", tipo);
     }
 
+    if (especialidade) {
+      // Busca parcial em especialidades (campo de texto)
+      query = query.ilike("especialidades", `%${especialidade}%`);
+    }
+
+    if (cidade) {
+      query = query.ilike("endereco_cidade", `%${cidade}%`);
+    }
+
+    if (estado) {
+      query = query.eq("endereco_estado", estado);
+    }
+
+    if (busca) {
+      // Busca por nome ou sobrenome
+      query = query.or(`nome.ilike.%${busca}%,sobrenome.ilike.%${busca}%`);
+    }
+
+    // Ordenar por nome
+    query = query.order("nome", { ascending: true });
+
+    // Aplicar paginação
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: profissionais, error, count } = await query;
+
     if (error) {
-      console.error("❌ Erro no Supabase:", error);
+      console.error("Erro ao buscar profissionais:", error);
       return NextResponse.json(
-        {
-          success: false,
-          error: "Erro ao buscar no banco",
-          details: error.message,
-          code: error.code,
-          hint: error.hint,
-        },
+        { error: "Erro ao buscar profissionais" },
         { status: 500 }
       );
     }
 
-    console.log(
-      `✅ Query executada com sucesso! Encontrados: ${
-        data?.length || 0
-      } profissionais`
-    );
-
-    // Retornar dados simplificados
-    const profissionaisSimples = (data || []).map((prof) => ({
-      id: prof.id,
-      nome: prof.nome,
-      sobrenome: prof.sobrenome,
-      especialidades: prof.especialidades || "Psicologia",
-      valor_sessao: prof.valor_sessao || 150,
-      verificado: prof.verificado || false,
-      rating: 4.5,
-      consultas_realizadas: 10,
-      tem_horarios_disponiveis: true,
-      experiencia_anos: 5,
-      endereco_cidade: "São Paulo",
-      endereco_estado: "SP",
-      bio_profissional: "Profissional dedicado ao seu bem-estar.",
-      foto_perfil_url: null,
-    }));
-
-    console.log("✅ Dados formatados com sucesso");
-
+    // 📊 RETORNAR COM METADADOS DE PAGINAÇÃO
     return NextResponse.json({
-      success: true,
-      profissionais: profissionaisSimples,
+      profissionais: profissionais || [],
       paginacao: {
-        pagina_atual: 1,
-        total_paginas: 1,
-        total_resultados: profissionaisSimples.length,
-        limite: 10,
-        tem_proxima: false,
-        tem_anterior: false,
+        total: count || 0,
+        pagina_atual: page,
+        total_paginas: Math.ceil((count || 0) / limit),
+        limite_por_pagina: limit,
+        tem_proxima: offset + limit < (count || 0),
+        tem_anterior: page > 1,
       },
-      filtros_aplicados: {},
     });
-  } catch (error: any) {
-    console.error("❌ ERRO CRÍTICO:", error);
-    console.error("Stack:", error.stack);
-
+  } catch (error) {
+    console.error("Erro na API de profissionais:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: "Erro crítico no servidor",
-        message: error.message,
-        type: error.constructor.name,
-        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-      },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

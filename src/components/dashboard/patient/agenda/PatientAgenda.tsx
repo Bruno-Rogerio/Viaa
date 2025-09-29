@@ -1,5 +1,5 @@
 // src/components/dashboard/patient/agenda/PatientAgenda.tsx
-// Container para agendamento (pacientes e outros profissionais)
+// VERSÃO INTEGRADA - Modal funcional com API
 
 "use client";
 
@@ -43,6 +43,14 @@ export default function PatientAgenda({
     data?: Date;
     horario?: string;
   }>({ aberto: false });
+  const [tipoConsulta, setTipoConsulta] = useState<"online" | "presencial">(
+    "online"
+  );
+  const [salvando, setSalvando] = useState(false);
+  const [mensagem, setMensagem] = useState<{
+    tipo: "sucesso" | "erro";
+    texto: string;
+  } | null>(null);
 
   // Hook para horários disponíveis do profissional
   const {
@@ -51,13 +59,7 @@ export default function PatientAgenda({
     temHorariosConfigurados,
   } = useHorariosDisponiveis(profissionalId);
 
-  // TODO: Carregar consultas públicas (apenas horários disponíveis + minhas consultas com este profissional)
-  // const { consultas, carregando } = useAgenda({
-  //   tipoUsuario: "paciente",
-  //   profissionalId
-  // });
-
-  // Mock de dados temporário
+  // TODO: Carregar consultas reais
   const consultas: Consulta[] = [];
   const carregando = false;
 
@@ -75,60 +77,91 @@ export default function PatientAgenda({
       updated_at: new Date().toISOString(),
     }));
 
-  // Handlers específicos para agendamento
+  // Handlers
   const handleDiaClick = (data: Date) => {
-    // Verificar se o dia tem horários disponíveis
     const diaSemana = data.getDay();
     const temHorario = horariosConfigurados[diaSemana]?.ativo;
 
     if (temHorario) {
-      console.log("Dia com horários disponíveis clicado:", data);
-      // TODO: Mostrar horários específicos disponíveis no dia
-    } else {
-      console.log("Dia sem horários configurados:", data);
+      console.log("Dia com horários disponíveis:", data);
     }
   };
 
   const handleHorarioClick = (data: Date, horario: string) => {
-    console.log("Solicitar agendamento:", {
-      data,
-      horario,
-      profissionalId,
-      usuarioId,
-    });
-
     setModalAgendamento({
       aberto: true,
       data,
       horario,
     });
-
-    // TODO: Abrir modal de confirmação de agendamento
   };
 
   const handleConsultaClick = (consulta: Consulta) => {
     console.log("Consulta clicada:", consulta);
-    // TODO: Mostrar detalhes da consulta (se for do usuário logado)
   };
 
+  // 🔥 FUNÇÃO PRINCIPAL - Criar consulta
   const handleSolicitarAgendamento = async (data: Date, horario: string) => {
-    console.log("Enviando solicitação de agendamento:", {
-      profissional_id: profissionalId,
-      solicitante_id: usuarioId,
-      data: data.toISOString().split("T")[0],
-      horario,
-      tipo_consulta: "online", // ou permitir escolha
-    });
+    setSalvando(true);
+    setMensagem(null);
 
-    // TODO: Chamar API para criar solicitação de consulta
-    // const resultado = await criarSolicitacaoConsulta({...});
+    try {
+      // Calcular data_fim (1 hora depois do início)
+      const dataInicio = new Date(data);
+      const [horas, minutos] = horario.split(":");
+      dataInicio.setHours(parseInt(horas), parseInt(minutos), 0, 0);
 
-    setModalAgendamento({ aberto: false });
+      const dataFim = new Date(dataInicio);
+      dataFim.setHours(dataFim.getHours() + 1);
+
+      const response = await fetch("/api/consultas", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          profissional_id: profissionalId,
+          data_inicio: dataInicio.toISOString(),
+          data_fim: dataFim.toISOString(),
+          tipo: tipoConsulta,
+          titulo: `Consulta com ${profissionalInfo.nome} ${profissionalInfo.sobrenome}`,
+          descricao: `Consulta ${tipoConsulta} agendada via plataforma`,
+        }),
+      });
+
+      const resultado = await response.json();
+
+      if (!response.ok) {
+        throw new Error(resultado.error || "Erro ao agendar consulta");
+      }
+
+      // Sucesso!
+      setMensagem({
+        tipo: "sucesso",
+        texto: resultado.message || "Consulta solicitada com sucesso!",
+      });
+
+      // Fechar modal após 2 segundos
+      setTimeout(() => {
+        setModalAgendamento({ aberto: false });
+        setMensagem(null);
+
+        // TODO: Recarregar consultas
+        // router.push('/dashboard/paciente/consultas')
+      }, 2000);
+    } catch (error: any) {
+      console.error("Erro ao solicitar agendamento:", error);
+      setMensagem({
+        tipo: "erro",
+        texto: error.message || "Erro ao agendar consulta. Tente novamente.",
+      });
+    } finally {
+      setSalvando(false);
+    }
   };
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Header específico para agendamento */}
+      {/* Header */}
       <PatientAgendaHeader
         profissionalInfo={profissionalInfo}
         temHorariosConfigurados={temHorariosConfigurados()}
@@ -136,7 +169,7 @@ export default function PatientAgenda({
         loadingHorarios={loadingHorarios}
       />
 
-      {/* Componente puro do calendário */}
+      {/* Calendário */}
       <AgendaCalendar
         consultas={consultas}
         horariosDisponiveis={horariosDisponiveis}
@@ -147,7 +180,7 @@ export default function PatientAgenda({
         mostrarIndicadores={{
           horariosDisponiveis: true,
           consultas: true,
-          diasInativos: false, // Não mostrar dias inativos para agendamento
+          diasInativos: false,
         }}
         onDiaClick={handleDiaClick}
         onConsultaClick={handleConsultaClick}
@@ -157,24 +190,65 @@ export default function PatientAgenda({
         className="shadow-lg"
       />
 
-      {/* Modal de confirmação de agendamento */}
+      {/* Modal de confirmação */}
       {modalAgendamento.aberto && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
             <h3 className="text-xl font-bold text-gray-900 mb-4">
               Confirmar Agendamento
             </h3>
 
+            {/* Mensagem de feedback */}
+            {mensagem && (
+              <div
+                className={`mb-4 p-4 rounded-lg ${
+                  mensagem.tipo === "sucesso"
+                    ? "bg-green-50 border border-green-200 text-green-800"
+                    : "bg-red-50 border border-red-200 text-red-800"
+                }`}
+              >
+                <div className="flex items-center">
+                  <span className="mr-2">
+                    {mensagem.tipo === "sucesso" ? "✓" : "⚠"}
+                  </span>
+                  <p className="text-sm font-medium">{mensagem.texto}</p>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4 mb-6">
+              {/* Profissional */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Profissional
                 </label>
-                <p className="text-gray-900">
-                  {profissionalInfo.nome} {profissionalInfo.sobrenome}
-                </p>
+                <div className="flex items-center space-x-3">
+                  {profissionalInfo.foto_perfil_url ? (
+                    <img
+                      src={profissionalInfo.foto_perfil_url}
+                      alt={profissionalInfo.nome}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-blue-600 font-bold">
+                        {profissionalInfo.nome[0]}
+                        {profissionalInfo.sobrenome[0]}
+                      </span>
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {profissionalInfo.nome} {profissionalInfo.sobrenome}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {profissionalInfo.especialidades}
+                    </p>
+                  </div>
+                </div>
               </div>
 
+              {/* Data e Horário */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Data e Horário
@@ -188,26 +262,71 @@ export default function PatientAgenda({
                   })}{" "}
                   às {modalAgendamento.horario}
                 </p>
+                <p className="text-sm text-gray-500 mt-1">Duração: 1 hora</p>
               </div>
 
+              {/* Tipo de Consulta */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tipo de Consulta
+                </label>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setTipoConsulta("online")}
+                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${
+                      tipoConsulta === "online"
+                        ? "border-blue-600 bg-blue-50 text-blue-900"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="text-center">
+                      <div className="text-2xl mb-1">💻</div>
+                      <div className="font-medium">Online</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setTipoConsulta("presencial")}
+                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${
+                      tipoConsulta === "presencial"
+                        ? "border-blue-600 bg-blue-50 text-blue-900"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="text-center">
+                      <div className="text-2xl mb-1">🏢</div>
+                      <div className="font-medium">Presencial</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Valor */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Valor da Sessão
                 </label>
-                <p className="text-gray-900">
+                <p className="text-2xl font-bold text-gray-900">
                   {profissionalInfo.valor_sessao
                     ? `R$ ${profissionalInfo.valor_sessao.toLocaleString(
-                        "pt-BR"
+                        "pt-BR",
+                        {
+                          minimumFractionDigits: 2,
+                        }
                       )}`
-                    : "Consultar com o profissional"}
+                    : "A combinar"}
                 </p>
               </div>
             </div>
 
-            <div className="flex space-x-4">
+            {/* Botões */}
+            <div className="flex space-x-3">
               <button
-                onClick={() => setModalAgendamento({ aberto: false })}
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                onClick={() => {
+                  setModalAgendamento({ aberto: false });
+                  setMensagem(null);
+                }}
+                disabled={salvando}
+                className="flex-1 px-4 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -220,9 +339,17 @@ export default function PatientAgenda({
                     modalAgendamento.horario
                   )
                 }
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={salvando}
+                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center"
               >
-                Confirmar Agendamento
+                {salvando ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Agendando...
+                  </>
+                ) : (
+                  "Confirmar Agendamento"
+                )}
               </button>
             </div>
           </div>

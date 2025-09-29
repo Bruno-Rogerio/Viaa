@@ -1,4 +1,4 @@
-// src/app/api/consultas/[id]/confirmar/route.ts
+// src/app/api/consultas/[id]/rejeitar/route.ts
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
@@ -19,16 +19,18 @@ export async function POST(
       return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     }
 
+    const body = await request.json();
+    const { motivo } = body;
     const consultaId = params.id;
 
     // Buscar perfil profissional
-    const { data: perfil, error: perfilError } = await supabase
+    const { data: perfil } = await supabase
       .from("perfis_profissionais")
       .select("id")
       .eq("user_id", user.id)
       .single();
 
-    if (perfilError || !perfil) {
+    if (!perfil) {
       return NextResponse.json(
         { error: "Perfil profissional não encontrado" },
         { status: 404 }
@@ -36,76 +38,60 @@ export async function POST(
     }
 
     // Buscar consulta
-    const { data: consulta, error: consultaError } = await supabase
+    const { data: consulta } = await supabase
       .from("consultas")
       .select("*, profissional_id, status")
       .eq("id", consultaId)
       .single();
 
-    if (consultaError || !consulta) {
+    if (!consulta) {
       return NextResponse.json(
         { error: "Consulta não encontrada" },
         { status: 404 }
       );
     }
 
-    // Verificar se o profissional é o dono da consulta
     if (consulta.profissional_id !== perfil.id) {
-      return NextResponse.json(
-        { error: "Sem permissão para confirmar esta consulta" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
     }
 
-    // Verificar se está no status correto
     if (consulta.status !== "agendada") {
       return NextResponse.json(
         {
-          error: `Consulta não pode ser confirmada. Status atual: ${consulta.status}`,
+          error: `Consulta não pode ser rejeitada. Status: ${consulta.status}`,
         },
         { status: 400 }
       );
     }
 
-    // Atualizar status para confirmada
+    // Atualizar para rejeitada
     const { data: consultaAtualizada, error: updateError } = await supabase
       .from("consultas")
       .update({
-        status: "confirmada",
+        status: "rejeitada",
+        observacoes: motivo || consulta.observacoes,
         updated_at: new Date().toISOString(),
       })
       .eq("id", consultaId)
-      .select(
-        `
-        *,
-        profissional:perfis_profissionais!consultas_profissional_id_fkey(
-          id, nome, sobrenome, foto_perfil_url
-        ),
-        paciente:perfis_pacientes!consultas_paciente_id_fkey(
-          id, nome, sobrenome, foto_perfil_url, telefone
-        )
-      `
-      )
+      .select()
       .single();
 
     if (updateError) {
-      console.error("Erro ao confirmar consulta:", updateError);
       return NextResponse.json(
-        { error: "Erro ao confirmar consulta" },
+        { error: "Erro ao rejeitar consulta" },
         { status: 500 }
       );
     }
 
-    // TODO: Enviar notificação para o paciente
-    // TODO: Criar lembretes automáticos
+    // TODO: Notificar paciente
 
     return NextResponse.json({
       success: true,
-      message: "Consulta confirmada com sucesso!",
+      message: "Consulta rejeitada",
       consulta: consultaAtualizada,
     });
   } catch (error) {
-    console.error("Erro ao confirmar consulta:", error);
+    console.error("Erro ao rejeitar consulta:", error);
     return NextResponse.json(
       { error: "Erro interno do servidor" },
       { status: 500 }
