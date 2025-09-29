@@ -8,19 +8,17 @@ export async function GET(request: NextRequest) {
     const supabase = createRouteHandlerClient({ cookies });
     const { searchParams } = new URL(request.url);
 
-    // 📋 PARÂMETROS DE FILTRO
-    const tipo = searchParams.get("tipo"); // psicologo, psicanalista, etc
+    const tipo = searchParams.get("tipo");
     const especialidade = searchParams.get("especialidade");
     const cidade = searchParams.get("cidade");
     const estado = searchParams.get("estado");
-    const busca = searchParams.get("busca"); // busca por nome
+    const busca = searchParams.get("busca");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "12");
 
-    // Calcular offset para paginação
     const offset = (page - 1) * limit;
 
-    // 🔍 CONSTRUIR QUERY COM FILTROS
+    // 🔍 QUERY CORRIGIDA - Apenas status_verificacao
     let query = supabase
       .from("perfis_profissionais")
       .select(
@@ -37,20 +35,19 @@ export async function GET(request: NextRequest) {
         endereco_cidade,
         endereco_estado,
         crp,
-        verificado
+        verificado,
+        status_verificacao
       `,
         { count: "exact" }
       )
-      .eq("verificado", true) // Apenas profissionais verificados
-      .eq("status_verificacao", "aprovado"); // Status aprovado
+      .eq("status_verificacao", "aprovado"); // ✅ Apenas esta condição
 
-    // Aplicar filtros condicionalmente
+    // Aplicar filtros
     if (tipo) {
       query = query.eq("tipo", tipo);
     }
 
     if (especialidade) {
-      // Busca parcial em especialidades (campo de texto)
       query = query.ilike("especialidades", `%${especialidade}%`);
     }
 
@@ -63,27 +60,38 @@ export async function GET(request: NextRequest) {
     }
 
     if (busca) {
-      // Busca por nome ou sobrenome
       query = query.or(`nome.ilike.%${busca}%,sobrenome.ilike.%${busca}%`);
     }
 
-    // Ordenar por nome
     query = query.order("nome", { ascending: true });
-
-    // Aplicar paginação
     query = query.range(offset, offset + limit - 1);
 
     const { data: profissionais, error, count } = await query;
 
     if (error) {
-      console.error("Erro ao buscar profissionais:", error);
+      console.error("❌ Erro ao buscar profissionais:", error);
       return NextResponse.json(
-        { error: "Erro ao buscar profissionais" },
+        {
+          error: "Erro ao buscar profissionais",
+          details: error.message,
+          profissionais: [],
+          paginacao: {
+            total: 0,
+            pagina_atual: page,
+            total_paginas: 0,
+            limite_por_pagina: limit,
+            tem_proxima: false,
+            tem_anterior: false,
+          },
+        },
         { status: 500 }
       );
     }
 
-    // 📊 RETORNAR COM METADADOS DE PAGINAÇÃO
+    // 📊 Log para debug
+    console.log("✅ Profissionais encontrados:", profissionais?.length || 0);
+    console.log("📋 Total no DB:", count);
+
     return NextResponse.json({
       profissionais: profissionais || [],
       paginacao: {
@@ -95,10 +103,22 @@ export async function GET(request: NextRequest) {
         tem_anterior: page > 1,
       },
     });
-  } catch (error) {
-    console.error("Erro na API de profissionais:", error);
+  } catch (error: any) {
+    console.error("❌ Erro na API de profissionais:", error);
     return NextResponse.json(
-      { error: "Erro interno do servidor" },
+      {
+        error: "Erro interno do servidor",
+        details: error.message,
+        profissionais: [],
+        paginacao: {
+          total: 0,
+          pagina_atual: 1,
+          total_paginas: 0,
+          limite_por_pagina: 12,
+          tem_proxima: false,
+          tem_anterior: false,
+        },
+      },
       { status: 500 }
     );
   }
