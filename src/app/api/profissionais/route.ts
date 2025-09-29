@@ -15,6 +15,10 @@ export async function GET(request: NextRequest) {
 
     // 2. Teste de query SUPER SIMPLES
     console.log("🔍 Tentando buscar profissionais...");
+    console.log("Query params:", {
+      status_verificacao: "aprovado",
+      limit: 10,
+    });
 
     const { data, error, count } = await supabase
       .from("perfis_profissionais")
@@ -22,8 +26,17 @@ export async function GET(request: NextRequest) {
         count: "exact",
       })
       .eq("status_verificacao", "aprovado")
-      // .eq("ativo", true) // ❌ COLUNA NÃO EXISTE - REMOVIDO
       .limit(10);
+
+    console.log("📊 Resultado da query:", {
+      encontrados: data?.length || 0,
+      total: count,
+      erro: error?.message || "nenhum",
+    });
+
+    if (data && data.length > 0) {
+      console.log("✅ Primeiro profissional:", data[0]);
+    }
 
     if (error) {
       console.error("❌ Erro no Supabase:", error);
@@ -94,4 +107,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-//aa
