@@ -1,5 +1,5 @@
 // src/contexts/AuthContext.tsx
-// 🔧 VERSÃO ORIGINAL RESTAURADA - que funcionava antes
+// 🔧 VERSÃO CORRIGIDA - SignOut funcional
 
 "use client";
 import { createContext, useContext, useEffect, useState, useRef } from "react";
@@ -97,13 +97,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // 🔧 FUNÇÃO SIGNOUT CORRIGIDA
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      console.log("🚪 Iniciando logout...");
+
+      // Limpar estado local primeiro
       setUser(null);
       setProfile(null);
+
+      // Fazer logout no Supabase
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error("❌ Erro ao fazer logout:", error);
+        throw error;
+      }
+
+      console.log("✅ Logout realizado com sucesso");
+
+      // Limpar qualquer cache/storage local se necessário
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("signup_user_type");
+        // Limpar outros items se necessário
+      }
     } catch (error) {
-      console.error("Erro ao fazer logout:", error);
+      console.error("❌ Erro no processo de logout:", error);
+      // Mesmo com erro, limpar estado local
+      setUser(null);
+      setProfile(null);
+      throw error;
     }
   };
 
@@ -144,7 +167,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     initializeAuth();
 
-    // 🔧 LISTENER ORIGINAL RESTAURADO
+    // 🔧 LISTENER CORRIGIDO
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -155,6 +178,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const userProfile = await fetchUserProfile(session.user.id);
         setProfile(userProfile);
       } else if (event === "SIGNED_OUT") {
+        console.log("🚪 User signed out - clearing state");
         setUser(null);
         setProfile(null);
       }
