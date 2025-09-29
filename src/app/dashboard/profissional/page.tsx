@@ -3,9 +3,8 @@
 
 "use client";
 import { useAuth } from "@/contexts/AuthContext";
-import { ProfessionalLayout } from "@/components/dashboard/professional/layout/ProfessionalLayout";
-import { ProfessionalWidget } from "@/components/dashboard/professional/widgets";
-import { FeedContainer } from "@/components/dashboard/professional/feed";
+import { ProfessionalLayout } from "@/components/dashboard/professional/layout";
+import ProfessionalFeedContainer from "@/components/dashboard/professional/feed/ProfessionalFeedContainer";
 
 export default function ProfessionalDashboard() {
   const { profile } = useAuth();
@@ -32,7 +31,7 @@ export default function ProfessionalDashboard() {
         </div>
 
         {/* Feed Social Completo - MODO PROFISSIONAL */}
-        <FeedContainer />
+        <ProfessionalFeedContainer />
       </div>
     </ProfessionalLayout>
   );

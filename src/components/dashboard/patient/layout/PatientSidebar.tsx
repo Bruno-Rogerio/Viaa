@@ -1,5 +1,5 @@
 // src/components/dashboard/patient/layout/PatientSidebar.tsx
-// 🔄 REUTILIZANDO 95% do ProfessionalSidebar - apenas navegação adaptada
+// 🔧 CORRIGIDO - Links para estrutura correta
 
 "use client";
 import { useState, useEffect } from "react";
@@ -18,41 +18,41 @@ import {
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/contexts/AuthContext";
 
-// 🎯 NAVEGAÇÃO ESPECÍFICA DO PACIENTE
+// 🎯 NAVEGAÇÃO ESPECÍFICA DO PACIENTE - LINKS CORRETOS
 const navigation = [
   {
-    name: "Perfil",
-    href: "/dashboard/perfil",
-    icon: UserIcon,
-  },
-  {
     name: "Início",
-    href: "/dashboard", // Dashboard principal
+    href: "/dashboard/paciente", // Página principal do paciente
     icon: HomeIcon,
   },
   {
+    name: "Perfil",
+    href: "/dashboard/paciente/perfil",
+    icon: UserIcon,
+  },
+  {
     name: "Buscar Profissionais",
-    href: "/dashboard/profissionais",
+    href: "/dashboard/paciente/profissionais",
     icon: UserGroupIcon,
   },
   {
     name: "Minhas Consultas",
-    href: "/dashboard/consultas",
+    href: "/dashboard/paciente/consultas",
     icon: CalendarIcon,
   },
   {
-    name: "Bem-estar",
-    href: "/dashboard/bem-estar",
+    name: "Feed",
+    href: "/dashboard/paciente/feed",
     icon: HeartIcon,
   },
   {
     name: "Mensagens",
-    href: "/dashboard/mensagens",
+    href: "/dashboard/paciente/mensagens",
     icon: ChatBubbleLeftRightIcon,
   },
   {
     name: "Configurações",
-    href: "/dashboard/configuracoes",
+    href: "/dashboard/paciente/configuracoes",
     icon: CogIcon,
   },
 ];
@@ -72,7 +72,6 @@ export default function PatientSidebar({
   const router = useRouter();
   const { signOut } = useAuth();
 
-  // 🔄 REUTILIZADO: Lógica mobile igual
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -87,6 +86,9 @@ export default function PatientSidebar({
     router.push("/");
   };
 
+  const nomeUsuario =
+    profile?.dados && "nome" in profile.dados ? profile.dados.nome : "Paciente";
+
   return (
     <div
       className={`
@@ -96,62 +98,74 @@ export default function PatientSidebar({
         ${isMobile ? "" : "lg:translate-x-0"}
       `}
     >
-      {/* 🔄 REUTILIZADO: Estrutura flexbox igual */}
-      <div className="h-full flex flex-col">
-        {/* 🔄 REUTILIZADO: Header */}
-        <div className="flex-shrink-0 p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-900">Menu</h2>
-            {isMobile && (
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-              >
-                <XMarkIcon className="w-5 h-5" />
-              </button>
-            )}
+      {/* Header da Sidebar */}
+      <div className="p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+              <span className="text-emerald-700 font-semibold">
+                {nomeUsuario.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">{nomeUsuario}</h3>
+              <p className="text-sm text-gray-500">Paciente</p>
+            </div>
           </div>
+          {isMobile && (
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <XMarkIcon className="w-5 h-5 text-gray-500" />
+            </button>
+          )}
         </div>
+      </div>
 
-        {/* 🎯 NAVEGAÇÃO ADAPTADA - cores emerald */}
-        <nav className="flex-1 overflow-y-auto p-4">
-          <div className="space-y-2">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
+      {/* Navegação */}
+      <nav className="flex-1 p-4">
+        <ul className="space-y-2">
+          {navigation.map((item) => {
+            const isActive =
+              pathname === item.href || pathname.startsWith(item.href + "/");
 
-              return (
+            return (
+              <li key={item.name}>
                 <Link
-                  key={item.name}
                   href={item.href}
-                  onClick={isMobile ? onClose : undefined}
+                  onClick={() => isMobile && onClose()}
                   className={`
-                    flex items-center p-3 rounded-lg transition-colors group
+                    flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors
                     ${
                       isActive
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : "text-gray-700 hover:bg-gray-50"
+                        ? "bg-emerald-100 text-emerald-700 border-r-2 border-emerald-500"
+                        : "text-gray-700 hover:bg-gray-100"
                     }
                   `}
                 >
-                  <Icon className="w-5 h-5 mr-3" />
+                  <item.icon
+                    className={`w-5 h-5 ${
+                      isActive ? "text-emerald-600" : "text-gray-500"
+                    }`}
+                  />
                   <span className="font-medium">{item.name}</span>
                 </Link>
-              );
-            })}
-          </div>
-        </nav>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
 
-        {/* 🔄 REUTILIZADO: Logout igual */}
-        <div className="flex-shrink-0 p-4 bg-gray-50 border-t border-gray-200">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center p-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-          >
-            <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" />
-            <span className="font-medium">Sair</span>
-          </button>
-        </div>
+      {/* Footer */}
+      <div className="p-4 border-t border-gray-200">
+        <button
+          onClick={handleLogout}
+          className="flex items-center space-x-3 w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+        >
+          <ArrowRightOnRectangleIcon className="w-5 h-5" />
+          <span className="font-medium">Sair</span>
+        </button>
       </div>
     </div>
   );

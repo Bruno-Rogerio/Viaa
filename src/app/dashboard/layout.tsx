@@ -1,15 +1,12 @@
-// viaa\src\app\dashboard\layout.tsx
-import { ProfessionalLayout } from "@/components/dashboard/professional/layout/ProfessionalLayout";
+// src/app/dashboard/layout.tsx
+// 🔧 LAYOUT NEUTRO - Não assume tipo de usuário
+
 import { AuthProvider } from "@/contexts/AuthContext";
 
-export default function DashboardLayoutPage({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <AuthProvider>
-      <ProfessionalLayout>{children}</ProfessionalLayout>
-    </AuthProvider>
-  );
+  return <AuthProvider>{children}</AuthProvider>;
 }

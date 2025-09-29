@@ -1,10 +1,9 @@
 // src/components/dashboard/patient/layout/PatientHeader.tsx
-// 🔄 REUTILIZANDO 90% do ProfessionalHeader - apenas adaptações específicas
+// 🔧 CORRIGIDO - Links para estrutura correta
 
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import {
   HomeIcon,
@@ -32,37 +31,37 @@ export default function PatientHeader({
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // 🎯 NAVEGAÇÃO ESPECÍFICA DO PACIENTE
+  // 🎯 NAVEGAÇÃO ESPECÍFICA DO PACIENTE - LINKS CORRETOS
   const navigationItems = [
     {
       name: "Início",
-      href: "/dashboard",
+      href: "/dashboard/paciente",
       icon: HomeIcon,
-      current: pathname === "/dashboard",
+      current: pathname === "/dashboard/paciente",
     },
     {
-      name: "Buscar Profissionais",
-      href: "/dashboard/profissionais",
+      name: "Profissionais",
+      href: "/dashboard/paciente/profissionais",
       icon: UserGroupIcon,
-      current: pathname.startsWith("/dashboard/profissionais"),
+      current: pathname.startsWith("/dashboard/paciente/profissionais"),
     },
     {
-      name: "Minhas Consultas",
-      href: "/dashboard/consultas",
+      name: "Consultas",
+      href: "/dashboard/paciente/consultas",
       icon: CalendarDaysIcon,
-      current: pathname.startsWith("/dashboard/consultas"),
+      current: pathname.startsWith("/dashboard/paciente/consultas"),
     },
     {
-      name: "Bem-estar",
-      href: "/dashboard/bem-estar",
+      name: "Feed",
+      href: "/dashboard/paciente/feed",
       icon: HeartIcon,
-      current: pathname.startsWith("/dashboard/bem-estar"),
+      current: pathname.startsWith("/dashboard/paciente/feed"),
     },
     {
       name: "Mensagens",
-      href: "/dashboard/mensagens",
+      href: "/dashboard/paciente/mensagens",
       icon: ChatBubbleLeftRightIcon,
-      current: pathname.startsWith("/dashboard/mensagens"),
+      current: pathname.startsWith("/dashboard/paciente/mensagens"),
     },
   ];
 
@@ -70,91 +69,75 @@ export default function PatientHeader({
     <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* 🔄 REUTILIZADO: Logo e menu mobile */}
+          {/* Logo e Menu Mobile */}
           <div className="flex items-center">
             <button
               onClick={onMenuClick}
-              className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+              className="p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 lg:hidden"
             >
               <Bars3Icon className="w-6 h-6" />
             </button>
 
-            <Link href="/dashboard" className="flex items-center ml-4 lg:ml-0">
-              <Image
-                src="/logo-viaa.png"
-                alt="VIAA"
-                width={500}
-                height={2000}
-                className="h-20 w-auto"
-                priority
-              />
+            <Link
+              href="/dashboard/paciente"
+              className="flex items-center ml-4 lg:ml-0"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">V</span>
+                </div>
+                <span className="text-xl font-bold text-gray-900 hidden sm:block">
+                  VIAA
+                </span>
+              </div>
             </Link>
           </div>
 
-          {/* 🎯 NAVEGAÇÃO ADAPTADA PARA PACIENTE */}
-          <nav className="hidden lg:flex items-center space-x-8">
-            {navigationItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+          {/* Navegação Desktop */}
+          <nav className="hidden lg:flex lg:space-x-8">
+            {navigationItems.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`
+                  flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors
+                  ${
                     item.current
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                  }`}
-                >
-                  <Icon className="w-5 h-5 mr-2" />
-                  {item.name}
-                </Link>
-              );
-            })}
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                  }
+                `}
+              >
+                <item.icon className="w-4 h-4" />
+                <span>{item.name}</span>
+              </Link>
+            ))}
           </nav>
 
-          {/* 🔄 REUTILIZADO: Busca, notificações e avatar */}
+          {/* Ações do usuário */}
           <div className="flex items-center space-x-4">
-            <div className="hidden md:block">
-              <SearchBar
-                placeholder="Buscar terapeutas, especialidades..."
-                onSearch={(query) => {
-                  // Redirecionar para busca de profissionais
-                  router.push(
-                    `/dashboard/profissionais?busca=${encodeURIComponent(
-                      query
-                    )}`
-                  );
-                }}
-              />
-            </div>
-
+            {/* Search */}
             <button
               onClick={() => setSearchOpen(true)}
-              className="md:hidden p-2 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+              className="p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-md"
             >
-              <MagnifyingGlassIcon className="w-6 h-6" />
+              <MagnifyingGlassIcon className="w-5 h-5" />
             </button>
 
+            {/* Notificações */}
             <NotificationBell />
 
-            <div className="flex items-center space-x-3">
-              <Avatar
-                src={profile?.dados?.foto_perfil_url}
-                alt={`${profile?.dados?.nome} ${profile?.dados?.sobrenome}`}
-                size="sm"
-                onClick={() => router.push("/dashboard/perfil")}
-                className="cursor-pointer"
-              />
-
-              <span className="hidden md:block text-sm font-medium text-gray-700">
-                {profile?.dados?.nome}
-              </span>
-            </div>
+            {/* Avatar */}
+            <Avatar
+              src={profile?.foto_perfil_url}
+              alt={profile?.dados?.nome || user?.email || "Usuário"}
+              size="sm"
+            />
           </div>
         </div>
       </div>
 
-      {/* 🔄 REUTILIZADO: Busca mobile */}
+      {/* Search Modal */}
       {searchOpen && (
         <div className="md:hidden absolute top-16 left-0 right-0 bg-white border-b border-gray-200 p-4">
           <SearchBar
