@@ -10,6 +10,11 @@ export async function GET(request: NextRequest) {
     const supabase = createRouteHandlerClient({ cookies });
     const { searchParams } = new URL(request.url);
 
+    console.log(
+      "🔍 API /profissionais chamada com params:",
+      Object.fromEntries(searchParams)
+    );
+
     // Parâmetros de busca e filtros
     const busca = searchParams.get("busca");
     const especialidade = searchParams.get("especialidade");
@@ -102,9 +107,17 @@ export async function GET(request: NextRequest) {
     const { data: profissionais, error, count } = await query;
 
     if (error) {
-      console.error("Erro ao buscar profissionais:", error);
-      return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+      console.error("❌ Erro ao buscar profissionais:", error);
+      return NextResponse.json(
+        {
+          error: "Erro ao buscar profissionais",
+          details: error.message,
+        },
+        { status: 500 }
+      );
     }
+
+    console.log(`✅ Encontrados ${profissionais?.length || 0} profissionais`);
 
     // Calcular estatísticas básicas para cada profissional
     const profissionaisComEstatisticas = await Promise.all(
@@ -116,15 +129,23 @@ export async function GET(request: NextRequest) {
           .eq("profissional_id", prof.id)
           .eq("status", "concluida");
 
-        // Verificar se tem horários disponíveis
-        const { data: horarios } = await supabase
-          .from("horarios_disponiveis")
-          .select("id")
-          .eq("profissional_id", prof.id)
-          .eq("ativo", true)
-          .limit(1);
+        // Verificar se tem horários disponíveis (com fallback)
+        let temHorariosDisponiveis = false;
+        try {
+          const { data: horarios, error: horariosError } = await supabase
+            .from("horarios_disponiveis")
+            .select("id")
+            .eq("profissional_id", prof.id)
+            .eq("ativo", true)
+            .limit(1);
 
-        const temHorariosDisponiveis = horarios && horarios.length > 0;
+          if (!horariosError && horarios) {
+            temHorariosDisponiveis = horarios.length > 0;
+          }
+        } catch (e) {
+          // Se tabela não existir, assume false
+          temHorariosDisponiveis = false;
+        }
 
         // Calcular rating simulado
         const ratingBase = prof.verificado ? 4.5 : 4.0;
@@ -165,8 +186,15 @@ export async function GET(request: NextRequest) {
         ordenacao,
       },
     });
-  } catch (error) {
-    console.error("Erro na API de profissionais:", error);
-    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  } catch (error: any) {
+    console.error("❌ Erro crítico na API de profissionais:", error);
+    return NextResponse.json(
+      {
+        error: "Erro interno do servidor",
+        message: error.message,
+        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      },
+      { status: 500 }
+    );
   }
 }
