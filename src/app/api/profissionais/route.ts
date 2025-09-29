@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
         count: "exact",
       })
       .eq("status_verificacao", "aprovado")
-      .eq("ativo", true)
+      // .eq("ativo", true) // ❌ COLUNA NÃO EXISTE - REMOVIDO
       .limit(10);
 
     if (error) {
