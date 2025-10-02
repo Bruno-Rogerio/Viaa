@@ -1,6 +1,4 @@
 // src/components/dashboard/patient/agenda/PatientAgenda.tsx
-// VERSÃO INTEGRADA - Modal funcional com API
-
 "use client";
 
 import { useState } from "react";
@@ -34,7 +32,6 @@ export default function PatientAgenda({
   tipoUsuario,
   className = "",
 }: PatientAgendaProps) {
-  // Estados locais
   const [dataAtual, setDataAtual] = useState(new Date());
   const [modoVisualizacao, setModoVisualizacao] =
     useState<ModoVisualizacao>("mes");
@@ -43,27 +40,21 @@ export default function PatientAgenda({
     data?: Date;
     horario?: string;
   }>({ aberto: false });
-  const [tipoConsulta, setTipoConsulta] = useState<"online" | "presencial">(
-    "online"
-  );
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState<{
     tipo: "sucesso" | "erro";
     texto: string;
   } | null>(null);
 
-  // Hook para horários disponíveis do profissional
   const {
     configuracao: horariosConfigurados,
     loading: loadingHorarios,
     temHorariosConfigurados,
   } = useHorariosDisponiveis(profissionalId);
 
-  // TODO: Carregar consultas reais
   const consultas: Consulta[] = [];
   const carregando = false;
 
-  // Converter configuração semanal para HorarioDisponivel[]
   const horariosDisponiveis = Object.entries(horariosConfigurados)
     .filter(([_, config]) => config.ativo)
     .map(([diaId, config]) => ({
@@ -77,13 +68,20 @@ export default function PatientAgenda({
       updated_at: new Date().toISOString(),
     }));
 
-  // Handlers
+  // 🔧 HANDLER DO DIA - AGORA FUNCIONA NA VISÃO MÊS
   const handleDiaClick = (data: Date) => {
     const diaSemana = data.getDay();
     const temHorario = horariosConfigurados[diaSemana]?.ativo;
 
     if (temHorario) {
-      console.log("Dia com horários disponíveis:", data);
+      // Pegar o primeiro horário disponível do dia
+      const primeiroHorario = horariosConfigurados[diaSemana].hora_inicio;
+
+      setModalAgendamento({
+        aberto: true,
+        data,
+        horario: primeiroHorario,
+      });
     }
   };
 
@@ -99,13 +97,11 @@ export default function PatientAgenda({
     console.log("Consulta clicada:", consulta);
   };
 
-  // 🔥 FUNÇÃO PRINCIPAL - Criar consulta
   const handleSolicitarAgendamento = async (data: Date, horario: string) => {
     setSalvando(true);
     setMensagem(null);
 
     try {
-      // Calcular data_fim (1 hora depois do início)
       const dataInicio = new Date(data);
       const [horas, minutos] = horario.split(":");
       dataInicio.setHours(parseInt(horas), parseInt(minutos), 0, 0);
@@ -122,9 +118,9 @@ export default function PatientAgenda({
           profissional_id: profissionalId,
           data_inicio: dataInicio.toISOString(),
           data_fim: dataFim.toISOString(),
-          tipo: tipoConsulta,
+          tipo: "online", // 🔧 SEMPRE ONLINE
           titulo: `Consulta com ${profissionalInfo.nome} ${profissionalInfo.sobrenome}`,
-          descricao: `Consulta ${tipoConsulta} agendada via plataforma`,
+          descricao: `Consulta online agendada via plataforma`,
         }),
       });
 
@@ -134,19 +130,14 @@ export default function PatientAgenda({
         throw new Error(resultado.error || "Erro ao agendar consulta");
       }
 
-      // Sucesso!
       setMensagem({
         tipo: "sucesso",
         texto: resultado.message || "Consulta solicitada com sucesso!",
       });
 
-      // Fechar modal após 2 segundos
       setTimeout(() => {
         setModalAgendamento({ aberto: false });
         setMensagem(null);
-
-        // TODO: Recarregar consultas
-        // router.push('/dashboard/paciente/consultas')
       }, 2000);
     } catch (error: any) {
       console.error("Erro ao solicitar agendamento:", error);
@@ -161,7 +152,6 @@ export default function PatientAgenda({
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Header */}
       <PatientAgendaHeader
         profissionalInfo={profissionalInfo}
         temHorariosConfigurados={temHorariosConfigurados()}
@@ -169,7 +159,6 @@ export default function PatientAgenda({
         loadingHorarios={loadingHorarios}
       />
 
-      {/* Calendário */}
       <AgendaCalendar
         consultas={consultas}
         horariosDisponiveis={horariosDisponiveis}
@@ -190,7 +179,7 @@ export default function PatientAgenda({
         className="shadow-lg"
       />
 
-      {/* Modal de confirmação */}
+      {/* 🔧 MODAL SIMPLIFICADO - SEM OPÇÃO PRESENCIAL */}
       {modalAgendamento.aberto && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
@@ -198,7 +187,6 @@ export default function PatientAgenda({
               Confirmar Agendamento
             </h3>
 
-            {/* Mensagem de feedback */}
             {mensagem && (
               <div
                 className={`mb-4 p-4 rounded-lg ${
@@ -265,38 +253,21 @@ export default function PatientAgenda({
                 <p className="text-sm text-gray-500 mt-1">Duração: 1 hora</p>
               </div>
 
-              {/* Tipo de Consulta */}
+              {/* 🔧 TIPO FIXO - APENAS ONLINE */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Tipo de Consulta
                 </label>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => setTipoConsulta("online")}
-                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${
-                      tipoConsulta === "online"
-                        ? "border-blue-600 bg-blue-50 text-blue-900"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">💻</div>
-                      <div className="font-medium">Online</div>
+                <div className="flex items-center space-x-3 p-4 bg-blue-50 border-2 border-blue-600 rounded-lg">
+                  <div className="text-3xl">💻</div>
+                  <div className="flex-1">
+                    <div className="font-semibold text-blue-900">
+                      Consulta Online
                     </div>
-                  </button>
-                  <button
-                    onClick={() => setTipoConsulta("presencial")}
-                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${
-                      tipoConsulta === "presencial"
-                        ? "border-blue-600 bg-blue-50 text-blue-900"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">🏢</div>
-                      <div className="font-medium">Presencial</div>
+                    <div className="text-sm text-blue-700">
+                      Atendimento por videochamada
                     </div>
-                  </button>
+                  </div>
                 </div>
               </div>
 
@@ -358,4 +329,3 @@ export default function PatientAgenda({
     </div>
   );
 }
-//aa

@@ -7,17 +7,44 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
 
-    // Verificar autenticação
+    // 🔧 VERIFICAÇÃO MELHORADA
     const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    console.log("🔍 Debug sessão:", {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      userId: session?.user?.id,
+      error: sessionError,
+    });
+
+    if (sessionError || !session || !session.user) {
+      console.error("❌ Erro de autenticação:", sessionError);
+      return NextResponse.json(
+        {
+          error: "Não autenticado",
+          details: "Sessão não encontrada. Faça login novamente.",
+          debug: {
+            hasSession: !!session,
+            sessionError: sessionError?.message,
+          },
+        },
+        { status: 401 }
+      );
     }
 
+    const user = session.user;
     const body = await request.json();
+
+    console.log("📋 Dados recebidos:", {
+      userId: user.id,
+      profissional_id: body.profissional_id,
+      data_inicio: body.data_inicio,
+      tipo: body.tipo,
+    });
+
     const {
       profissional_id,
       data_inicio,
@@ -28,7 +55,7 @@ export async function POST(request: NextRequest) {
       observacoes,
     } = body;
 
-    // Validações básicas
+    // Validações
     if (!profissional_id || !data_inicio || !data_fim || !tipo) {
       return NextResponse.json(
         { error: "Campos obrigatórios faltando" },
@@ -36,7 +63,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar se data_fim > data_inicio
     if (new Date(data_fim) <= new Date(data_inicio)) {
       return NextResponse.json(
         { error: "Data de fim deve ser posterior à data de início" },
@@ -44,12 +70,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Buscar ID do perfil do paciente
+    // Buscar perfil do paciente
     const { data: perfilPaciente, error: perfilError } = await supabase
       .from("perfis_pacientes")
       .select("id")
       .eq("user_id", user.id)
       .single();
+
+    console.log("👤 Perfil paciente:", { perfilPaciente, perfilError });
 
     if (perfilError || !perfilPaciente) {
       return NextResponse.json(
@@ -58,12 +86,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar se profissional existe e está verificado
+    // Verificar profissional
     const { data: profissional, error: profError } = await supabase
       .from("perfis_profissionais")
-      .select("id, nome, sobrenome, valor_sessao, verificado")
+      .select(
+        "id, nome, sobrenome, valor_sessao, verificado, status_verificacao"
+      )
       .eq("id", profissional_id)
       .single();
+
+    console.log("👨‍⚕️ Profissional:", { profissional, profError });
 
     if (profError || !profissional) {
       return NextResponse.json(
@@ -72,24 +104,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!profissional.verificado) {
+    if (profissional.status_verificacao !== "aprovado") {
       return NextResponse.json(
-        { error: "Profissional não está verificado" },
+        { error: "Profissional não está aprovado" },
         { status: 400 }
       );
     }
 
-    // Verificar conflitos de horário (profissional)
-    const { data: conflitos, error: conflitoError } = await supabase
+    // Verificar conflitos
+    const { data: conflitos } = await supabase
       .from("consultas")
       .select("id")
       .eq("profissional_id", profissional_id)
       .in("status", ["agendada", "confirmada", "em_andamento"])
-      .or(`data_inicio.lte.${data_fim},data_fim.gte.${data_inicio}`);
-
-    if (conflitoError) {
-      console.error("Erro ao verificar conflitos:", conflitoError);
-    }
+      .or(`and(data_inicio.lte.${data_fim},data_fim.gte.${data_inicio})`);
 
     if (conflitos && conflitos.length > 0) {
       return NextResponse.json(
@@ -98,7 +126,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Criar a consulta com status "agendada" (aguardando confirmação do profissional)
+    // Criar consulta
     const { data: novaConsulta, error: createError } = await supabase
       .from("consultas")
       .insert({
@@ -108,7 +136,7 @@ export async function POST(request: NextRequest) {
         descricao: descricao || null,
         data_inicio,
         data_fim,
-        status: "agendada", // Aguardando confirmação do profissional
+        status: "agendada",
         tipo,
         profissional_id,
         paciente_id: perfilPaciente.id,
@@ -116,139 +144,31 @@ export async function POST(request: NextRequest) {
         observacoes: observacoes || null,
         lembretes_enviados: false,
       })
-      .select(
-        `
-        *,
-        profissional:perfis_profissionais!consultas_profissional_id_fkey(
-          id, nome, sobrenome, foto_perfil_url, especialidades, crp, verificado
-        ),
-        paciente:perfis_pacientes!consultas_paciente_id_fkey(
-          id, nome, sobrenome, foto_perfil_url, telefone, email:user_id
-        )
-      `
-      )
+      .select()
       .single();
 
+    console.log("✅ Consulta criada:", { novaConsulta, createError });
+
     if (createError) {
-      console.error("Erro ao criar consulta:", createError);
+      console.error("❌ Erro ao criar:", createError);
       return NextResponse.json(
-        { error: "Erro ao criar consulta" },
+        { error: "Erro ao criar consulta", details: createError.message },
         { status: 500 }
       );
     }
-
-    // TODO: Enviar notificação para o profissional
-    // TODO: Criar lembretes automáticos
 
     return NextResponse.json(
       {
         success: true,
-        message:
-          "Solicitação de consulta enviada com sucesso! Aguarde a confirmação do profissional.",
+        message: "Solicitação enviada! Aguarde a confirmação do profissional.",
         consulta: novaConsulta,
       },
       { status: 201 }
     );
-  } catch (error) {
-    console.error("Erro na API de consultas:", error);
+  } catch (error: any) {
+    console.error("❌ Erro geral:", error);
     return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
-  }
-}
-
-// GET para buscar consultas (usado pelo hook useAgenda)
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { searchParams } = new URL(request.url);
-
-    // Verificar autenticação
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-    }
-
-    // Parâmetros de filtro
-    const tipo_usuario = searchParams.get("tipo_usuario"); // profissional ou paciente
-    const status = searchParams.getAll("status");
-    const data_inicio = searchParams.get("data_inicio");
-    const data_fim = searchParams.get("data_fim");
-
-    // Buscar perfil do usuário
-    let query = supabase.from("consultas").select(`
-        *,
-        profissional:perfis_profissionais!consultas_profissional_id_fkey(
-          id, nome, sobrenome, foto_perfil_url, especialidades, crp, verificado
-        ),
-        paciente:perfis_pacientes!consultas_paciente_id_fkey(
-          id, nome, sobrenome, foto_perfil_url, telefone
-        )
-      `);
-
-    // Filtrar por tipo de usuário
-    if (tipo_usuario === "profissional") {
-      // Buscar perfil profissional
-      const { data: perfil } = await supabase
-        .from("perfis_profissionais")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (perfil) {
-        query = query.eq("profissional_id", perfil.id);
-      }
-    } else if (tipo_usuario === "paciente") {
-      // Buscar perfil paciente
-      const { data: perfil } = await supabase
-        .from("perfis_pacientes")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (perfil) {
-        query = query.eq("paciente_id", perfil.id);
-      }
-    }
-
-    // Aplicar filtros
-    if (status.length > 0) {
-      query = query.in("status", status);
-    }
-
-    if (data_inicio) {
-      query = query.gte("data_inicio", data_inicio);
-    }
-
-    if (data_fim) {
-      query = query.lte("data_inicio", data_fim);
-    }
-
-    query = query.order("data_inicio", { ascending: true });
-
-    const { data: consultas, error } = await query;
-
-    if (error) {
-      console.error("Erro ao buscar consultas:", error);
-      return NextResponse.json(
-        { error: "Erro ao buscar consultas" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      consultas: consultas || [],
-      total: consultas?.length || 0,
-    });
-  } catch (error) {
-    console.error("Erro na API de consultas GET:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
+      { error: "Erro interno", details: error.message },
       { status: 500 }
     );
   }
