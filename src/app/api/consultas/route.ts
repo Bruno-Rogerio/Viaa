@@ -7,35 +7,59 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
 
-    // 🔧 VERIFICAÇÃO MELHORADA
+    // 🔧 PRIMEIRO: Tentar obter sessão via cookie (padrão)
+    let session = null;
+    let user = null;
+
     const {
-      data: { session },
+      data: { session: cookieSession },
       error: sessionError,
     } = await supabase.auth.getSession();
 
-    console.log("🔍 Debug sessão:", {
-      hasSession: !!session,
-      hasUser: !!session?.user,
-      userId: session?.user?.id,
+    console.log("🔍 Debug sessão (cookie):", {
+      hasSession: !!cookieSession,
+      hasUser: !!cookieSession?.user,
+      userId: cookieSession?.user?.id,
       error: sessionError,
     });
 
-    if (sessionError || !session || !session.user) {
-      console.error("❌ Erro de autenticação:", sessionError);
+    // Se não tem sessão via cookie, tentar via Bearer token
+    if (!cookieSession) {
+      const authHeader = request.headers.get("authorization");
+      console.log("🔑 Tentando autenticação via Bearer token:", !!authHeader);
+
+      if (authHeader?.startsWith("Bearer ")) {
+        const token = authHeader.substring(7);
+
+        // Verificar o token com Supabase
+        const {
+          data: { user: tokenUser },
+          error: tokenError,
+        } = await supabase.auth.getUser(token);
+
+        if (tokenUser && !tokenError) {
+          console.log("✅ Usuário autenticado via Bearer token:", tokenUser.id);
+          user = tokenUser;
+        } else {
+          console.error("❌ Erro ao validar Bearer token:", tokenError);
+        }
+      }
+    } else {
+      user = cookieSession.user;
+    }
+
+    // Se ainda não tem usuário, retornar erro
+    if (!user) {
+      console.error("❌ Nenhuma forma de autenticação funcionou");
       return NextResponse.json(
         {
           error: "Não autenticado",
           details: "Sessão não encontrada. Faça login novamente.",
-          debug: {
-            hasSession: !!session,
-            sessionError: sessionError?.message,
-          },
         },
         { status: 401 }
       );
     }
 
-    const user = session.user;
     const body = await request.json();
 
     console.log("📋 Dados recebidos:", {
@@ -80,95 +104,100 @@ export async function POST(request: NextRequest) {
     console.log("👤 Perfil paciente:", { perfilPaciente, perfilError });
 
     if (perfilError || !perfilPaciente) {
-      return NextResponse.json(
-        { error: "Perfil de paciente não encontrado" },
-        { status: 404 }
-      );
+      // Tentar buscar se é um profissional agendando
+      const { data: perfilProfissional } = await supabase
+        .from("perfis_profissionais")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!perfilProfissional) {
+        return NextResponse.json(
+          { error: "Perfil não encontrado. Complete seu cadastro." },
+          { status: 404 }
+        );
+      }
+
+      // Se é um profissional, usar o ID dele como paciente (auto-consulta)
+      // ou implementar lógica específica
     }
 
-    // Verificar profissional
-    const { data: profissional, error: profError } = await supabase
-      .from("perfis_profissionais")
-      .select(
-        "id, nome, sobrenome, valor_sessao, verificado, status_verificacao"
-      )
-      .eq("id", profissional_id)
-      .single();
+    const pacienteId = perfilPaciente?.id;
 
-    console.log("👨‍⚕️ Profissional:", { profissional, profError });
-
-    if (profError || !profissional) {
+    if (!pacienteId) {
       return NextResponse.json(
-        { error: "Profissional não encontrado" },
-        { status: 404 }
-      );
-    }
-
-    if (profissional.status_verificacao !== "aprovado") {
-      return NextResponse.json(
-        { error: "Profissional não está aprovado" },
+        { error: "ID do paciente não encontrado" },
         { status: 400 }
       );
     }
 
-    // Verificar conflitos
-    const { data: conflitos } = await supabase
+    // Verificar conflitos de horário
+    const { data: consultasExistentes } = await supabase
       .from("consultas")
       .select("id")
       .eq("profissional_id", profissional_id)
-      .in("status", ["agendada", "confirmada", "em_andamento"])
-      .or(`and(data_inicio.lte.${data_fim},data_fim.gte.${data_inicio})`);
+      .not("status", "in", "(cancelada,rejeitada)")
+      .or(`and(data_inicio.lt.${data_fim},data_fim.gt.${data_inicio})`);
 
-    if (conflitos && conflitos.length > 0) {
+    if (consultasExistentes && consultasExistentes.length > 0) {
       return NextResponse.json(
-        { error: "Horário não disponível - já existe uma consulta agendada" },
+        { error: "Já existe uma consulta agendada neste horário" },
         { status: 409 }
       );
     }
 
     // Criar consulta
-    const { data: novaConsulta, error: createError } = await supabase
+    const { data: novaConsulta, error: insertError } = await supabase
       .from("consultas")
-      .insert({
-        titulo:
-          titulo ||
-          `Consulta com ${profissional.nome} ${profissional.sobrenome}`,
-        descricao: descricao || null,
-        data_inicio,
-        data_fim,
-        status: "agendada",
-        tipo,
-        profissional_id,
-        paciente_id: perfilPaciente.id,
-        valor: profissional.valor_sessao || null,
-        observacoes: observacoes || null,
-        lembretes_enviados: false,
-      })
-      .select()
+      .insert([
+        {
+          titulo: titulo || "Consulta",
+          descricao,
+          data_inicio,
+          data_fim,
+          status: "agendada",
+          tipo,
+          profissional_id,
+          paciente_id: pacienteId,
+          observacoes,
+        },
+      ])
+      .select(
+        `
+        *,
+        profissional:perfis_profissionais!consultas_profissional_id_fkey(
+          id, nome, sobrenome, foto_perfil_url
+        ),
+        paciente:perfis_pacientes!consultas_paciente_id_fkey(
+          id, nome, sobrenome, foto_perfil_url
+        )
+      `
+      )
       .single();
 
-    console.log("✅ Consulta criada:", { novaConsulta, createError });
-
-    if (createError) {
-      console.error("❌ Erro ao criar:", createError);
+    if (insertError) {
+      console.error("Erro ao criar consulta:", insertError);
       return NextResponse.json(
-        { error: "Erro ao criar consulta", details: createError.message },
+        { error: "Erro ao agendar consulta" },
         { status: 500 }
       );
     }
 
+    console.log("✅ Consulta criada:", novaConsulta?.id);
+
+    // TODO: Enviar notificação para o profissional
+    // TODO: Criar lembretes automáticos
+
+    return NextResponse.json({
+      success: true,
+      message:
+        "Consulta agendada com sucesso! Aguarde a confirmação do profissional.",
+      consulta: novaConsulta,
+    });
+  } catch (error) {
+    console.error("Erro ao criar consulta:", error);
     return NextResponse.json(
-      {
-        success: true,
-        message: "Solicitação enviada! Aguarde a confirmação do profissional.",
-        consulta: novaConsulta,
-      },
-      { status: 201 }
-    );
-  } catch (error: any) {
-    console.error("❌ Erro geral:", error);
-    return NextResponse.json(
-      { error: "Erro interno", details: error.message },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }
