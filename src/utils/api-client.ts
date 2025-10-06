@@ -15,10 +15,21 @@ class ApiClient {
   private async getAuthHeaders(): Promise<HeadersInit> {
     // Em Next.js com Supabase, o cookie de sessão é gerenciado automaticamente
     // Mas vamos garantir que sempre enviamos os headers corretos
-    return {
+    const headers: HeadersInit = {
       "Content-Type": "application/json",
-      // Importante: incluir credentials para enviar cookies
     };
+
+    // Se estivermos no cliente, podemos tentar pegar o token do localStorage
+    if (typeof window !== "undefined") {
+      const {
+        data: { session },
+      } = (await (window as any).supabase?.auth?.getSession()) || { data: {} };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+    }
+
+    return headers;
   }
 
   async request<T = any>(

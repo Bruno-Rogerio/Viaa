@@ -1,9 +1,10 @@
 // src/components/dashboard/patient/agenda/PatientAgenda.tsx
-// Container principal para agendamento - VERSÃO SIMPLIFICADA E INTEGRADA
+// Container principal para agendamento - VERSÃO CORRIGIDA
 
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useHorariosDisponiveis } from "@/hooks/dashboard/useHorariosDisponiveis";
 import { apiClient } from "@/utils/api-client";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/utils/agendamento/validacoes";
 import AgendaCalendar from "../../common/agenda/AgendaCalendar";
 import PatientAgendaHeader from "./PatientAgendaHeader";
+import AgendaControlsLimited from "./AgendaControlsLimited";
 import type {
   Consulta,
   ModoVisualizacao,
@@ -51,10 +53,13 @@ export default function PatientAgenda({
   profissionalInfo,
   className = "",
 }: PatientAgendaProps) {
+  // Hook de autenticação
+  const { user } = useAuth();
+
   // Estados principais
   const [dataAtual, setDataAtual] = useState(new Date());
   const [modoVisualizacao, setModoVisualizacao] =
-    useState<ModoVisualizacao>("mes");
+    useState<ModoVisualizacao>("semana");
   const [modalAgendamento, setModalAgendamento] = useState<ModalAgendamento>({
     aberto: false,
   });
@@ -174,6 +179,30 @@ export default function PatientAgenda({
     [temHorariosConfigurados, horariosDisponiveis, consultas]
   );
 
+  // Handler para clique em horário (para visão semanal)
+  const handleHorarioClick = useCallback((data: Date, horario: string) => {
+    const [hora, minuto] = horario.split(":").map(Number);
+    const dataCompleta = new Date(data);
+    dataCompleta.setHours(hora, minuto, 0, 0);
+
+    // Validar se o horário é válido
+    const validacao = validarDataAgendamento(dataCompleta);
+    if (!validacao.valido) {
+      setMensagem({
+        tipo: "erro",
+        texto: validacao.erros[0],
+      });
+      return;
+    }
+
+    setModalAgendamento({
+      aberto: true,
+      data: data,
+      horario: dataCompleta,
+      tipo: "online",
+    });
+  }, []);
+
   // Handler para confirmar agendamento
   const handleConfirmarAgendamento = async () => {
     if (!modalAgendamento.horario) {
@@ -198,14 +227,10 @@ export default function PatientAgenda({
       // Preparar dados da consulta
       const dadosConsulta = {
         titulo: `Consulta com ${profissionalInfo.nome} ${profissionalInfo.sobrenome}`,
-        descricao: `${
-          modalAgendamento.tipo === "online"
-            ? "Consulta Online"
-            : "Consulta Presencial"
-        }`,
+        descricao: "Consulta Online",
         data_inicio: dataInicio.toISOString(),
         data_fim: dataFim.toISOString(),
-        tipo: modalAgendamento.tipo || "online",
+        tipo: "online" as TipoConsulta,
         profissional_id: profissionalId,
         paciente_id: usuarioId,
         valor: profissionalInfo.valor_sessao,
@@ -263,29 +288,55 @@ export default function PatientAgenda({
         loadingHorarios={loadingHorarios}
       />
 
-      <AgendaCalendar
-        consultas={consultas}
-        horariosDisponiveis={horariosDisponiveis}
-        dataAtual={dataAtual}
-        modoVisualizacao={modoVisualizacao}
-        carregando={carregando}
-        carregandoHorarios={loadingHorarios}
-        mostrarIndicadores={{
-          horariosDisponiveis: true,
-          consultas: true,
-          diasInativos: false,
-        }}
-        onDiaClick={handleDiaClick}
-        onConsultaClick={(consulta) => {
-          console.log("Consulta clicada:", consulta);
-          // TODO: Mostrar detalhes da consulta
-        }}
-        onNavigateData={setDataAtual}
-        onChangeModoVisualizacao={setModoVisualizacao}
-        className="shadow-lg"
-      />
+      {/* Wrapper customizado para a agenda com controles limitados */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Controles limitados */}
+        <div className="border-b border-gray-200">
+          <AgendaControlsLimited
+            dataAtual={dataAtual}
+            modoVisualizacao={modoVisualizacao}
+            carregando={carregando}
+            onNavigateData={setDataAtual}
+            onChangeModoVisualizacao={(modo) => {
+              if (modo === "semana" || modo === "lista") {
+                setModoVisualizacao(modo);
+              }
+            }}
+          />
+        </div>
 
-      {/* Modal de Agendamento Simplificado */}
+        {/* Calendário sem os controles padrão */}
+        <div style={{ marginTop: "-1px" }}>
+          <AgendaCalendar
+            consultas={consultas}
+            horariosDisponiveis={horariosDisponiveis}
+            dataAtual={dataAtual}
+            modoVisualizacao={modoVisualizacao}
+            carregando={carregando}
+            carregandoHorarios={loadingHorarios}
+            mostrarIndicadores={{
+              horariosDisponiveis: true,
+              consultas: true,
+              diasInativos: false,
+            }}
+            onDiaClick={handleDiaClick}
+            onHorarioClick={handleHorarioClick}
+            onConsultaClick={(consulta) => {
+              console.log("Consulta clicada:", consulta);
+              // TODO: Mostrar detalhes da consulta
+            }}
+            onNavigateData={setDataAtual}
+            onChangeModoVisualizacao={(modo) => {
+              if (modo === "semana" || modo === "lista") {
+                setModoVisualizacao(modo);
+              }
+            }}
+            className=""
+          />
+        </div>
+      </div>
+
+      {/* Modal de Agendamento */}
       {modalAgendamento.aberto && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -390,42 +441,23 @@ export default function PatientAgenda({
                 </div>
               </div>
 
-              {/* Tipo de consulta */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de Consulta
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() =>
-                      setModalAgendamento((prev) => ({
-                        ...prev,
-                        tipo: "online",
-                      }))
-                    }
-                    className={`p-2 border rounded-lg text-sm transition-colors ${
-                      modalAgendamento.tipo === "online"
-                        ? "bg-blue-50 border-blue-500 text-blue-700"
-                        : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
-                    }`}
+              {/* Tipo de consulta - sempre online */}
+              <div className="border-t pt-3">
+                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <svg
+                    className="w-5 h-5 text-blue-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
                   >
-                    Online
-                  </button>
-                  <button
-                    onClick={() =>
-                      setModalAgendamento((prev) => ({
-                        ...prev,
-                        tipo: "presencial",
-                      }))
-                    }
-                    className={`p-2 border rounded-lg text-sm transition-colors ${
-                      modalAgendamento.tipo === "presencial"
-                        ? "bg-blue-50 border-blue-500 text-blue-700"
-                        : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
-                    }`}
-                  >
-                    Presencial
-                  </button>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <span className="font-medium">Consulta Online</span>
                 </div>
               </div>
 
