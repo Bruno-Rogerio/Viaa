@@ -1,6 +1,8 @@
 // src/utils/api-client.ts
 // Cliente API centralizado com autenticação automática
 
+import { supabase } from "@/lib/supabase/client";
+
 interface ApiRequestOptions extends RequestInit {
   requiresAuth?: boolean;
 }
@@ -13,20 +15,30 @@ class ApiClient {
   }
 
   private async getAuthHeaders(): Promise<HeadersInit> {
-    // Em Next.js com Supabase, o cookie de sessão é gerenciado automaticamente
-    // Mas vamos garantir que sempre enviamos os headers corretos
     const headers: HeadersInit = {
       "Content-Type": "application/json",
     };
 
-    // Se estivermos no cliente, podemos tentar pegar o token do localStorage
-    if (typeof window !== "undefined") {
+    try {
+      // Pegar a sessão atual do Supabase
       const {
         data: { session },
-      } = (await (window as any).supabase?.auth?.getSession()) || { data: {} };
+        error,
+      } = await supabase.auth.getSession();
+
+      if (error) {
+        console.error("Erro ao obter sessão:", error);
+        return headers;
+      }
+
       if (session?.access_token) {
         headers["Authorization"] = `Bearer ${session.access_token}`;
+        console.log("✅ Token de autenticação adicionado ao header");
+      } else {
+        console.warn("⚠️ Nenhum token de autenticação encontrado");
       }
+    } catch (error) {
+      console.error("Erro ao configurar headers de auth:", error);
     }
 
     return headers;

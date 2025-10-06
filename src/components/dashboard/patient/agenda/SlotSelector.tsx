@@ -129,17 +129,27 @@ export default function SlotSelector({
                           ? "bg-blue-600 border-blue-600 text-white shadow-md scale-105"
                           : validacao.valido
                           ? "bg-white border-gray-300 text-gray-700 hover:border-blue-500 hover:bg-blue-50"
-                          : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
+                          : validacao.erros.some((e) => e.includes("passado"))
+                          ? "bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed line-through"
+                          : "bg-red-50 border-red-200 text-red-400 cursor-not-allowed"
                       }
                     `}
                     title={
-                      !validacao.valido ? validacao.erros.join(", ") : undefined
+                      !validacao.valido
+                        ? validacao.erros.join(", ")
+                        : "Horário disponível"
                     }
                   >
                     {formatarSlotHorario(slot)}
                     {isSelected && (
                       <CheckIcon className="w-4 h-4 inline-block ml-1" />
                     )}
+                    {!validacao.valido &&
+                      validacao.erros.some((e) => e.includes("passado")) && (
+                        <span className="absolute -top-1 -right-1 text-xs bg-gray-600 text-white px-1 rounded">
+                          Passou
+                        </span>
+                      )}
                   </button>
                 );
               })}

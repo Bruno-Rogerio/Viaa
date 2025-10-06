@@ -9,6 +9,7 @@ import { useHorariosDisponiveis } from "@/hooks/dashboard/useHorariosDisponiveis
 import { apiClient } from "@/utils/api-client";
 import {
   validarDataAgendamento,
+  validarHorarioAgendamento,
   gerarSlotsDisponiveis,
   formatarSlotHorario,
   REGRAS_AGENDAMENTO,
@@ -16,6 +17,7 @@ import {
 import AgendaCalendar from "../../common/agenda/AgendaCalendar";
 import PatientAgendaHeader from "./PatientAgendaHeader";
 import AgendaControlsLimited from "./AgendaControlsLimited";
+import SlotSelector from "./SlotSelector";
 import type {
   Consulta,
   ModoVisualizacao,
@@ -142,29 +144,79 @@ export default function PatientAgenda({
         return;
       }
 
-      // Gerar slots para o dia selecionado
-      const slots = gerarSlotsDisponiveis(
-        data,
-        horariosDisponiveis,
-        consultas,
-        REGRAS_AGENDAMENTO.duracaoConsultaPadrao
+      // Gerar todos os slots do dia (válidos e inválidos para mostrar com cores diferentes)
+      const todosSlots: Date[] = [];
+      const diaSemana = data.getDay();
+      const horariosNoDia = horariosDisponiveis.filter(
+        (h) => h.dia_semana === diaSemana && h.ativo
       );
 
-      if (slots.length === 0) {
+      if (horariosNoDia.length === 0) {
         setMensagem({
           tipo: "aviso",
-          texto: "Não há horários disponíveis nesta data.",
+          texto: "O profissional não atende neste dia da semana.",
         });
         return;
       }
 
-      // Selecionar primeiro horário disponível como padrão
-      const primeiroSlot = slots[0];
+      // Gerar todos os slots possíveis do dia
+      horariosNoDia.forEach((horario) => {
+        const [horaInicio, minutoInicio] = horario.hora_inicio
+          .split(":")
+          .map(Number);
+        const [horaFim, minutoFim] = horario.hora_fim.split(":").map(Number);
+
+        const slotAtual = new Date(data);
+        slotAtual.setHours(horaInicio, minutoInicio, 0, 0);
+
+        const horarioFim = new Date(data);
+        horarioFim.setHours(horaFim, minutoFim, 0, 0);
+
+        while (slotAtual < horarioFim) {
+          const fimSlot = new Date(slotAtual);
+          fimSlot.setMinutes(
+            fimSlot.getMinutes() + REGRAS_AGENDAMENTO.duracaoConsultaPadrao
+          );
+
+          if (fimSlot <= horarioFim) {
+            todosSlots.push(new Date(slotAtual));
+          }
+
+          slotAtual.setMinutes(
+            slotAtual.getMinutes() +
+              REGRAS_AGENDAMENTO.duracaoConsultaPadrao +
+              REGRAS_AGENDAMENTO.intervaloEntreConsultas
+          );
+        }
+      });
+
+      // Ordenar slots
+      todosSlots.sort((a, b) => a.getTime() - b.getTime());
+
+      if (todosSlots.length === 0) {
+        setMensagem({
+          tipo: "aviso",
+          texto: "Não há horários configurados para este dia.",
+        });
+        return;
+      }
+
+      // Encontrar primeiro slot válido
+      const slotsValidos = todosSlots.filter((slot) => {
+        const validacao = validarHorarioAgendamento(
+          slot,
+          horariosDisponiveis,
+          consultas
+        );
+        return validacao.valido;
+      });
+
+      const primeiroSlotValido = slotsValidos[0] || todosSlots[0];
 
       setModalAgendamento({
         aberto: true,
         data: data,
-        horario: primeiroSlot,
+        horario: primeiroSlotValido,
         tipo: "online",
       });
 
@@ -267,17 +319,49 @@ export default function PatientAgenda({
     }
   };
 
-  // Gerar slots para o modal
-  const slotsDisponiveis = useMemo(() => {
+  // Gerar todos os slots para o modal (incluindo indisponíveis)
+  const todosSlots = useMemo(() => {
     if (!modalAgendamento.data) return [];
 
-    return gerarSlotsDisponiveis(
-      modalAgendamento.data,
-      horariosDisponiveis,
-      consultas,
-      REGRAS_AGENDAMENTO.duracaoConsultaPadrao
+    const slots: Date[] = [];
+    const data = modalAgendamento.data;
+    const diaSemana = data.getDay();
+    const horariosNoDia = horariosDisponiveis.filter(
+      (h) => h.dia_semana === diaSemana && h.ativo
     );
-  }, [modalAgendamento.data, horariosDisponiveis, consultas]);
+
+    horariosNoDia.forEach((horario) => {
+      const [horaInicio, minutoInicio] = horario.hora_inicio
+        .split(":")
+        .map(Number);
+      const [horaFim, minutoFim] = horario.hora_fim.split(":").map(Number);
+
+      const slotAtual = new Date(data);
+      slotAtual.setHours(horaInicio, minutoInicio, 0, 0);
+
+      const horarioFim = new Date(data);
+      horarioFim.setHours(horaFim, minutoFim, 0, 0);
+
+      while (slotAtual < horarioFim) {
+        const fimSlot = new Date(slotAtual);
+        fimSlot.setMinutes(
+          fimSlot.getMinutes() + REGRAS_AGENDAMENTO.duracaoConsultaPadrao
+        );
+
+        if (fimSlot <= horarioFim) {
+          slots.push(new Date(slotAtual));
+        }
+
+        slotAtual.setMinutes(
+          slotAtual.getMinutes() +
+            REGRAS_AGENDAMENTO.duracaoConsultaPadrao +
+            REGRAS_AGENDAMENTO.intervaloEntreConsultas
+        );
+      }
+    });
+
+    return slots.sort((a, b) => a.getTime() - b.getTime());
+  }, [modalAgendamento.data, horariosDisponiveis]);
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -339,7 +423,8 @@ export default function PatientAgenda({
       {/* Modal de Agendamento */}
       {modalAgendamento.aberto && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            {/* Mudou de max-w-md para max-w-2xl */}
             <h3 className="text-xl font-bold text-gray-900 mb-4">
               Confirmar Agendamento
             </h3>
@@ -401,9 +486,9 @@ export default function PatientAgenda({
               {/* Data e Horário */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data e Horário
+                  Data
                 </label>
-                <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="bg-gray-50 p-3 rounded-lg mb-4">
                   <p className="font-medium text-gray-900">
                     {modalAgendamento.data?.toLocaleDateString("pt-BR", {
                       weekday: "long",
@@ -412,33 +497,20 @@ export default function PatientAgenda({
                       year: "numeric",
                     })}
                   </p>
-
-                  {/* Seletor de horários */}
-                  {slotsDisponiveis.length > 0 && (
-                    <div className="mt-3">
-                      <label className="block text-xs font-medium text-gray-600 mb-2">
-                        Escolha o horário:
-                      </label>
-                      <select
-                        value={modalAgendamento.horario?.toISOString() || ""}
-                        onChange={(e) => {
-                          const novoHorario = new Date(e.target.value);
-                          setModalAgendamento((prev) => ({
-                            ...prev,
-                            horario: novoHorario,
-                          }));
-                        }}
-                        className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                      >
-                        {slotsDisponiveis.map((slot, index) => (
-                          <option key={index} value={slot.toISOString()}>
-                            {formatarSlotHorario(slot)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
                 </div>
+
+                {/* Seletor de horários visual */}
+                <SlotSelector
+                  data={modalAgendamento.data!}
+                  slots={todosSlots}
+                  horarioSelecionado={modalAgendamento.horario}
+                  onSelectSlot={(slot) => {
+                    setModalAgendamento((prev) => ({ ...prev, horario: slot }));
+                  }}
+                  horariosDisponiveis={horariosDisponiveis}
+                  consultasExistentes={consultas}
+                  loading={false}
+                />
               </div>
 
               {/* Tipo de consulta - sempre online */}
