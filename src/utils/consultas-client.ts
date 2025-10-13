@@ -10,7 +10,7 @@ export interface DadosConsulta {
   data_fim: string;
   tipo: "online" | "presencial" | "telefone";
   profissional_id: string;
-  paciente_id: string;
+  paciente_id?: string; // Tornando opcional
   valor?: number;
   observacoes?: string;
 }
@@ -24,10 +24,12 @@ export async function criarConsultaCliente(dados: DadosConsulta) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.error("❌ Erro de autenticação:", authError);
       throw new Error("Usuário não autenticado");
     }
 
     console.log("🔍 Criando consulta para usuário:", user.id);
+    console.log("📋 Dados recebidos:", dados);
 
     // Buscar perfil do paciente
     const { data: perfilPaciente, error: perfilError } = await supabase
@@ -36,24 +38,46 @@ export async function criarConsultaCliente(dados: DadosConsulta) {
       .eq("user_id", user.id)
       .single();
 
-    if (perfilError || !perfilPaciente) {
+    console.log("👤 Resultado busca perfil paciente:", {
+      perfilPaciente,
+      perfilError,
+    });
+
+    // Se não encontrou perfil de paciente e não foi passado paciente_id
+    if (!perfilPaciente && !dados.paciente_id) {
       // Tentar buscar perfil de profissional (caso seja um profissional marcando)
-      const { data: perfilProfissional } = await supabase
+      const { data: perfilProfissional, error: profError } = await supabase
         .from("perfis_profissionais")
         .select("id")
         .eq("user_id", user.id)
         .single();
 
+      console.log("👨‍⚕️ Resultado busca perfil profissional:", {
+        perfilProfissional,
+        profError,
+      });
+
       if (!perfilProfissional) {
         throw new Error("Perfil não encontrado. Complete seu cadastro.");
       }
+
+      // Se for profissional marcando para si mesmo, criar um perfil de paciente temporário
+      // ou usar uma lógica diferente conforme regra de negócio
+      console.warn(
+        "⚠️ Profissional tentando marcar consulta sem perfil de paciente"
+      );
     }
 
     const pacienteId = dados.paciente_id || perfilPaciente?.id;
 
     if (!pacienteId) {
+      console.error("❌ ID do paciente não encontrado");
+      console.log("Debug - dados:", dados);
+      console.log("Debug - perfilPaciente:", perfilPaciente);
       throw new Error("ID do paciente não encontrado");
     }
+
+    console.log("✅ Paciente ID encontrado:", pacienteId);
 
     // Verificar conflitos de horário
     const { data: consultasExistentes, error: conflitosError } = await supabase

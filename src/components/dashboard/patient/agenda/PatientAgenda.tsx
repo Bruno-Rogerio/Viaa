@@ -6,7 +6,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHorariosDisponiveis } from "@/hooks/dashboard/useHorariosDisponiveis";
-import { apiClient } from "@/utils/api-client";
+import {
+  criarConsultaCliente,
+  listarConsultasProfissional,
+} from "@/utils/consultas-client";
 import {
   validarDataAgendamento,
   validarHorarioAgendamento,
@@ -102,9 +105,7 @@ export default function PatientAgenda({
   const carregarConsultas = useCallback(async () => {
     setCarregando(true);
     try {
-      const response = await apiClient.get(
-        `/api/consultas/profissional/${profissionalId}`
-      );
+      const response = await listarConsultasProfissional(profissionalId);
       setConsultas(response.consultas || []);
     } catch (error) {
       console.error("Erro ao carregar consultas:", error);
@@ -269,6 +270,13 @@ export default function PatientAgenda({
     setMensagem(null);
 
     try {
+      // Usar o user do contexto de autenticação
+      console.log("🔍 Usuário atual:", user);
+      console.log("📋 Usuario ID passado como prop:", usuarioId);
+
+      // O usuarioId passado como prop deve ser o ID do perfil do paciente
+      // Se não foi passado corretamente, vamos deixar o criarConsultaCliente buscar
+
       // Calcular horário de fim baseado na duração
       const dataInicio = new Date(modalAgendamento.horario);
       const dataFim = new Date(modalAgendamento.horario);
@@ -284,20 +292,19 @@ export default function PatientAgenda({
         data_fim: dataFim.toISOString(),
         tipo: "online" as TipoConsulta,
         profissional_id: profissionalId,
-        paciente_id: usuarioId,
+        paciente_id: usuarioId, // Este deve ser o ID do perfil_pacientes, não o user_id
         valor: profissionalInfo.valor_sessao,
       };
 
       console.log("📅 Enviando agendamento:", dadosConsulta);
 
-      // Fazer requisição
-      const response = await apiClient.post("/api/consultas", dadosConsulta);
+      // Fazer requisição diretamente via Supabase
+      const response = await criarConsultaCliente(dadosConsulta);
 
       // Sucesso
       setMensagem({
         tipo: "sucesso",
-        texto:
-          "Consulta agendada com sucesso! Aguarde a confirmação do profissional.",
+        texto: response.message,
       });
 
       // Recarregar consultas
