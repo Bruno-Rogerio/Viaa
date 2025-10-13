@@ -1,63 +1,21 @@
-// src/components/dashboard/professional/layout/ProfessionalSidebar.tsx
-// 🔧 VERSÃO SIMPLIFICADA - QUE REALMENTE FUNCIONA
-
 "use client";
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+
 import {
   HomeIcon,
   CalendarIcon,
   UserIcon,
-  ChatBubbleLeftRightIcon,
   DocumentTextIcon,
   ChartBarIcon,
   ArrowRightOnRectangleIcon,
   XMarkIcon,
   CogIcon,
 } from "@heroicons/react/24/outline";
+
 import { useAuth } from "@/contexts/AuthContext";
-
-const navigation = [
-  {
-    name: "Perfil",
-    href: "/dashboard/perfil",
-    icon: UserIcon,
-  },
-  {
-    name: "Feed",
-    href: "/dashboard", // Feed é o dashboard principal
-    icon: HomeIcon,
-  },
-  {
-    name: "Agenda",
-    href: "/dashboard/agenda",
-    icon: CalendarIcon,
-  },
-
-  {
-    name: "Consultas",
-    href: "/dashboard/profissional/consultas",
-    icon: CalendarDaysIcon,
-    badge: consultasPendentes, // número de consultas pendentes
-  },
-
-  {
-    name: "Prontuários",
-    href: "/dashboard/prontuarios",
-    icon: DocumentTextIcon,
-  },
-  {
-    name: "Analytics",
-    href: "/dashboard/analytics",
-    icon: ChartBarIcon,
-  },
-  {
-    name: "Configurações",
-    href: "/dashboard/configuracoes",
-    icon: CogIcon,
-  },
-];
+import { contarConsultasPendentesProfissional } from "@/utils/consultas-client"; // <- IMPORTADO!
 
 interface ProfessionalSidebarProps {
   isOpen: boolean;
@@ -73,8 +31,24 @@ export default function ProfessionalSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { signOut } = useAuth();
-
   const [isMobile, setIsMobile] = useState(false);
+
+  // NOVO: Estado para guardar o número de pendentes
+  const [consultasPendentes, setConsultasPendentes] = useState(0);
+
+  // NOVO: Recupera o id do profissional certinho
+  const profissionalId = profile?.dados?.id;
+
+  // NOVO: Busca a quantidade toda vez que profile mudar (ou ao abrir)
+  useEffect(() => {
+    if (!profissionalId) {
+      setConsultasPendentes(0);
+      return;
+    }
+    contarConsultasPendentesProfissional(profissionalId).then(
+      setConsultasPendentes
+    );
+  }, [profissionalId]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -87,6 +61,46 @@ export default function ProfessionalSidebar({
     await signOut();
     router.push("/");
   };
+
+  // Agora você pode usar consultasPendentes aqui!
+  const navigation = [
+    {
+      name: "Perfil",
+      href: "/dashboard/perfil",
+      icon: UserIcon,
+    },
+    {
+      name: "Feed",
+      href: "/dashboard", // Feed é o dashboard principal
+      icon: HomeIcon,
+    },
+    {
+      name: "Agenda",
+      href: "/dashboard/agenda",
+      icon: CalendarIcon,
+    },
+    {
+      name: "Consultas",
+      href: "/dashboard/profissional/consultas",
+      icon: CalendarIcon,
+      badge: consultasPendentes,
+    },
+    {
+      name: "Prontuários",
+      href: "/dashboard/prontuarios",
+      icon: DocumentTextIcon,
+    },
+    {
+      name: "Analytics",
+      href: "/dashboard/analytics",
+      icon: ChartBarIcon,
+    },
+    {
+      name: "Configurações",
+      href: "/dashboard/configuracoes",
+      icon: CogIcon,
+    },
+  ];
 
   return (
     <div
@@ -113,14 +127,12 @@ export default function ProfessionalSidebar({
             )}
           </div>
         </div>
-
         {/* 🔧 NAVEGAÇÃO - ÁREA QUE EXPANDE */}
         <nav className="flex-1 overflow-y-auto p-4">
           <div className="space-y-2">
             {navigation.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
-
               return (
                 <Link
                   key={item.name}
@@ -137,12 +149,18 @@ export default function ProfessionalSidebar({
                 >
                   <Icon className="w-5 h-5 mr-3" />
                   <span className="font-medium">{item.name}</span>
+
+                  {/* MOSTRA BADGE SE FOR CONSULTAS E HOUVER PENDENTES */}
+                  {item.name === "Consultas" && !!item.badge && (
+                    <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5">
+                      {item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
           </div>
         </nav>
-
         {/* 🔧 LOGOUT - SEMPRE NO BOTTOM */}
         <div className="flex-shrink-0 p-4 bg-gray-50 border-t border-gray-200">
           <button

@@ -165,3 +165,29 @@ export async function listarConsultasProfissional(profissionalId: string) {
     throw error;
   }
 }
+
+/**
+ * Conta o número de consultas 'pendentes' (status = 'agendada') do profissional.
+ * @param profissionalId O uuid do profissional.
+ * @returns A quantidade (number) de consultas pendentes
+ */
+export async function contarConsultasPendentesProfissional(
+  profissionalId: string
+): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from("consultas")
+      .select("id", { count: "exact", head: true })
+      .eq("profissional_id", profissionalId)
+      .eq("status", "agendada");
+
+    if (error) {
+      console.error("Erro ao buscar consultas pendentes:", error);
+      return 0;
+    }
+    return count ?? 0;
+  } catch (error) {
+    console.error("Erro crítico ao buscar consultas pendentes:", error);
+    return 0;
+  }
+}

@@ -1,17 +1,13 @@
 // src/app/dashboard/profissional/consultas/page.tsx
-// Página principal de gestão de consultas para profissionais
 
 "use client";
-
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfessionalLayout } from "@/components/dashboard/professional/layout";
 import ConsultasList from "@/components/dashboard/professional/consultas/ConsultasList";
 import {
-  CalendarDaysIcon,
   ClockIcon,
   CheckCircleIcon,
-  XCircleIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import type { StatusConsulta } from "@/types/agenda";
@@ -23,6 +19,7 @@ export default function ConsultasPage() {
   >("pendentes");
   const [recarregar, setRecarregar] = useState(0);
 
+  // SE profile não existe ou não é profissional, restringe acesso (segurança extra)
   if (!profile || profile.tipo !== "profissional") {
     return (
       <ProfessionalLayout>
@@ -33,9 +30,10 @@ export default function ConsultasPage() {
     );
   }
 
-  const profissionalId = profile.dados.id;
+  // Aqui garantimos que profile existe (por causa do if acima), mas TypeScript não assume o shape.
+  // Então, sempre check de segurança:
+  const profissionalId: string | null = profile?.dados?.id ?? null;
 
-  // Configuração dos filtros
   const filtros: Record<
     string,
     {
@@ -80,13 +78,11 @@ export default function ConsultasPage() {
             Gerencie suas consultas e agendamentos
           </p>
         </div>
-
         {/* Tabs de filtro */}
         <div className="bg-white rounded-xl border border-gray-200 p-1 inline-flex">
           {Object.entries(filtros).map(([key, config]) => {
             const Icon = config.icon;
             const isAtivo = filtroAtivo === key;
-
             return (
               <button
                 key={key}
@@ -106,17 +102,17 @@ export default function ConsultasPage() {
             );
           })}
         </div>
-
         {/* Lista de consultas */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <ConsultasList
-            key={recarregar}
-            profissionalId={profissionalId}
-            filtroStatus={filtros[filtroAtivo].status}
-            onConsultaAtualizada={handleConsultaAtualizada}
-          />
+          {profissionalId && (
+            <ConsultasList
+              key={recarregar}
+              profissionalId={profissionalId}
+              filtroStatus={filtros[filtroAtivo].status}
+              onConsultaAtualizada={handleConsultaAtualizada}
+            />
+          )}
         </div>
-
         {/* Dicas */}
         {filtroAtivo === "pendentes" && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
