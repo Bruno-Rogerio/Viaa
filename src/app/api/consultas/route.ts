@@ -1,54 +1,78 @@
 // src/app/api/consultas/route.ts
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
 
-    // 🔧 PRIMEIRO: Tentar obter sessão via cookie (padrão)
-    let session = null;
+    // Tentar obter sessão de múltiplas formas
     let user = null;
 
+    // 1. Tentar via cookies (padrão)
     const {
       data: { session: cookieSession },
-      error: sessionError,
     } = await supabase.auth.getSession();
 
-    console.log("🔍 Debug sessão (cookie):", {
-      hasSession: !!cookieSession,
-      hasUser: !!cookieSession?.user,
-      userId: cookieSession?.user?.id,
-      error: sessionError,
-    });
+    if (cookieSession?.user) {
+      user = cookieSession.user;
+      console.log("✅ Autenticado via cookie:", user.id);
+    }
 
-    // Se não tem sessão via cookie, tentar via Bearer token
-    if (!cookieSession) {
+    // 2. Se não funcionou, tentar via Authorization header
+    if (!user) {
       const authHeader = request.headers.get("authorization");
-      console.log("🔑 Tentando autenticação via Bearer token:", !!authHeader);
 
       if (authHeader?.startsWith("Bearer ")) {
         const token = authHeader.substring(7);
 
-        // Verificar o token com Supabase
+        // Criar cliente com a chave anon para validar o token
+        const supabaseAuth = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
         const {
           data: { user: tokenUser },
-          error: tokenError,
-        } = await supabase.auth.getUser(token);
+          error,
+        } = await supabaseAuth.auth.getUser(token);
 
-        if (tokenUser && !tokenError) {
-          console.log("✅ Usuário autenticado via Bearer token:", tokenUser.id);
+        if (tokenUser && !error) {
           user = tokenUser;
-        } else {
-          console.error("❌ Erro ao validar Bearer token:", tokenError);
+          console.log("✅ Autenticado via Bearer token:", user.id);
         }
       }
-    } else {
-      user = cookieSession.user;
     }
 
-    // Se ainda não tem usuário, retornar erro
+    // 3. Se ainda não tem usuário, tentar pegar token dos cookies manualmente
+    if (!user) {
+      const cookieStore = await cookies();
+      const accessToken =
+        cookieStore.get("sb-access-token")?.value ||
+        cookieStore.get("sb-pfthvckypamprtslfrxx-auth-token")?.value;
+
+      if (accessToken) {
+        console.log("🔑 Tentando autenticar com token do cookie");
+
+        const supabaseAuth = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        const {
+          data: { user: cookieUser },
+          error,
+        } = await supabaseAuth.auth.getUser(accessToken);
+
+        if (cookieUser && !error) {
+          user = cookieUser;
+          console.log("✅ Autenticado via cookie token:", user.id);
+        }
+      }
+    }
+
     if (!user) {
       console.error("❌ Nenhuma forma de autenticação funcionou");
       return NextResponse.json(
@@ -120,9 +144,6 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
-
-      // Se é um profissional, usar o ID dele como paciente (auto-consulta)
-      // ou implementar lógica específica
     }
 
     const pacienteId = perfilPaciente?.id;
