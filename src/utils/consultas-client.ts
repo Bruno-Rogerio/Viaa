@@ -10,7 +10,7 @@ export interface DadosConsulta {
   data_fim: string;
   tipo: "online" | "presencial" | "telefone";
   profissional_id: string;
-  paciente_id?: string;
+  paciente_id?: string; // Tornando opcional
   valor?: number;
   observacoes?: string;
 }
@@ -40,12 +40,12 @@ export async function criarConsultaCliente(dados: DadosConsulta) {
       body: JSON.stringify(dados),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Erro ao agendar consulta");
-    }
-
     const result = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ Erro na resposta da API:", result);
+      throw new Error(result.error || "Erro ao agendar consulta");
+    }
 
     console.log("✅ Consulta criada com sucesso via API:", result.consulta?.id);
 
@@ -93,6 +93,8 @@ export async function listarConsultasProfissional(profissionalId: string) {
 
 /**
  * Conta o número de consultas 'pendentes' (status = 'agendada') do profissional.
+ * @param profissionalId O uuid do profissional.
+ * @returns A quantidade (number) de consultas pendentes
  */
 export async function contarConsultasPendentesProfissional(
   profissionalId: string
