@@ -2,6 +2,11 @@
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { TipoLembrete, CriarLembreteConsulta } from "@/types/notificacao";
+import {
+  criarLembrete,
+  processarLembrete,
+} from "@/services/lembretes/lembreteService";
 
 export async function POST(
   request: NextRequest,
@@ -40,7 +45,7 @@ export async function POST(
     // Buscar consulta
     const { data: consulta } = await supabase
       .from("consultas")
-      .select("*, profissional_id, status")
+      .select("*, profissional_id, paciente_id, status")
       .eq("id", consultaId)
       .single();
 
@@ -83,7 +88,28 @@ export async function POST(
       );
     }
 
-    // TODO: Notificar paciente
+    // Notificar paciente
+    try {
+      const dadosLembrete: CriarLembreteConsulta = {
+        consulta_id: consultaId,
+        tipo: TipoLembrete.CANCELAMENTO,
+        destinatario_id: consulta.paciente_id,
+        agendado_para: new Date().toISOString(),
+        mensagem: motivo || "A consulta foi rejeitada pelo profissional.",
+      };
+
+      const lembreteCriado = await criarLembrete(dadosLembrete);
+
+      if (lembreteCriado) {
+        await processarLembrete(lembreteCriado.id);
+      }
+    } catch (notificacaoError) {
+      console.error(
+        "Erro ao enviar notificação de rejeição:",
+        notificacaoError
+      );
+      // Não falha a rejeição por causa da notificação
+    }
 
     return NextResponse.json({
       success: true,
