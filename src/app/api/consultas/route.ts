@@ -134,12 +134,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar conflitos de horário
+    // Verificar conflitos de horário - CORRIGIDO
     const { data: consultasExistentes } = await supabase
       .from("consultas")
       .select("id")
       .eq("profissional_id", profissional_id)
-      .not("status", "in", "(cancelada,rejeitada)")
+      .in("status", ["agendada", "confirmada", "em_andamento"])
       .or(`and(data_inicio.lt.${data_fim},data_fim.gt.${data_inicio})`);
 
     if (consultasExistentes && consultasExistentes.length > 0) {
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error("Erro ao criar consulta:", insertError);
+      console.error("❌ Erro ao criar consulta:", insertError);
       return NextResponse.json(
         { error: "Erro ao agendar consulta" },
         { status: 500 }
@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
       consulta: novaConsulta,
     });
   } catch (error) {
-    console.error("Erro ao criar consulta:", error);
+    console.error("❌ Erro ao criar consulta:", error);
     return NextResponse.json(
       { error: "Erro interno do servidor" },
       { status: 500 }

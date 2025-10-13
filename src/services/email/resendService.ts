@@ -180,6 +180,9 @@ function obterConteudoEmail(
   tipo: TipoLembrete,
   dados: DadosTemplateEmail
 ): string {
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL || "https://viaa-six.vercel.app";
+
   switch (tipo) {
     case TipoLembrete.AGENDAMENTO:
       return `
@@ -196,10 +199,7 @@ function obterConteudoEmail(
         <p style="color: ${COLORS.text}; font-size: 16px; line-height: 1.6;">
           Você receberá uma notificação assim que o profissional confirmar sua consulta.
         </p>
-        ${botao(
-          "Acessar Minhas Consultas",
-          `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/consultas`
-        )}
+        ${botao("Acessar Minhas Consultas", `${appUrl}/dashboard/consultas`)}
       `;
 
     case TipoLembrete.CONFIRMACAO:
@@ -224,10 +224,7 @@ function obterConteudoEmail(
         `
             : ""
         }
-        ${botao(
-          "Ver Detalhes da Consulta",
-          `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/consultas`
-        )}
+        ${botao("Ver Detalhes da Consulta", `${appUrl}/dashboard/consultas`)}
       `;
 
     case TipoLembrete.LEMBRETE_24H:
@@ -252,10 +249,7 @@ function obterConteudoEmail(
         `
             : ""
         }
-        ${botao(
-          "Preparar-me para a Consulta",
-          `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/consultas`
-        )}
+        ${botao("Preparar-me para a Consulta", `${appUrl}/dashboard/consultas`)}
       `;
 
     case TipoLembrete.LEMBRETE_1H:
@@ -283,10 +277,7 @@ function obterConteudoEmail(
         </p>
         ${botao("Entrar na Consulta", dados.consulta.link_videochamada)}
         `
-            : botao(
-                "Ver Detalhes",
-                `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/consultas`
-              )
+            : botao("Ver Detalhes", `${appUrl}/dashboard/consultas`)
         }
       `;
 
@@ -305,10 +296,7 @@ function obterConteudoEmail(
         <p style="color: ${COLORS.text}; font-size: 16px; line-height: 1.6;">
           Entre em contato conosco se precisar de mais informações ou para reagendar.
         </p>
-        ${botao(
-          "Agendar Nova Consulta",
-          `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/agendar`
-        )}
+        ${botao("Agendar Nova Consulta", `${appUrl}/dashboard/agendar`)}
       `;
 
     default:
@@ -374,6 +362,8 @@ export async function notificarProfissionalNovoAgendamentoResend(
   dados: DadosTemplateEmail
 ): Promise<boolean> {
   try {
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL || "https://viaa-six.vercel.app";
     const dataConsulta = new Date(dados.consulta.data_inicio);
     const dataFormatada = dataConsulta.toLocaleDateString("pt-BR", {
       weekday: "long",
@@ -446,10 +436,7 @@ export async function notificarProfissionalNovoAgendamentoResend(
       <p style="color: ${COLORS.text}; font-size: 16px; line-height: 1.6;">
         Por favor, acesse seu dashboard para <strong>confirmar ou rejeitar</strong> este agendamento.
       </p>
-      ${botao(
-        "Gerenciar Agendamento",
-        `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/consultas`
-      )}
+      ${botao("Gerenciar Agendamento", `${appUrl}/dashboard/consultas`)}
     `;
 
     const htmlCompleto = templateBase(conteudo);
