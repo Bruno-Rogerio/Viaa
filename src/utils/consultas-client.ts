@@ -31,12 +31,13 @@ export async function criarConsultaCliente(dados: DadosConsulta) {
     console.log("🔍 Criando consulta via API para usuário:", user.id);
     console.log("📋 Dados da consulta:", dados);
 
-    // 🚀 CHAMAR A API AO INVÉS DE INSERIR DIRETO NO BANCO
+    // 🚀 CHAMAR A API COM CREDENCIAIS (cookies)
     const response = await fetch("/api/consultas", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
+      credentials: "include", // ✅ ENVIAR COOKIES
       body: JSON.stringify(dados),
     });
 
@@ -44,7 +45,9 @@ export async function criarConsultaCliente(dados: DadosConsulta) {
 
     if (!response.ok) {
       console.error("❌ Erro na resposta da API:", result);
-      throw new Error(result.error || "Erro ao agendar consulta");
+      throw new Error(
+        result.error || result.details || "Erro ao agendar consulta"
+      );
     }
 
     console.log("✅ Consulta criada com sucesso via API:", result.consulta?.id);
