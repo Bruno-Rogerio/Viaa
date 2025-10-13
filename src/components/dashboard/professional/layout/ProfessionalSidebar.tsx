@@ -34,6 +34,14 @@ const navigation = [
     href: "/dashboard/agenda",
     icon: CalendarIcon,
   },
+
+  {
+    name: "Consultas",
+    href: "/dashboard/profissional/consultas",
+    icon: CalendarDaysIcon,
+    badge: consultasPendentes, // número de consultas pendentes
+  },
+
   {
     name: "Prontuários",
     href: "/dashboard/prontuarios",
