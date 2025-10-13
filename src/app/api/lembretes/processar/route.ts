@@ -1,8 +1,9 @@
 // src/app/api/lembretes/processar/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase/server";
-import { StatusNotificacao } from "@/types/notificacao";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
+import { StatusNotificacao, LembreteConsulta } from "@/types/notificacao";
 import { processarLembrete } from "@/services/lembretes/lembreteService";
 
 export async function GET(request: NextRequest) {
@@ -15,6 +16,8 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    const supabase = createRouteHandlerClient({ cookies });
 
     // Obter lembretes pendentes que estão agendados para agora ou no passado
     const agora = new Date().toISOString();
@@ -36,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     // Processar cada lembrete
     const resultados = await Promise.all(
-      lembretes.map(async (lembrete) => {
+      lembretes.map(async (lembrete: LembreteConsulta) => {
         const sucesso = await processarLembrete(lembrete.id);
         return {
           id: lembrete.id,
