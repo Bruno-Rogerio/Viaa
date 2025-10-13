@@ -9,9 +9,9 @@ import {
   DadosTemplateEmail,
 } from "@/types/notificacao";
 import {
-  enviarEmail,
-  notificarProfissionalNovoAgendamento,
-} from "../email/emailService";
+  enviarEmailResend,
+  notificarProfissionalNovoAgendamentoResend,
+} from "../email/resendService";
 import { Consulta } from "@/types/agenda";
 
 // Função para criar um novo lembrete
@@ -73,46 +73,58 @@ export async function obterDadosTemplateEmail(
   consultaId: string
 ): Promise<DadosTemplateEmail | null> {
   try {
-    // Obter dados da consulta com joins para profissional e paciente
-    const { data, error } = await supabase
+    // Obter dados da consulta
+    const { data: consulta, error: consultaError } = await supabase
       .from("consultas")
       .select(
-        `
-        id, data_inicio, data_fim, status, tipo, link_videochamada,
-        profissionais:profissional_id (
-          id, nome, sobrenome, especialidades, foto_perfil_url
-        ),
-        pacientes:paciente_id (
-          id, nome, sobrenome, foto_perfil_url
-        )
-      `
+        "id, data_inicio, data_fim, status, tipo, link_videochamada, profissional_id, paciente_id"
       )
       .eq("id", consultaId)
       .single();
 
-    if (error) throw error;
-    if (!data) return null;
+    if (consultaError) throw consultaError;
+    if (!consulta) return null;
+
+    // Obter dados do profissional
+    const { data: profissional, error: profissionalError } = await supabase
+      .from("perfis_profissionais")
+      .select("id, nome, sobrenome, especialidades, foto_perfil_url")
+      .eq("id", consulta.profissional_id)
+      .single();
+
+    if (profissionalError) throw profissionalError;
+    if (!profissional) return null;
+
+    // Obter dados do paciente
+    const { data: paciente, error: pacienteError } = await supabase
+      .from("perfis_pacientes")
+      .select("id, nome, sobrenome, foto_perfil_url")
+      .eq("id", consulta.paciente_id)
+      .single();
+
+    if (pacienteError) throw pacienteError;
+    if (!paciente) return null;
 
     // Formatar os dados para o template
     return {
       consulta: {
-        id: data.id,
-        data_inicio: data.data_inicio,
-        data_fim: data.data_fim,
-        status: data.status,
-        tipo: data.tipo,
-        link_videochamada: data.link_videochamada,
+        id: consulta.id,
+        data_inicio: consulta.data_inicio,
+        data_fim: consulta.data_fim,
+        status: consulta.status,
+        tipo: consulta.tipo,
+        link_videochamada: consulta.link_videochamada,
       },
       profissional: {
-        nome: data.profissionais.nome,
-        sobrenome: data.profissionais.sobrenome,
-        especialidade: data.profissionais.especialidades,
-        foto_url: data.profissionais.foto_perfil_url,
+        nome: profissional.nome,
+        sobrenome: profissional.sobrenome,
+        especialidade: profissional.especialidades,
+        foto_url: profissional.foto_perfil_url,
       },
       paciente: {
-        nome: data.pacientes.nome,
-        sobrenome: data.pacientes.sobrenome,
-        foto_url: data.pacientes.foto_perfil_url,
+        nome: paciente.nome,
+        sobrenome: paciente.sobrenome,
+        foto_url: paciente.foto_perfil_url,
       },
     };
   } catch (error) {
@@ -128,17 +140,17 @@ async function obterEmailDestinatario(
   try {
     // Primeiro tenta buscar na tabela de perfis de profissionais
     let { data, error } = await supabase
-      .from("perfil_profissional")
+      .from("perfis_profissionais")
       .select("email")
-      .eq("user_id", destinatarioId)
+      .eq("id", destinatarioId)
       .single();
 
     // Se não encontrou ou deu erro, busca na tabela de perfis de pacientes
     if (error || !data) {
       const { data: pacienteData, error: pacienteError } = await supabase
-        .from("perfil_paciente")
+        .from("perfis_pacientes")
         .select("email")
-        .eq("user_id", destinatarioId)
+        .eq("id", destinatarioId)
         .single();
 
       if (pacienteError) throw pacienteError;
@@ -188,8 +200,8 @@ export async function processarLembrete(lembreteId: string): Promise<boolean> {
       );
     }
 
-    // Enviar email baseado no tipo do lembrete
-    const enviado = await enviarEmail(
+    // Enviar email baseado no tipo do lembrete usando Resend
+    const enviado = await enviarEmailResend(
       emailDestinatario,
       lembrete.tipo as TipoLembrete,
       dadosTemplate
@@ -233,20 +245,6 @@ export async function criarLembretesAutomaticos(
       agendado_para: agora.toISOString(),
     });
 
-    // Notificação para o profissional (imediato)
-    // Vamos buscar o email do profissional e enviar diretamente
-    const emailProfissional = await obterEmailDestinatario(
-      consulta.profissional_id
-    );
-    const dadosTemplate = await obterDadosTemplateEmail(consulta.id);
-
-    if (emailProfissional && dadosTemplate) {
-      await notificarProfissionalNovoAgendamento(
-        emailProfissional,
-        dadosTemplate
-      );
-    }
-
     // Lembrete 24h antes (se ainda não passou do prazo)
     const data24h = new Date(dataConsulta);
     data24h.setHours(data24h.getHours() - 24);
@@ -289,6 +287,21 @@ export async function criarLembretesAutomaticos(
 
     if (lembreteAgendamento.data) {
       await processarLembrete(lembreteAgendamento.data.id);
+    }
+
+    // Notificação para o profissional (imediato)
+    const dadosTemplate = await obterDadosTemplateEmail(consulta.id);
+    if (dadosTemplate) {
+      const emailProfissional = await obterEmailDestinatario(
+        consulta.profissional_id
+      );
+
+      if (emailProfissional) {
+        await notificarProfissionalNovoAgendamentoResend(
+          emailProfissional,
+          dadosTemplate
+        );
+      }
     }
 
     return true;

@@ -60,51 +60,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Obter dados do body
     const body = await request.json();
-
-    console.log("📋 Dados recebidos:", {
-      userId: user.id,
-      profissional_id: body.profissional_id,
-      data_inicio: body.data_inicio,
-      tipo: body.tipo,
-    });
-
     const {
-      profissional_id,
+      titulo,
+      descricao,
       data_inicio,
       data_fim,
       tipo,
-      titulo,
-      descricao,
+      profissional_id,
       observacoes,
     } = body;
 
-    // Validações
-    if (!profissional_id || !data_inicio || !data_fim || !tipo) {
+    console.log("📋 Dados da consulta:", {
+      titulo,
+      data_inicio,
+      data_fim,
+      tipo,
+      profissional_id,
+      user_id: user.id,
+    });
+
+    // Validações básicas
+    if (!data_inicio || !data_fim || !tipo || !profissional_id) {
       return NextResponse.json(
-        { error: "Campos obrigatórios faltando" },
+        { error: "Dados obrigatórios faltando" },
         { status: 400 }
       );
     }
 
+    // Verificar se data_fim é maior que data_inicio
     if (new Date(data_fim) <= new Date(data_inicio)) {
       return NextResponse.json(
-        { error: "Data de fim deve ser posterior à data de início" },
+        { error: "Data de término deve ser posterior à data de início" },
         { status: 400 }
       );
     }
 
-    // Buscar perfil do paciente
+    // Obter perfil do paciente
     const { data: perfilPaciente, error: perfilError } = await supabase
       .from("perfis_pacientes")
       .select("id")
       .eq("user_id", user.id)
       .single();
 
-    console.log("👤 Perfil paciente:", { perfilPaciente, perfilError });
+    if (perfilError) {
+      console.error("❌ Erro ao buscar perfil do paciente:", perfilError);
 
-    if (perfilError || !perfilPaciente) {
-      // Tentar buscar se é um profissional agendando
+      // Se não é paciente, pode ser profissional fazendo auto-consulta
       const { data: perfilProfissional } = await supabase
         .from("perfis_profissionais")
         .select("id")
@@ -185,8 +188,37 @@ export async function POST(request: NextRequest) {
 
     console.log("✅ Consulta criada:", novaConsulta?.id);
 
-    // TODO: Enviar notificação para o profissional
-    // TODO: Criar lembretes automáticos
+    // Criar lembretes automáticos (email imediato + lembretes futuros)
+    try {
+      const { criarLembretesAutomaticos } = await import(
+        "@/services/lembretes/lembreteService"
+      );
+
+      await criarLembretesAutomaticos({
+        id: novaConsulta.id,
+        titulo: novaConsulta.titulo,
+        descricao: novaConsulta.descricao,
+        data_inicio: novaConsulta.data_inicio,
+        data_fim: novaConsulta.data_fim,
+        status: novaConsulta.status,
+        tipo: novaConsulta.tipo,
+        profissional_id: novaConsulta.profissional_id,
+        paciente_id: novaConsulta.paciente_id,
+        valor: novaConsulta.valor,
+        observacoes: novaConsulta.observacoes,
+        link_videochamada: novaConsulta.link_videochamada,
+        lembretes_enviados: novaConsulta.lembretes_enviados || false,
+        created_at: novaConsulta.created_at,
+        updated_at: novaConsulta.updated_at,
+        profissional: novaConsulta.profissional,
+        paciente: novaConsulta.paciente,
+      });
+
+      console.log("✅ Lembretes criados com sucesso");
+    } catch (lembreteError) {
+      console.error("⚠️ Erro ao criar lembretes (não crítico):", lembreteError);
+      // Não falha a criação da consulta por causa dos lembretes
+    }
 
     return NextResponse.json({
       success: true,

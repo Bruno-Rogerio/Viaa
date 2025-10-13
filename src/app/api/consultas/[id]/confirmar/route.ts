@@ -1,7 +1,8 @@
 // src/app/api/consultas/[id]/confirmar/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 import {
   TipoLembrete,
   StatusNotificacao,
@@ -17,12 +18,17 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const supabase = createRouteHandlerClient({ cookies });
     const consultaId = params.id;
     const { acao, motivo } = await request.json();
 
     // Verificar autenticação
-    const { data: session } = await supabase.auth.getSession();
-    if (!session?.session?.user) {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError || !session?.user) {
       return NextResponse.json(
         { error: "Usuário não autenticado" },
         { status: 401 }
@@ -44,7 +50,7 @@ export async function PUT(
     }
 
     // Verificar se o usuário é o profissional da consulta
-    if (consulta.profissional_id !== session.session.user.id) {
+    if (consulta.profissional_id !== session.user.id) {
       return NextResponse.json(
         { error: "Você não tem permissão para modificar esta consulta" },
         { status: 403 }
