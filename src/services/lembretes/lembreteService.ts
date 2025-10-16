@@ -1,6 +1,6 @@
 // src/services/lembretes/lembreteService.ts
 
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@supabase/supabase-js";
 import {
   LembreteConsulta,
   CriarLembreteConsulta,
@@ -14,11 +14,27 @@ import {
 } from "../email/resendService";
 import { Consulta } from "@/types/agenda";
 
+// Função helper para obter cliente Supabase (server-side ou client-side)
+function getSupabaseClient() {
+  // Se estiver no servidor (tem as variáveis de ambiente do servidor)
+  if (typeof window === "undefined" && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+
+  // Se estiver no cliente
+  const { supabase } = require("@/lib/supabase/client");
+  return supabase;
+}
+
 // Função para criar um novo lembrete
 export async function criarLembrete(
   dados: CriarLembreteConsulta
 ): Promise<LembreteConsulta | null> {
   try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from("lembretes_consulta")
       .insert([
@@ -49,6 +65,7 @@ export async function atualizarStatusLembrete(
   dataEnvio?: string
 ): Promise<boolean> {
   try {
+    const supabase = getSupabaseClient();
     const updateData: any = { status };
 
     if (dataEnvio) {
@@ -73,6 +90,8 @@ export async function obterDadosTemplateEmail(
   consultaId: string
 ): Promise<DadosTemplateEmail | null> {
   try {
+    const supabase = getSupabaseClient();
+
     // Obter dados da consulta
     const { data: consulta, error: consultaError } = await supabase
       .from("consultas")
@@ -138,6 +157,8 @@ async function obterEmailDestinatario(
   destinatarioId: string
 ): Promise<string | null> {
   try {
+    const supabase = getSupabaseClient();
+
     // Primeiro tenta buscar na tabela de perfis de profissionais
     let { data, error } = await supabase
       .from("perfis_profissionais")
@@ -167,6 +188,8 @@ async function obterEmailDestinatario(
 // Função para processar um lembrete (enviar notificação)
 export async function processarLembrete(lembreteId: string): Promise<boolean> {
   try {
+    const supabase = getSupabaseClient();
+
     // Obter dados do lembrete
     const { data: lembrete, error } = await supabase
       .from("lembretes_consulta")
@@ -231,8 +254,11 @@ export async function criarLembretesAutomaticos(
   consulta: Consulta
 ): Promise<boolean> {
   try {
+    const supabase = getSupabaseClient();
     const dataConsulta = new Date(consulta.data_inicio);
     const agora = new Date();
+
+    console.log("🔔 Criando lembretes para consulta:", consulta.id);
 
     // Definir quando enviar os lembretes
     const lembretesParaCriar: CriarLembreteConsulta[] = [];
@@ -271,6 +297,8 @@ export async function criarLembretesAutomaticos(
       });
     }
 
+    console.log(`📝 Criando ${lembretesParaCriar.length} lembretes no banco`);
+
     // Criar todos os lembretes na base de dados
     for (const lembrete of lembretesParaCriar) {
       await criarLembrete(lembrete);
@@ -286,6 +314,7 @@ export async function criarLembretesAutomaticos(
       .single();
 
     if (lembreteAgendamento.data) {
+      console.log("📧 Processando lembrete de agendamento imediato");
       await processarLembrete(lembreteAgendamento.data.id);
     }
 
@@ -297,6 +326,7 @@ export async function criarLembretesAutomaticos(
       );
 
       if (emailProfissional) {
+        console.log("📧 Enviando email para profissional");
         await notificarProfissionalNovoAgendamentoResend(
           emailProfissional,
           dadosTemplate
@@ -304,9 +334,10 @@ export async function criarLembretesAutomaticos(
       }
     }
 
+    console.log("✅ Lembretes criados e enviados com sucesso");
     return true;
   } catch (error) {
-    console.error("Erro ao criar lembretes automáticos:", error);
+    console.error("❌ Erro ao criar lembretes automáticos:", error);
     return false;
   }
 }
