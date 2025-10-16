@@ -159,28 +159,58 @@ async function obterEmailDestinatario(
   try {
     const supabase = getSupabaseClient();
 
-    // Primeiro tenta buscar na tabela de perfis de profissionais
-    let { data, error } = await supabase
+    // Primeiro tenta buscar na tabela de perfis de profissionais (tem email)
+    let { data: profissionalData, error: profissionalError } = await supabase
       .from("perfis_profissionais")
       .select("email")
       .eq("id", destinatarioId)
       .single();
 
-    // Se não encontrou ou deu erro, busca na tabela de perfis de pacientes
-    if (error || !data) {
-      const { data: pacienteData, error: pacienteError } = await supabase
-        .from("perfis_pacientes")
-        .select("email")
-        .eq("id", destinatarioId)
-        .single();
-
-      if (pacienteError) throw pacienteError;
-      return pacienteData?.email || null;
+    if (profissionalData?.email) {
+      console.log("✅ Email encontrado no perfil profissional");
+      return profissionalData.email;
     }
 
-    return data.email;
+    // Se não encontrou, buscar user_id do paciente e depois o email em auth.users
+    const { data: pacienteData, error: pacienteError } = await supabase
+      .from("perfis_pacientes")
+      .select("user_id")
+      .eq("id", destinatarioId)
+      .single();
+
+    if (pacienteError || !pacienteData) {
+      console.error("❌ Perfil de paciente não encontrado");
+      throw new Error("Perfil não encontrado");
+    }
+
+    // Buscar email na tabela auth.users
+    const { data: userData, error: userError } = await supabase
+      .from("auth.users")
+      .select("email")
+      .eq("id", pacienteData.user_id)
+      .single();
+
+    if (userError || !userData) {
+      console.error("❌ Email não encontrado em auth.users");
+
+      // Tentar usando admin API
+      const {
+        data: { user },
+        error: adminError,
+      } = await supabase.auth.admin.getUserById(pacienteData.user_id);
+
+      if (adminError || !user?.email) {
+        throw new Error("Email não encontrado");
+      }
+
+      console.log("✅ Email encontrado via admin API");
+      return user.email;
+    }
+
+    console.log("✅ Email encontrado em auth.users");
+    return userData.email;
   } catch (error) {
-    console.error("Erro ao obter email do destinatário:", error);
+    console.error("❌ Erro ao obter email do destinatário:", error);
     return null;
   }
 }
