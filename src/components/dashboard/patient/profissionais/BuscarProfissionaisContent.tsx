@@ -1,18 +1,16 @@
 // src/components/dashboard/patient/profissionais/BuscarProfissionaisContent.tsx
+// 🔄 ATUALIZADO PARA USAR O PROFESSIONAL CARD COM FOLLOW
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  MapPinIcon,
-  CheckBadgeIcon,
-} from "@heroicons/react/24/outline";
-import Image from "next/image";
+import { MagnifyingGlassIcon, FunnelIcon } from "@heroicons/react/24/outline";
+import ProfessionalCard from "./ProfessionalCard";
 
 interface Profissional {
   id: string;
+  user_id: string;
   nome: string;
   sobrenome: string;
   tipo: string;
@@ -25,6 +23,7 @@ interface Profissional {
   endereco_estado?: string;
   crp?: string;
   verificado: boolean;
+  rating?: number;
 }
 
 interface Paginacao {
@@ -94,6 +93,7 @@ export default function BuscarProfissionaisContent() {
     page: parseInt(searchParams.get("page") || "1"),
   });
 
+  // Buscar profissionais
   useEffect(() => {
     buscarProfissionais();
   }, [filtros]);
@@ -275,165 +275,56 @@ export default function BuscarProfissionaisContent() {
         )}
 
         {!carregando && profissionais.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {profissionais.map((prof) => (
-              <div
-                key={prof.id}
-                className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow"
-              >
-                <div className="flex items-start space-x-4 mb-4">
-                  <div className="relative">
-                    {prof.foto_perfil_url ? (
-                      <Image
-                        src={prof.foto_perfil_url}
-                        alt={prof.nome}
-                        width={64}
-                        height={64}
-                        className="rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xl font-bold">
-                          {prof.nome[0]}
-                          {prof.sobrenome[0]}
-                        </span>
-                      </div>
-                    )}
-                    {prof.verificado && (
-                      <CheckBadgeIcon className="absolute -bottom-1 -right-1 w-6 h-6 text-blue-600 bg-white rounded-full" />
-                    )}
-                  </div>
+          <>
+            {/* NOVO: Grid de ProfessionalCards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {profissionais.map((prof) => (
+                <ProfessionalCard key={prof.id} profissional={prof} />
+              ))}
+            </div>
 
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-gray-900 truncate">
-                      {prof.nome} {prof.sobrenome}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      {getTipoLabel(prof.tipo)}
-                    </p>
-                    {prof.crp && (
-                      <p className="text-xs text-gray-500">CRP: {prof.crp}</p>
-                    )}
-                  </div>
-                </div>
+            {/* Paginação */}
+            {paginacao && paginacao.total_paginas > 1 && (
+              <div className="flex items-center justify-center gap-4 pt-6 border-t border-gray-200">
+                <button
+                  onClick={() =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      page: Math.max(1, prev.page - 1),
+                    }))
+                  }
+                  disabled={!paginacao.tem_anterior}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ← Anterior
+                </button>
 
-                <div className="mb-4">
-                  <p className="text-sm text-gray-600 line-clamp-2">
-                    {prof.especialidades}
-                  </p>
-                </div>
+                <span className="text-gray-600">
+                  Página {paginacao.pagina_atual} de {paginacao.total_paginas}
+                </span>
 
-                {(prof.endereco_cidade || prof.endereco_estado) && (
-                  <div className="flex items-center text-sm text-gray-500 mb-4">
-                    <MapPinIcon className="w-4 h-4 mr-1" />
-                    <span>
-                      {prof.endereco_cidade}
-                      {prof.endereco_cidade && prof.endereco_estado && ", "}
-                      {prof.endereco_estado}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-100">
-                  {prof.valor_sessao && (
-                    <div>
-                      <p className="text-xs text-gray-500">Valor da sessão</p>
-                      <p className="text-lg font-bold text-gray-900">
-                        R$ {prof.valor_sessao.toFixed(2)}
-                      </p>
-                    </div>
-                  )}
-                  {prof.experiencia_anos && (
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500">Experiência</p>
-                      <p className="text-lg font-bold text-gray-900">
-                        {prof.experiencia_anos} anos
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() =>
-                      router.push(`/dashboard/profissionais/${prof.id}`)
-                    }
-                    className="flex-1 px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-medium"
-                  >
-                    Ver Perfil
-                  </button>
-                  <button
-                    onClick={() =>
-                      router.push(`/dashboard/profissionais/${prof.id}/agendar`)
-                    }
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  >
-                    Agendar
-                  </button>
-                </div>
+                <button
+                  onClick={() =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      page: prev.page + 1,
+                    }))
+                  }
+                  disabled={!paginacao.tem_proxima}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Próxima →
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
 
         {!carregando && profissionais.length === 0 && (
           <div className="text-center py-12">
-            <div className="text-6xl mb-4">🔍</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              Nenhum profissional encontrado
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Tente ajustar os filtros de busca
+            <p className="text-gray-500 text-lg">
+              Nenhum profissional encontrado com esses critérios.
             </p>
-            <button
-              onClick={limparFiltros}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Limpar filtros
-            </button>
-          </div>
-        )}
-
-        {paginacao && paginacao.total_paginas > 1 && (
-          <div className="mt-8 flex items-center justify-center space-x-2">
-            <button
-              onClick={() =>
-                handleFiltroChange("page", (filtros.page - 1).toString())
-              }
-              disabled={!paginacao.tem_anterior}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Anterior
-            </button>
-
-            <div className="flex items-center space-x-1">
-              {Array.from(
-                { length: Math.min(paginacao.total_paginas, 5) },
-                (_, i) => i + 1
-              ).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => handleFiltroChange("page", page.toString())}
-                  className={`w-10 h-10 rounded-lg font-medium ${
-                    page === paginacao.pagina_atual
-                      ? "bg-blue-600 text-white"
-                      : "border border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() =>
-                handleFiltroChange("page", (filtros.page + 1).toString())
-              }
-              disabled={!paginacao.tem_proxima}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Próxima
-            </button>
           </div>
         )}
       </div>
