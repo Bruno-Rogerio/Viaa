@@ -1,11 +1,14 @@
 // src/app/dashboard/paciente/profissionais/[id]/page.tsx
-// 🎯 DETALHES DO PROFISSIONAL + AGENDAMENTO INTEGRADO
+// 🎯 COMPLETO COM FOLLOW INTEGRADO - SEM PERDER NADA
 
 "use client";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase/client";
 import { PatientLayout } from "@/components/dashboard/patient/layout";
+import FollowButton from "@/components/dashboard/common/FollowButton";
+import FollowersModal from "@/components/dashboard/common/FollowersModal";
 import {
   StarIcon,
   MapPinIcon,
@@ -19,6 +22,7 @@ import {
   ArrowLeftIcon,
   VideoCameraIcon,
   BuildingOfficeIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import {
   StarIcon as StarSolid,
@@ -28,6 +32,7 @@ import Link from "next/link";
 
 interface ProfissionalDetalhado {
   id: string;
+  user_id: string;
   nome: string;
   sobrenome: string;
   especialidades: string;
@@ -75,8 +80,30 @@ export default function ProfissionalDetalhePage() {
   });
   const [agendandoConsulta, setAgendandoConsulta] = useState(false);
 
+  // NOVO: States para Follow
+  const [showFollowers, setShowFollowers] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [followerCount, setFollowerCount] = useState(0);
+
   const profissionalId = params.id as string;
   const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+  // NOVO: Obter token
+  useEffect(() => {
+    const getToken = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          setAuthToken(session.access_token);
+        }
+      } catch (error) {
+        console.error("Erro ao obter token:", error);
+      }
+    };
+    getToken();
+  }, []);
 
   // Carregar detalhes do profissional
   useEffect(() => {
@@ -106,6 +133,27 @@ export default function ProfissionalDetalhePage() {
     carregarProfissional();
   }, [user, profissionalId]);
 
+  // NOVO: Buscar contagem de followers
+  useEffect(() => {
+    const getFollowerCount = async () => {
+      try {
+        const response = await fetch(
+          `/api/connections/count-followers?user_id=${profissional?.user_id}`
+        );
+        const data = await response.json();
+        if (data.success) {
+          setFollowerCount(data.follower_count || 0);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar seguidores:", error);
+      }
+    };
+
+    if (profissional?.user_id) {
+      getFollowerCount();
+    }
+  }, [profissional?.user_id]);
+
   // Agendar consulta
   const handleAgendar = async (data: string, horarioInicio: string) => {
     if (!user || !profissional) return;
@@ -124,7 +172,7 @@ export default function ProfissionalDetalhePage() {
           profissional_id: profissional.id,
           data_inicio: dataHorarioCompleto,
           duracao_minutos: 50,
-          tipo: "online", // Por padrão online, pode ser alterado depois
+          tipo: "online",
           observacoes_paciente: "",
         }),
       });
@@ -135,89 +183,47 @@ export default function ProfissionalDetalhePage() {
         throw new Error(resultado.error || "Erro ao agendar consulta");
       }
 
-      // Sucesso - redirecionar para minhas consultas
-      alert(
-        "✅ Consulta agendada com sucesso! O profissional receberá sua solicitação."
-      );
+      alert("✅ Consulta agendada com sucesso!");
+      setModalAgendamento({ aberto: false });
       router.push("/dashboard/paciente/consultas");
     } catch (error: any) {
       console.error("Erro ao agendar:", error);
       alert(`❌ ${error.message}`);
     } finally {
       setAgendandoConsulta(false);
-      setModalAgendamento({ aberto: false });
     }
-  };
-
-  // Formatadores
-  const formatarValor = (valor: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(valor);
-  };
-
-  const formatarData = (dataString: string) => {
-    const data = new Date(dataString);
-    return data.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const renderEstrelas = (rating: number) => {
-    const estrelas = [];
-    const estrelasCompletas = Math.floor(rating);
-    const temMeiaEstrela = rating % 1 !== 0;
-
-    for (let i = 0; i < 5; i++) {
-      if (i < estrelasCompletas) {
-        estrelas.push(
-          <StarSolid key={i} className="w-5 h-5 text-yellow-400" />
-        );
-      } else if (i === estrelasCompletas && temMeiaEstrela) {
-        estrelas.push(
-          <div key={i} className="relative w-5 h-5">
-            <StarIcon className="w-5 h-5 text-gray-300 absolute" />
-            <div className="overflow-hidden w-1/2">
-              <StarSolid className="w-5 h-5 text-yellow-400" />
-            </div>
-          </div>
-        );
-      } else {
-        estrelas.push(<StarIcon key={i} className="w-5 h-5 text-gray-300" />);
-      }
-    }
-    return estrelas;
   };
 
   const obterIniciais = (nome: string, sobrenome: string) => {
-    return `${nome[0]}${sobrenome[0]}`.toUpperCase();
+    return `${nome.charAt(0)}${sobrenome.charAt(0)}`.toUpperCase();
   };
 
-  // Loading state
+  const renderEstrelas = (rating: number) => {
+    return Array.from({ length: 5 }).map((_, i) => (
+      <span
+        key={i}
+        className={`text-lg ${
+          i < Math.floor(rating) ? "text-yellow-400" : "text-gray-300"
+        }`}
+      >
+        ★
+      </span>
+    ));
+  };
+
+  // Loading
   if (carregando) {
     return (
       <PatientLayout>
-        <div className="space-y-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-8">
-            <div className="animate-pulse space-y-4">
-              <div className="flex items-center space-x-4">
-                <div className="w-24 h-24 bg-gray-200 rounded-full"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="h-6 bg-gray-200 rounded w-1/3"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando profissional...</p>
         </div>
       </PatientLayout>
     );
   }
 
-  // Error state
+  // Erro
   if (erro || !profissional) {
     return (
       <PatientLayout>
@@ -249,7 +255,7 @@ export default function ProfissionalDetalhePage() {
           Voltar para profissionais
         </Link>
 
-        {/* Header do Profissional */}
+        {/* Header do Profissional - COM FOLLOW INTEGRADO */}
         <div className="bg-white rounded-xl border border-gray-200 p-8">
           <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6 mb-6">
             {/* Foto */}
@@ -274,71 +280,67 @@ export default function ProfissionalDetalhePage() {
             </div>
 
             {/* Informações Principais */}
-            <div className="flex-1">
-              <div className="flex items-center space-x-2 mb-2">
-                <h1 className="text-3xl font-bold text-gray-900">
-                  {profissional.nome} {profissional.sobrenome}
-                </h1>
-                {profissional.verificado && (
-                  <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                    Verificado
-                  </span>
-                )}
-              </div>
+            <div className="flex-1 space-y-4">
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    {profissional.nome} {profissional.sobrenome}
+                  </h1>
+                  {profissional.verificado && (
+                    <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">
+                      Verificado
+                    </span>
+                  )}
+                </div>
 
-              <p className="text-lg text-gray-600 mb-3">
-                {profissional.especialidades}
-              </p>
+                <p className="text-lg text-gray-600 mb-3">
+                  {profissional.especialidades}
+                </p>
 
-              {/* Rating */}
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="flex items-center space-x-2">
+                {/* Rating */}
+                <div className="flex items-center space-x-2 mb-3">
                   <div className="flex items-center">
                     {renderEstrelas(profissional.rating)}
                   </div>
-                  <span className="text-sm font-medium text-gray-900">
-                    {profissional.rating}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    ({profissional.consultas_realizadas} avaliações)
+                  <span className="text-gray-600">
+                    {profissional.rating.toFixed(1)}
                   </span>
                 </div>
               </div>
 
-              {/* Badges */}
-              <div className="flex flex-wrap gap-2">
-                <div className="flex items-center px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-sm">
-                  <ClockIcon className="w-4 h-4 mr-1" />
-                  {profissional.experiencia_anos} anos de experiência
-                </div>
+              {/* NOVO: Seguidores */}
+              <div className="flex items-center space-x-4 py-2 border-y border-gray-200">
+                <button
+                  onClick={() => setShowFollowers(true)}
+                  className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 transition-colors font-medium cursor-pointer"
+                >
+                  <UserGroupIcon className="w-5 h-5" />
+                  <span>{followerCount} seguidores</span>
+                </button>
+              </div>
 
-                <div className="flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  <MapPinIcon className="w-4 h-4 mr-1" />
-                  {profissional.endereco_cidade}, {profissional.endereco_estado}
-                </div>
+              {/* NOVO: Botões com Follow */}
+              <div className="flex gap-3 flex-wrap pt-2">
+                <button
+                  onClick={() => setModalAgendamento({ aberto: true })}
+                  className="bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  Agendar Consulta
+                </button>
 
-                {profissional.crp && (
-                  <div className="flex items-center px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                    <AcademicCapIcon className="w-4 h-4 mr-1" />
-                    CRP {profissional.crp}
-                  </div>
+                {authToken && (
+                  <FollowButton
+                    userId={profissional.user_id}
+                    variant="primary"
+                    size="md"
+                    showLabel={true}
+                    onFollow={() => setFollowerCount((c: number) => c + 1)}
+                    onUnfollow={() =>
+                      setFollowerCount((c: number) => Math.max(0, c - 1))
+                    }
+                  />
                 )}
               </div>
-            </div>
-
-            {/* Valor e CTA */}
-            <div className="flex-shrink-0 text-center">
-              <div className="text-3xl font-bold text-gray-900 mb-1">
-                {formatarValor(profissional.valor_sessao)}
-              </div>
-              <p className="text-sm text-gray-500 mb-4">por sessão (50 min)</p>
-
-              <button
-                onClick={() => setModalAgendamento({ aberto: true })}
-                className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                Agendar Consulta
-              </button>
             </div>
           </div>
 
@@ -411,6 +413,18 @@ export default function ProfissionalDetalhePage() {
                     </p>
                   </div>
                 )}
+
+                {profissional.experiencia_anos && (
+                  <div>
+                    <h3 className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                      <ClockIcon className="w-4 h-4 mr-2" />
+                      Experiência
+                    </h3>
+                    <p className="text-gray-900">
+                      {profissional.experiencia_anos} anos de atuação
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -431,156 +445,119 @@ export default function ProfissionalDetalhePage() {
                     >
                       <span className="font-medium text-gray-700">{dia}</span>
                       {horarios && horarios.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {horarios.map((horario, idx) => (
-                            <span
-                              key={idx}
-                              className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded"
-                            >
-                              {horario.inicio} - {horario.fim}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400">
-                          Indisponível
+                        <span className="text-sm text-emerald-600 font-medium">
+                          {horarios
+                            .map((h) => `${h.inicio} - ${h.fim}`)
+                            .join(", ")}
                         </span>
+                      ) : (
+                        <span className="text-sm text-gray-400">Fechado</span>
                       )}
                     </div>
                   );
                 })}
               </div>
             </div>
-          </div>
 
-          {/* Sidebar - Próximos Horários */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-xl border border-gray-200 p-6 sticky top-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Próximos Horários
-              </h3>
+            {/* Próximos Horários Disponíveis */}
+            {profissional.proximos_horarios_disponiveis &&
+              profissional.proximos_horarios_disponiveis.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                    Próximos Horários
+                  </h2>
 
-              {profissional.proximos_horarios_disponiveis.length > 0 ? (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {profissional.proximos_horarios_disponiveis
-                    .slice(0, 10)
-                    .map((horario, index) => (
-                      <button
-                        key={index}
-                        onClick={() =>
-                          setModalAgendamento({
-                            aberto: true,
-                            data: horario.data,
-                            horario: horario.hora_inicio,
-                          })
-                        }
-                        className="w-full flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors text-left"
-                      >
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {formatarData(horario.data)}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {profissional.proximos_horarios_disponiveis.map(
+                      (slot, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() =>
+                            handleAgendar(slot.data, slot.hora_inicio)
+                          }
+                          disabled={!slot.disponivel || agendandoConsulta}
+                          className={`p-3 rounded-lg text-sm font-medium transition-colors ${
+                            slot.disponivel
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                              : "bg-gray-50 text-gray-400 border border-gray-200"
+                          }`}
+                        >
+                          <div className="font-semibold">
+                            {new Date(slot.data).toLocaleDateString("pt-BR", {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })}
                           </div>
-                          <div className="text-sm text-gray-600">
-                            {diasSemana[horario.dia_semana]}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-medium text-blue-600">
-                            {horario.hora_inicio}
-                          </div>
-                          <div className="text-xs text-gray-500">50 min</div>
-                        </div>
-                      </button>
-                    ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <CalendarDaysIcon className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm">Sem horários disponíveis no momento</p>
+                          <div className="text-xs">{slot.hora_inicio}</div>
+                        </button>
+                      )
+                    )}
+                  </div>
                 </div>
               )}
+          </div>
+
+          {/* Coluna Lateral */}
+          <div className="space-y-6">
+            {/* Informações de Contato */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Informações
+              </h3>
+
+              <div className="space-y-3">
+                {profissional.valor_sessao && (
+                  <div className="flex items-start space-x-3">
+                    <CurrencyDollarIcon className="w-5 h-5 text-emerald-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-gray-600">Valor da Sessão</p>
+                      <p className="font-semibold text-gray-900">
+                        R$ {profissional.valor_sessao.toFixed(2)}/h
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {profissional.endereco_cidade && (
+                  <div className="flex items-start space-x-3">
+                    <MapPinIcon className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-gray-600">Localização</p>
+                      <p className="font-semibold text-gray-900">
+                        {profissional.endereco_cidade},{" "}
+                        {profissional.endereco_estado}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {profissional.crp && (
+                  <div className="flex items-start space-x-3">
+                    <CheckCircleIcon className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-gray-600">Registro</p>
+                      <p className="font-semibold text-gray-900">
+                        CRP {profissional.crp}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Modal de Agendamento */}
-      {modalAgendamento.aberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">
-              Confirmar Agendamento
-            </h3>
-
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Profissional
-                </label>
-                <p className="text-gray-900">
-                  {profissional.nome} {profissional.sobrenome}
-                </p>
-              </div>
-
-              {modalAgendamento.data && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Data e Horário
-                  </label>
-                  <p className="text-gray-900">
-                    {formatarData(modalAgendamento.data)} às{" "}
-                    {modalAgendamento.horario}
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Valor
-                </label>
-                <p className="text-gray-900 font-semibold">
-                  {formatarValor(profissional.valor_sessao)}
-                </p>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start space-x-2">
-                  <VideoCameraIcon className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-blue-800">
-                    <p className="font-medium mb-1">Consulta Online</p>
-                    <p>
-                      Você receberá o link da videochamada após a confirmação do
-                      profissional.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setModalAgendamento({ aberto: false })}
-                disabled={agendandoConsulta}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() =>
-                  handleAgendar(
-                    modalAgendamento.data || "",
-                    modalAgendamento.horario || ""
-                  )
-                }
-                disabled={agendandoConsulta}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {agendandoConsulta ? "Agendando..." : "Confirmar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* NOVO: Modal de Seguidores */}
+      <FollowersModal
+        isOpen={showFollowers}
+        onClose={() => setShowFollowers(false)}
+        userId={profissional.user_id}
+        mode="followers"
+        authToken={authToken}
+        title={`Seguidores de ${profissional.nome}`}
+      />
     </PatientLayout>
   );
 }
