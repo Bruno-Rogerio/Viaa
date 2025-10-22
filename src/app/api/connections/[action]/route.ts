@@ -1,4 +1,4 @@
-// app/api/connections/[action].ts
+// app/api/connections/[action]/route.ts
 // 🔗 API Routes para o sistema de conexões (follow/unfollow)
 
 import { NextRequest, NextResponse } from "next/server";
@@ -75,8 +75,18 @@ function successResponse(data: any, status: number = 200) {
  * POST /api/connections/follow
  * Seguir um usuário
  */
-export async function POST(req: NextRequest) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { action: string } }
+) {
   try {
+    const action = params.action;
+
+    // Apenas "follow" aceita POST
+    if (action !== "follow") {
+      return errorResponse("Método não permitido para esta ação", 405);
+    }
+
     // Obter user ID autenticado
     const userId = await getUserIdFromRequest(req);
     if (!userId) {
@@ -127,6 +137,8 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const action = params.action;
 
+    console.log("🔍 Action recebida:", action);
+
     // ========== FOLLOWERS ==========
     if (action === "followers") {
       const userId = searchParams.get("user_id");
@@ -143,7 +155,6 @@ export async function GET(
         return errorResponse(result.error, 400);
       }
 
-      // ✅ FIX: Garantir que followers sempre existe
       return successResponse({
         followers: result.followers || [],
         total: result.total,
@@ -169,7 +180,6 @@ export async function GET(
         return errorResponse(result.error, 400);
       }
 
-      // ✅ FIX: Garantir que following sempre existe
       return successResponse({
         following: result.following || [],
         total: result.total,
@@ -249,8 +259,18 @@ export async function GET(
  * DELETE /api/connections/unfollow
  * Deixar de seguir um usuário
  */
-export async function DELETE(req: NextRequest) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { action: string } }
+) {
   try {
+    const action = params.action;
+
+    // Apenas "unfollow" aceita DELETE
+    if (action !== "unfollow") {
+      return errorResponse("Método não permitido para esta ação", 405);
+    }
+
     // Obter user ID autenticado
     const userId = await getUserIdFromRequest(req);
     if (!userId) {
@@ -279,16 +299,4 @@ export async function DELETE(req: NextRequest) {
     console.error("Erro em DELETE /api/connections/unfollow:", error);
     return errorResponse("Erro interno do servidor", 500);
   }
-}
-
-// ============================================================
-// 📊 MÉTODOS NÃO PERMITIDOS
-// ============================================================
-
-export async function PATCH(req: NextRequest) {
-  return errorResponse("Método PATCH não permitido", 405);
-}
-
-export async function PUT(req: NextRequest) {
-  return errorResponse("Método PUT não permitido", 405);
 }
