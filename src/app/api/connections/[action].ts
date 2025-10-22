@@ -116,8 +116,8 @@ export async function POST(req: NextRequest) {
 // ============================================================
 
 /**
- * GET /api/connections/followers/:userId
- * Listar seguidores de um usuário
+ * GET /api/connections/[action]
+ * Listar seguidores, following, contadores, etc
  */
 export async function GET(
   req: NextRequest,
@@ -143,10 +143,11 @@ export async function GET(
         return errorResponse(result.error, 400);
       }
 
+      // ✅ FIX: Garantir que followers sempre existe
       return successResponse({
-        followers: result.followers,
+        followers: result.followers || [],
         total: result.total,
-        count: result.followers.length,
+        count: result.followers?.length || 0,
         limit,
         offset,
       });
@@ -168,10 +169,11 @@ export async function GET(
         return errorResponse(result.error, 400);
       }
 
+      // ✅ FIX: Garantir que following sempre existe
       return successResponse({
-        following: result.following,
+        following: result.following || [],
         total: result.total,
-        count: result.following.length,
+        count: result.following?.length || 0,
         limit,
         offset,
       });
@@ -280,7 +282,7 @@ export async function DELETE(req: NextRequest) {
 }
 
 // ============================================================
-// 📊 MÉTODO NÃO PERMITIDO
+// 📊 MÉTODOS NÃO PERMITIDOS
 // ============================================================
 
 export async function PATCH(req: NextRequest) {
