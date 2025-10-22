@@ -1,302 +1,371 @@
 // app/api/connections/[action]/route.ts
-// 🔗 API Routes para o sistema de conexões (follow/unfollow)
+// 🔧 VERSÃO SIMPLIFICADA PARA DEBUG - SEM UTILS
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import {
-  canFollow,
-  createFollow,
-  removeFollow,
-  isFollowing,
-  getFollowerCount,
-  getFollowingCount,
-  getFollowersList,
-  getFollowingList,
-} from "@/utils/connections";
 
-// ============================================================
-// 🔐 MIDDLEWARE - AUTENTICAÇÃO
-// ============================================================
+console.log("🚀 Arquivo route.ts carregado!");
+console.log("📦 Environment vars disponíveis:", {
+  hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+  hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+});
 
-/**
- * Extrair user ID do token JWT no header Authorization
- */
+// Cliente Supabase
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// Helper para pegar user ID
 async function getUserIdFromRequest(req: NextRequest): Promise<string | null> {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
-    // Tentar obter sessão do header Authorization
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
+      console.log("❌ Sem Authorization header");
       return null;
     }
 
     const token = authHeader.substring(7);
-
-    // Verificar token com Supabase
     const {
       data: { user },
       error,
     } = await supabase.auth.getUser(token);
 
     if (error || !user) {
+      console.log("❌ Erro ao validar token:", error);
       return null;
     }
 
+    console.log("✅ User autenticado:", user.id);
     return user.id;
   } catch (error) {
-    console.error("Erro ao extrair user ID:", error);
+    console.error("💥 Erro ao extrair user ID:", error);
     return null;
   }
 }
 
-/**
- * Resposta de erro padrão
- */
-function errorResponse(message: string, status: number = 400) {
-  return NextResponse.json({ success: false, error: message }, { status });
-}
+// ============================================================
+// OPTIONS - Para CORS
+// ============================================================
+export async function OPTIONS(req: NextRequest) {
+  console.log("🔧 OPTIONS request recebido");
 
-/**
- * Resposta de sucesso padrão
- */
-function successResponse(data: any, status: number = 200) {
-  return NextResponse.json({ success: true, ...data }, { status });
+  return NextResponse.json(
+    {},
+    {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
+    }
+  );
 }
 
 // ============================================================
-// 📝 POST - SEGUIR
+// POST - SEGUIR
 // ============================================================
-
-/**
- * POST /api/connections/follow
- * Seguir um usuário
- */
 export async function POST(
   req: NextRequest,
   { params }: { params: { action: string } }
 ) {
+  console.log("🎯 ========== POST RECEBIDO ==========");
+  console.log("📝 Params completos:", JSON.stringify(params));
+  console.log("🔗 Action:", params.action);
+  console.log("🌐 URL:", req.url);
+  console.log("📋 Method:", req.method);
+  console.log("🔑 Headers:", Object.fromEntries(req.headers.entries()));
+
   try {
     const action = params.action;
 
-    // Apenas "follow" aceita POST
+    console.log("✅ Action extraído:", action);
+
     if (action !== "follow") {
-      return errorResponse("Método não permitido para esta ação", 405);
+      console.log("⚠️ Action não é 'follow', retornando 405");
+      return NextResponse.json(
+        { success: false, error: "Ação não permitida" },
+        { status: 405 }
+      );
     }
 
-    // Obter user ID autenticado
+    // Obter user ID
+    console.log("🔍 Obtendo user ID...");
     const userId = await getUserIdFromRequest(req);
+
     if (!userId) {
-      return errorResponse("Não autenticado", 401);
+      console.log("❌ Usuário não autenticado");
+      return NextResponse.json(
+        { success: false, error: "Não autenticado" },
+        { status: 401 }
+      );
     }
 
-    // Extrair followingId do corpo
+    console.log("✅ User ID obtido:", userId);
+
+    // Parse body
+    console.log("📦 Parseando body...");
     const body = await req.json();
+    console.log("📄 Body recebido:", JSON.stringify(body));
+
     const { following_id } = body;
 
     if (!following_id) {
-      return errorResponse("following_id é obrigatório", 400);
+      console.log("❌ following_id não fornecido");
+      return NextResponse.json(
+        { success: false, error: "following_id é obrigatório" },
+        { status: 400 }
+      );
     }
 
-    // Criar follow
-    const result = await createFollow(userId, following_id);
+    console.log("✅ following_id:", following_id);
 
-    if (!result.success) {
-      return errorResponse(result.error || "Erro ao seguir", 400);
+    // Validações básicas
+    if (userId === following_id) {
+      console.log("❌ Tentando seguir a si mesmo");
+      return NextResponse.json(
+        { success: false, error: "Você não pode seguir a si mesmo" },
+        { status: 400 }
+      );
     }
 
-    return successResponse(
+    // Verificar se já está seguindo
+    console.log("🔍 Verificando se já está seguindo...");
+    const { data: existing } = await supabase
+      .from("connections")
+      .select("id")
+      .eq("follower_id", userId)
+      .eq("following_id", following_id)
+      .single();
+
+    if (existing) {
+      console.log("⚠️ Já está seguindo");
+      return NextResponse.json(
+        { success: false, error: "Você já segue este usuário" },
+        { status: 400 }
+      );
+    }
+
+    // Criar conexão
+    console.log("💾 Criando conexão no banco...");
+    const { data, error } = await supabase
+      .from("connections")
+      .insert([
+        {
+          follower_id: userId,
+          following_id: following_id,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("❌ Erro ao criar conexão:", error);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Erro ao seguir usuário",
+          details: error.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    console.log("✅ Conexão criada com sucesso!");
+    console.log("📦 Dados:", JSON.stringify(data));
+
+    return NextResponse.json(
       {
-        data: result.data,
+        success: true,
+        data: data,
         message: "Seguindo com sucesso",
       },
-      201
+      { status: 201 }
     );
   } catch (error: any) {
-    console.error("Erro em POST /api/connections/follow:", error);
-    return errorResponse("Erro interno do servidor", 500);
+    console.error("💥 ERRO CRÍTICO em POST:", error);
+    console.error("Stack:", error.stack);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message || "Erro interno do servidor",
+        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      },
+      { status: 500 }
+    );
   }
 }
 
 // ============================================================
-// 🔗 GET - INFORMAÇÕES DE CONEXÃO
+// GET - INFORMAÇÕES
 // ============================================================
-
-/**
- * GET /api/connections/[action]
- * Listar seguidores, following, contadores, etc
- */
 export async function GET(
   req: NextRequest,
   { params }: { params: { action: string } }
 ) {
+  console.log("🔍 ========== GET RECEBIDO ==========");
+  console.log("📝 Action:", params.action);
+  console.log("🌐 URL:", req.url);
+
   try {
     const { searchParams } = new URL(req.url);
     const action = params.action;
 
-    console.log("🔍 Action recebida:", action);
-
-    // ========== FOLLOWERS ==========
-    if (action === "followers") {
-      const userId = searchParams.get("user_id");
-      const limit = parseInt(searchParams.get("limit") ?? "20");
-      const offset = parseInt(searchParams.get("offset") ?? "0");
-
-      if (!userId) {
-        return errorResponse("user_id é obrigatório", 400);
-      }
-
-      const result = await getFollowersList(userId, limit, offset);
-
-      if (result.error) {
-        return errorResponse(result.error, 400);
-      }
-
-      return successResponse({
-        followers: result.followers || [],
-        total: result.total,
-        count: result.followers?.length || 0,
-        limit,
-        offset,
-      });
-    }
-
-    // ========== FOLLOWING ==========
-    if (action === "following") {
-      const userId = searchParams.get("user_id");
-      const limit = parseInt(searchParams.get("limit") ?? "20");
-      const offset = parseInt(searchParams.get("offset") ?? "0");
-
-      if (!userId) {
-        return errorResponse("user_id é obrigatório", 400);
-      }
-
-      const result = await getFollowingList(userId, limit, offset);
-
-      if (result.error) {
-        return errorResponse(result.error, 400);
-      }
-
-      return successResponse({
-        following: result.following || [],
-        total: result.total,
-        count: result.following?.length || 0,
-        limit,
-        offset,
-      });
-    }
-
-    // ========== FOLLOWER COUNT ==========
-    if (action === "count-followers") {
-      const userId = searchParams.get("user_id");
-
-      if (!userId) {
-        return errorResponse("user_id é obrigatório", 400);
-      }
-
-      const count = await getFollowerCount(userId);
-
-      return successResponse({
-        user_id: userId,
-        follower_count: count,
-      });
-    }
-
-    // ========== FOLLOWING COUNT ==========
-    if (action === "count-following") {
-      const userId = searchParams.get("user_id");
-
-      if (!userId) {
-        return errorResponse("user_id é obrigatório", 400);
-      }
-
-      const count = await getFollowingCount(userId);
-
-      return successResponse({
-        user_id: userId,
-        following_count: count,
-      });
-    }
-
-    // ========== CHECK IF FOLLOWING ==========
+    // IS FOLLOWING
     if (action === "is-following") {
       const userId = await getUserIdFromRequest(req);
       if (!userId) {
-        return errorResponse("Não autenticado", 401);
+        return NextResponse.json(
+          { success: false, error: "Não autenticado" },
+          { status: 401 }
+        );
       }
 
       const targetUserId = searchParams.get("user_id");
-
       if (!targetUserId) {
-        return errorResponse("user_id é obrigatório", 400);
+        return NextResponse.json(
+          { success: false, error: "user_id é obrigatório" },
+          { status: 400 }
+        );
       }
 
-      const following = await isFollowing(userId, targetUserId);
+      const { data } = await supabase
+        .from("connections")
+        .select("id")
+        .eq("follower_id", userId)
+        .eq("following_id", targetUserId)
+        .single();
 
-      return successResponse({
+      return NextResponse.json({
+        success: true,
         follower_id: userId,
         following_id: targetUserId,
-        is_following: following,
+        is_following: !!data,
       });
     }
 
-    // Action não reconhecida
-    return errorResponse("Ação não reconhecida", 404);
+    // COUNT FOLLOWERS
+    if (action === "count-followers") {
+      const userId = searchParams.get("user_id");
+      if (!userId) {
+        return NextResponse.json(
+          { success: false, error: "user_id é obrigatório" },
+          { status: 400 }
+        );
+      }
+
+      const { count } = await supabase
+        .from("connections")
+        .select("*", { count: "exact", head: true })
+        .eq("following_id", userId);
+
+      return NextResponse.json({
+        success: true,
+        user_id: userId,
+        follower_count: count || 0,
+      });
+    }
+
+    // COUNT FOLLOWING
+    if (action === "count-following") {
+      const userId = searchParams.get("user_id");
+      if (!userId) {
+        return NextResponse.json(
+          { success: false, error: "user_id é obrigatório" },
+          { status: 400 }
+        );
+      }
+
+      const { count } = await supabase
+        .from("connections")
+        .select("*", { count: "exact", head: true })
+        .eq("follower_id", userId);
+
+      return NextResponse.json({
+        success: true,
+        user_id: userId,
+        following_count: count || 0,
+      });
+    }
+
+    return NextResponse.json(
+      { success: false, error: "Ação não reconhecida" },
+      { status: 404 }
+    );
   } catch (error: any) {
-    console.error("Erro em GET /api/connections:", error);
-    return errorResponse("Erro interno do servidor", 500);
+    console.error("💥 ERRO em GET:", error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
   }
 }
 
 // ============================================================
-// ❌ DELETE - DEIXAR DE SEGUIR
+// DELETE - UNFOLLOW
 // ============================================================
-
-/**
- * DELETE /api/connections/unfollow
- * Deixar de seguir um usuário
- */
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { action: string } }
 ) {
+  console.log("🗑️ ========== DELETE RECEBIDO ==========");
+  console.log("📝 Action:", params.action);
+
   try {
     const action = params.action;
 
-    // Apenas "unfollow" aceita DELETE
     if (action !== "unfollow") {
-      return errorResponse("Método não permitido para esta ação", 405);
+      return NextResponse.json(
+        { success: false, error: "Ação não permitida" },
+        { status: 405 }
+      );
     }
 
-    // Obter user ID autenticado
     const userId = await getUserIdFromRequest(req);
     if (!userId) {
-      return errorResponse("Não autenticado", 401);
+      return NextResponse.json(
+        { success: false, error: "Não autenticado" },
+        { status: 401 }
+      );
     }
 
-    // Extrair followingId do corpo ou query
     const body = await req.json().catch(() => ({}));
     const { following_id } = body;
 
     if (!following_id) {
-      return errorResponse("following_id é obrigatório", 400);
+      return NextResponse.json(
+        { success: false, error: "following_id é obrigatório" },
+        { status: 400 }
+      );
     }
 
-    // Remover follow
-    const result = await removeFollow(userId, following_id);
+    const { error } = await supabase
+      .from("connections")
+      .delete()
+      .eq("follower_id", userId)
+      .eq("following_id", following_id);
 
-    if (!result.success) {
-      return errorResponse(result.error || "Erro ao deixar de seguir", 400);
+    if (error) {
+      console.error("❌ Erro ao deletar:", error);
+      return NextResponse.json(
+        { success: false, error: "Erro ao deixar de seguir" },
+        { status: 500 }
+      );
     }
 
-    return successResponse({
+    console.log("✅ Unfollow realizado");
+
+    return NextResponse.json({
+      success: true,
       message: "Deixou de seguir com sucesso",
     });
   } catch (error: any) {
-    console.error("Erro em DELETE /api/connections/unfollow:", error);
-    return errorResponse("Erro interno do servidor", 500);
+    console.error("💥 ERRO em DELETE:", error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
   }
 }
