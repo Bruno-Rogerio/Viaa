@@ -1,11 +1,10 @@
 // src/components/dashboard/common/FollowButton.tsx
-// 🔗 Botão reutilizável de Seguir/Deixar de Seguir
+// 🔗 Botão reutilizável de Seguir/Deixar de Seguir - VERSÃO CORRIGIDA
 
 "use client";
 
 import { useCallback, useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useConnections } from "@/hooks/useConnections";
 import { UserPlusIcon, UserMinusIcon } from "@heroicons/react/24/outline";
 import { supabase } from "@/lib/supabase/client";
 
@@ -28,12 +27,16 @@ export default function FollowButton({
   onUnfollow,
   className = "",
 }: FollowButtonProps) {
-  // ========== OBTER CONTEXTO ==========
-
-  const { user, profile } = useAuth();
+  // ========== ESTADOS ==========
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
 
-  // Obter token JWT da sessão
+  // ========== CONTEXTOS ==========
+  const { user, profile } = useAuth();
+
+  // ========== OBTER TOKEN ==========
   useEffect(() => {
     const getToken = async () => {
       try {
@@ -43,6 +46,9 @@ export default function FollowButton({
 
         if (session?.access_token) {
           setAuthToken(session.access_token);
+
+          // Verificar status de seguir quando temos o token
+          checkFollowStatus(session.access_token);
         }
       } catch (error) {
         console.error("Erro ao obter token:", error);
@@ -50,31 +56,132 @@ export default function FollowButton({
     };
 
     getToken();
-  }, [user]);
+  }, [user, userId]);
 
-  const { isFollowing, isLoading, error, follow, unfollow } = useConnections(
-    userId,
-    authToken
-  );
+  // ========== VERIFICAR STATUS FOLLOW ==========
+  const checkFollowStatus = async (token: string) => {
+    if (!userId || !token) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await fetch(
+        `/api/connections/is-following?user_id=${userId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        setIsFollowing(data.is_following);
+      } else {
+        console.error("Erro ao verificar status de follow:", data.error);
+      }
+    } catch (err) {
+      console.error("Erro ao verificar follow status:", err);
+      setError("Erro ao verificar status");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ========== FOLLOW USER ==========
+  const follow = async () => {
+    if (!userId || !authToken) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      console.log("🔗 Seguindo usuário:", userId);
+
+      const response = await fetch("/api/connections/follow", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          following_id: userId,
+        }),
+      });
+
+      console.log("📦 Resposta da API:", response);
+
+      const data = await response.json();
+
+      if (data.success) {
+        setIsFollowing(true);
+        onFollow?.();
+      } else {
+        console.error("❌ Erro ao seguir:", data.error);
+        setError(data.error || "Erro ao seguir");
+      }
+    } catch (err: any) {
+      console.error("❌ Erro ao seguir:", err);
+      setError(err.message || "Erro ao seguir");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ========== UNFOLLOW USER ==========
+  const unfollow = async () => {
+    if (!userId || !authToken) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      console.log("🔗 Deixando de seguir usuário:", userId);
+
+      const response = await fetch(`/api/connections/unfollow`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          following_id: userId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setIsFollowing(false);
+        onUnfollow?.();
+      } else {
+        console.error("❌ Erro ao deixar de seguir:", data.error);
+        setError(data.error || "Erro ao deixar de seguir");
+      }
+    } catch (err: any) {
+      console.error("❌ Erro ao deixar de seguir:", err);
+      setError(err.message || "Erro ao deixar de seguir");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // ========== HANDLE CLICK ==========
-
   const handleClick = useCallback(async () => {
     try {
       if (isFollowing) {
         await unfollow();
-        onUnfollow?.();
       } else {
         await follow();
-        onFollow?.();
       }
     } catch (err) {
       console.error("Erro ao seguir/deixar de seguir:", err);
     }
-  }, [isFollowing, follow, unfollow, onFollow, onUnfollow]);
+  }, [isFollowing, follow, unfollow]);
 
   // ========== VALIDAÇÕES ==========
-
   // Não mostrar botão se não estiver autenticado
   if (!user) {
     return null;
@@ -86,7 +193,6 @@ export default function FollowButton({
   }
 
   // ========== ESTILOS ==========
-
   const baseStyles =
     "flex items-center justify-center gap-2 font-medium transition-all duration-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed";
 
@@ -115,7 +221,6 @@ export default function FollowButton({
   };
 
   // ========== RENDERIZAR ==========
-
   return (
     <button
       onClick={handleClick}

@@ -1,5 +1,5 @@
 // src/app/api/connections/unfollow/route.ts
-// ✅ ROTA FIXA - DEIXAR DE SEGUIR
+// ✅ ROTA FIXA - DEIXAR DE SEGUIR (UNFOLLOW)
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -28,7 +28,7 @@ async function getUserId(req: NextRequest): Promise<string | null> {
 }
 
 export async function DELETE(req: NextRequest) {
-  console.log("🗑️ DELETE /api/connections/unfollow recebido!");
+  console.log("🚫 DELETE /api/connections/unfollow recebido!");
 
   try {
     // Autenticação
@@ -44,7 +44,7 @@ export async function DELETE(req: NextRequest) {
     console.log("✅ User autenticado:", userId);
 
     // Parse body
-    const body = await req.json().catch(() => ({}));
+    const body = await req.json();
     const { following_id } = body;
 
     if (!following_id) {
@@ -57,7 +57,23 @@ export async function DELETE(req: NextRequest) {
 
     console.log("📝 Deixando de seguir:", following_id);
 
-    // Deletar conexão
+    // Verificar se já está seguindo
+    const { data: existingConnection } = await supabase
+      .from("connections")
+      .select("id")
+      .eq("follower_id", userId)
+      .eq("following_id", following_id)
+      .single();
+
+    if (!existingConnection) {
+      return NextResponse.json(
+        { success: false, error: "Você não segue este usuário" },
+        { status: 400 }
+      );
+    }
+
+    // Remover conexão
+    console.log("🗑️ Removendo conexão...");
     const { error } = await supabase
       .from("connections")
       .delete()
@@ -65,19 +81,22 @@ export async function DELETE(req: NextRequest) {
       .eq("following_id", following_id);
 
     if (error) {
-      console.error("❌ Erro ao deletar:", error);
+      console.error("❌ Erro ao remover:", error);
       return NextResponse.json(
-        { success: false, error: "Erro ao deixar de seguir" },
+        { success: false, error: "Erro ao deixar de seguir usuário" },
         { status: 500 }
       );
     }
 
-    console.log("✅ Unfollow realizado!");
+    console.log("✅ Conexão removida!");
 
-    return NextResponse.json({
-      success: true,
-      message: "Deixou de seguir com sucesso",
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Deixou de seguir com sucesso",
+      },
+      { status: 200 }
+    );
   } catch (error: any) {
     console.error("💥 Erro crítico:", error);
     return NextResponse.json(
@@ -88,9 +107,4 @@ export async function DELETE(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-// POST também aceito para compatibilidade
-export async function POST(req: NextRequest) {
-  return DELETE(req);
 }
