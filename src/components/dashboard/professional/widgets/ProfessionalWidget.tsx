@@ -1,5 +1,6 @@
 // src/components/dashboard/professional/widgets/ProfessionalWidget.tsx
-// 🎯 Widget do Dashboard - Sugestões de Conexões FUNCIONAL
+// 🎯 Widget do Dashboard - Sugestões de Conexões
+// ✅ VERSÃO CORRIGIDA com tipos corretos
 
 "use client";
 import { useState, useEffect } from "react";
@@ -87,11 +88,22 @@ export default function ProfessionalWidget() {
         }
 
         const data = await response.json();
+
         // Filtrar profissionais que não são o próprio usuário
-        const filtrados = (data.profissionais || []).filter(
-          (prof: Profissional) => prof.user_id !== user?.id
-        );
+        const filtrados = (data.profissionais || [])
+          .filter((prof: Profissional) => prof.user_id !== user?.id)
+          // ✅ CORREÇÃO - Filtrar profissionais sem user_id
+          .filter((prof: Profissional) => !!prof.user_id);
+
         setProfissionaisSugeridos(filtrados);
+
+        // Log para debug
+        console.log("🔎 Profissionais sugeridos carregados:", {
+          total: filtrados.length,
+          // ✅ CORREÇÃO - Adicionando tipo explícito para 'p'
+          todosTemUserId: filtrados.every((p: Profissional) => !!p.user_id),
+          primeiroProf: filtrados[0],
+        });
       } catch (error) {
         console.error("Erro ao carregar sugestões:", error);
         setErro("Erro ao carregar sugestões");
@@ -160,51 +172,34 @@ export default function ProfessionalWidget() {
                 <BanknotesIcon className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">Receita (Mês)</p>
-                <p className="text-sm text-gray-600">Comissão VIAA</p>
+                <p className="font-medium text-gray-900">Faturamento</p>
+                <p className="text-sm text-gray-600">Esta semana</p>
               </div>
             </div>
-            <span className="text-2xl font-bold text-amber-600">R$ 2.1k</span>
+            <span className="text-2xl font-bold text-amber-600">R$ 450</span>
           </div>
         </div>
-      </div>
 
-      {/* Ações Rápidas */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Ações Rápidas
-        </h3>
+        {/* Ações Rápidas */}
+        <div className="mt-5 pt-4 border-t border-gray-100 space-y-3">
+          <h4 className="font-medium text-gray-700 mb-2">Ações Rápidas:</h4>
 
-        <div className="space-y-2">
           <Link
-            href="/dashboard/agenda"
-            className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 group"
+            href="/dashboard/profissional/agenda"
+            className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-all duration-200 group"
           >
             <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
               <CalendarDaysIcon className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="font-medium text-gray-900">Nova Consulta</p>
-              <p className="text-sm text-gray-600">Agendar um novo horário</p>
+              <p className="font-medium text-gray-900">Minha Agenda</p>
+              <p className="text-sm text-gray-600">Ver consultas pendentes</p>
             </div>
           </Link>
 
           <Link
-            href="/dashboard/pacientes"
-            className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all duration-200 group"
-          >
-            <div className="p-2 bg-emerald-100 rounded-lg group-hover:bg-emerald-200 transition-colors">
-              <UserGroupIcon className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900">Gerenciar Pacientes</p>
-              <p className="text-sm text-gray-600">Ver lista de pacientes</p>
-            </div>
-          </Link>
-
-          <Link
-            href="/dashboard/configuracoes"
-            className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all duration-200 group"
+            href="/dashboard/profissional/horarios"
+            className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg hover:bg-purple-50 transition-all duration-200 group"
           >
             <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
               <ChartBarIcon className="w-5 h-5 text-purple-600" />
@@ -217,7 +212,7 @@ export default function ProfessionalWidget() {
         </div>
       </div>
 
-      {/* Sugestões de Conexões - AGORA FUNCIONAL */}
+      {/* Sugestões de Conexões - CORRIGIDA */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -279,8 +274,8 @@ export default function ProfessionalWidget() {
                   </div>
                 </div>
 
-                {/* Follow Button */}
-                {authToken && (
+                {/* Follow Button - CORRIGIDO */}
+                {authToken && prof.user_id && (
                   <div className="flex-shrink-0 ml-2">
                     <FollowButton
                       userId={prof.user_id}

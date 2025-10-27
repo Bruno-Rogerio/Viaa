@@ -1,5 +1,6 @@
 // src/components/dashboard/patient/profissionais/ProfessionalCard.tsx
 // 🎯 Card do profissional com botão de seguir integrado
+// ✅ VERSÃO CORRIGIDA
 
 "use client";
 
@@ -40,6 +41,13 @@ export default function ProfessionalCard({
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [followerCount, setFollowerCount] = useState(0);
 
+  // Log para debug
+  console.log("🔎 ProfessionalCard renderizado com:", {
+    profissionalId: profissional.id,
+    userId: profissional.user_id,
+    temUserId: !!profissional.user_id,
+  });
+
   // Obter token
   useEffect(() => {
     const getToken = async () => {
@@ -60,14 +68,25 @@ export default function ProfessionalCard({
   }, []);
 
   // Obter contagem de followers
-  const { followerCount: count } = useConnections(
-    profissional.user_id,
-    authToken
-  );
-
   useEffect(() => {
-    setFollowerCount(count);
-  }, [count]);
+    const getFollowerCount = async () => {
+      if (!profissional.user_id) return;
+
+      try {
+        const { followerCount: count } = useConnections(
+          profissional.user_id,
+          authToken
+        );
+        setFollowerCount(count);
+      } catch (error) {
+        console.error("Erro ao obter contagem de seguidores:", error);
+      }
+    };
+
+    if (authToken) {
+      getFollowerCount();
+    }
+  }, [profissional.user_id, authToken]);
 
   // Renderizar estrelas
   const renderStars = (rating: number = 5) => {
@@ -94,60 +113,57 @@ export default function ProfessionalCard({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 via-emerald-400 to-cyan-400">
-            <span className="text-white text-3xl font-bold">
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-4xl font-bold text-white">
               {profissional.nome.charAt(0)}
               {profissional.sobrenome.charAt(0)}
-            </span>
+            </div>
           </div>
         )}
 
-        {/* Badge de verificação */}
+        {/* Badge de verificado */}
         {profissional.verificado && (
-          <div className="absolute top-2 right-2 bg-white rounded-full p-1">
-            <CheckBadgeIcon className="w-5 h-5 text-blue-600" />
+          <div className="absolute top-2 right-2 bg-blue-100 text-blue-800 rounded-full p-1">
+            <CheckBadgeIcon className="w-6 h-6" />
           </div>
         )}
       </div>
 
       {/* Conteúdo */}
-      <div className="p-4 space-y-3">
+      <div className="p-4">
         {/* Nome e especialidade */}
-        <div>
-          <h3 className="font-semibold text-gray-900 text-lg truncate">
+        <div className="mb-2">
+          <h3 className="font-bold text-gray-900 text-lg leading-tight">
             {profissional.nome} {profissional.sobrenome}
           </h3>
-          <p className="text-sm text-gray-600 truncate">
-            {profissional.especialidades || "Profissional de saúde"}
+          <p className="text-sm text-blue-600 mb-1">
+            {profissional.especialidades || "Profissional"}
           </p>
+
+          {/* Localização */}
+          {(profissional.endereco_cidade || profissional.endereco_estado) && (
+            <p className="text-xs text-gray-600 flex items-center mb-2">
+              <MapPinIcon className="w-3 h-3 mr-1" />
+              {profissional.endereco_cidade}{" "}
+              {profissional.endereco_estado
+                ? `- ${profissional.endereco_estado}`
+                : ""}
+            </p>
+          )}
         </div>
 
-        {/* Localização */}
-        {(profissional.endereco_cidade || profissional.endereco_estado) && (
-          <div className="flex items-center gap-1 text-sm text-gray-600">
-            <MapPinIcon className="w-4 h-4" />
-            <span className="truncate">
-              {profissional.endereco_cidade}, {profissional.endereco_estado}
+        {/* Avaliação */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex">
+            {renderStars(profissional.rating || 5)}
+            <span className="text-xs text-gray-600 ml-1">
+              {profissional.rating || 5}
             </span>
           </div>
-        )}
-
-        {/* Rating */}
-        {profissional.rating && (
-          <div className="flex items-center gap-1">
-            <div className="flex gap-0.5">
-              {renderStars(profissional.rating)}
-            </div>
-            <span className="text-xs text-gray-600">
-              ({profissional.rating.toFixed(1)})
-            </span>
+          <div className="text-xs text-gray-500 flex items-center">
+            <UserGroupIcon className="w-3 h-3 mr-1" />
+            {followerCount} seguidores
           </div>
-        )}
-
-        {/* Seguidores */}
-        <div className="flex items-center gap-1 text-sm text-gray-600 py-2 border-y border-gray-200">
-          <UserGroupIcon className="w-4 h-4" />
-          <span>{followerCount} seguidores</span>
         </div>
 
         {/* Valor da sessão */}
@@ -174,14 +190,16 @@ export default function ProfessionalCard({
             Ver Perfil
           </Link>
 
-          {/* Botão de Seguir */}
+          {/* Botão de Seguir - CORRIGIDO */}
           <div className="flex-shrink-0">
-            <FollowButton
-              userId={profissional.user_id}
-              variant="secondary"
-              size="sm"
-              showLabel={false}
-            />
+            {authToken && profissional.user_id && (
+              <FollowButton
+                userId={profissional.user_id}
+                variant="secondary"
+                size="sm"
+                showLabel={false}
+              />
+            )}
           </div>
         </div>
       </div>
