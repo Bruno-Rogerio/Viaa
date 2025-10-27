@@ -1,5 +1,5 @@
 // src/app/dashboard/paciente/profissionais/[id]/page.tsx
-// 🎯 COMPLETO COM FOLLOW INTEGRADO - SEM PERDER NADA
+// ✅ VERSÃO CORRIGIDA - COM user_id NO SELECT
 
 "use client";
 import { useState, useEffect } from "react";
@@ -50,14 +50,6 @@ interface ProfissionalDetalhado {
   rating: number;
   consultas_realizadas: number;
   consultas_este_ano: number;
-  horarios_por_dia: Record<number, Array<{ inicio: string; fim: string }>>;
-  proximos_horarios_disponiveis: Array<{
-    data: string;
-    dia_semana: number;
-    hora_inicio: string;
-    hora_fim: string;
-    disponivel: boolean;
-  }>;
 }
 
 interface ModalAgendamento {
@@ -80,15 +72,14 @@ export default function ProfissionalDetalhePage() {
   });
   const [agendandoConsulta, setAgendandoConsulta] = useState(false);
 
-  // NOVO: States para Follow
+  // States para Follow
   const [showFollowers, setShowFollowers] = useState(false);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [followerCount, setFollowerCount] = useState(0);
 
   const profissionalId = params.id as string;
-  const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-  // NOVO: Obter token
+  // Obter token
   useEffect(() => {
     const getToken = async () => {
       try {
@@ -105,53 +96,71 @@ export default function ProfissionalDetalhePage() {
     getToken();
   }, []);
 
-  // Carregar detalhes do profissional
+  // ✅ BUSCAR PROFISSIONAL - CORRIGIDO COM user_id
   useEffect(() => {
-    const carregarProfissional = async () => {
-      if (!user || !profissionalId) return;
+    const buscarProfissional = async () => {
+      if (!profissionalId) return;
 
       try {
         setCarregando(true);
         setErro(null);
 
-        const response = await fetch(`/api/profissionais/${profissionalId}`);
-        const data = await response.json();
+        console.log("🔍 Buscando profissional:", profissionalId);
 
-        if (!response.ok) {
-          throw new Error(data.error || "Erro ao carregar profissional");
+        // ✅ CORREÇÃO: Adicionado user_id no select
+        const { data, error } = await supabase
+          .from("perfis_profissionais")
+          .select("*") // ← Pega TODOS os campos incluindo user_id
+          .eq("id", profissionalId)
+          .single();
+
+        if (error) {
+          console.error("❌ Erro ao buscar:", error);
+          throw error;
         }
 
-        setProfissional(data.profissional);
+        if (!data) {
+          throw new Error("Profissional não encontrado");
+        }
+
+        console.log("✅ Profissional carregado:", data);
+        console.log("👤 user_id:", data.user_id); // Debug
+
+        setProfissional(data);
       } catch (error: any) {
-        console.error("Erro ao carregar profissional:", error);
-        setErro(error.message);
+        console.error("💥 Erro:", error);
+        setErro(error.message || "Erro ao carregar profissional");
       } finally {
         setCarregando(false);
       }
     };
 
-    carregarProfissional();
-  }, [user, profissionalId]);
+    buscarProfissional();
+  }, [profissionalId]);
 
-  // NOVO: Buscar contagem de followers
+  // Buscar contagem de followers
   useEffect(() => {
     const getFollowerCount = async () => {
+      if (!profissional?.user_id) return;
+
       try {
+        console.log("📊 Buscando followers de:", profissional.user_id);
+
         const response = await fetch(
-          `/api/connections/count-followers?user_id=${profissional?.user_id}`
+          `/api/connections/count-followers?user_id=${profissional.user_id}`
         );
         const data = await response.json();
+
         if (data.success) {
           setFollowerCount(data.follower_count || 0);
+          console.log("✅ Followers:", data.follower_count);
         }
       } catch (error) {
-        console.error("Erro ao buscar seguidores:", error);
+        console.error("❌ Erro ao buscar seguidores:", error);
       }
     };
 
-    if (profissional?.user_id) {
-      getFollowerCount();
-    }
+    getFollowerCount();
   }, [profissional?.user_id]);
 
   // Agendar consulta
@@ -255,7 +264,7 @@ export default function ProfissionalDetalhePage() {
           Voltar para profissionais
         </Link>
 
-        {/* Header do Profissional - COM FOLLOW INTEGRADO */}
+        {/* Header do Profissional */}
         <div className="bg-white rounded-xl border border-gray-200 p-8">
           <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6 mb-6">
             {/* Foto */}
@@ -264,79 +273,80 @@ export default function ProfissionalDetalhePage() {
                 <img
                   src={profissional.foto_perfil_url}
                   alt={`${profissional.nome} ${profissional.sobrenome}`}
-                  className="w-24 h-24 rounded-full object-cover"
+                  className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
                 />
               ) : (
-                <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-700 font-semibold text-2xl">
-                    {obterIniciais(profissional.nome, profissional.sobrenome)}
-                  </span>
+                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold border-4 border-white shadow-lg">
+                  {obterIniciais(profissional.nome, profissional.sobrenome)}
                 </div>
               )}
-
               {profissional.verificado && (
-                <CheckSolid className="absolute -bottom-2 -right-2 w-8 h-8 text-blue-500 bg-white rounded-full" />
+                <div className="absolute bottom-2 right-2 bg-blue-500 rounded-full p-1">
+                  <CheckCircleIcon className="w-6 h-6 text-white" />
+                </div>
               )}
             </div>
 
-            {/* Informações Principais */}
-            <div className="flex-1 space-y-4">
+            {/* Informações */}
+            <div className="flex-1 space-y-3">
+              {/* Nome */}
               <div>
-                <div className="flex items-center space-x-2 mb-2">
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    {profissional.nome} {profissional.sobrenome}
-                  </h1>
-                  {profissional.verificado && (
-                    <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                      Verificado
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-lg text-gray-600 mb-3">
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {profissional.nome} {profissional.sobrenome}
+                </h1>
+                <p className="text-lg text-gray-600 mt-1">
                   {profissional.especialidades}
                 </p>
+              </div>
 
-                {/* Rating */}
-                <div className="flex items-center space-x-2 mb-3">
-                  <div className="flex items-center">
-                    {renderEstrelas(profissional.rating)}
-                  </div>
-                  <span className="text-gray-600">
+              {/* Rating e Consultas */}
+              <div className="flex items-center space-x-6">
+                <div className="flex items-center space-x-2">
+                  {renderEstrelas(profissional.rating)}
+                  <span className="text-sm text-gray-600 font-medium">
                     {profissional.rating.toFixed(1)}
                   </span>
                 </div>
+                <div className="text-sm text-gray-600">
+                  <CheckCircleIcon className="w-4 h-4 inline mr-1" />
+                  {profissional.consultas_realizadas} consultas
+                </div>
               </div>
 
-              {/* NOVO: Seguidores */}
+              {/* Seguidores */}
               <div className="flex items-center space-x-4 py-2 border-y border-gray-200">
                 <button
                   onClick={() => setShowFollowers(true)}
-                  className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 transition-colors font-medium cursor-pointer"
+                  className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 transition-colors font-medium"
                 >
                   <UserGroupIcon className="w-5 h-5" />
                   <span>{followerCount} seguidores</span>
                 </button>
               </div>
 
-              {/* NOVO: Botões com Follow */}
-              <div className="flex gap-3 flex-wrap pt-2">
+              {/* Botões de Ação */}
+              <div className="flex gap-3 flex-wrap">
                 <button
-                  onClick={() => setModalAgendamento({ aberto: true })}
-                  className="bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  onClick={() =>
+                    router.push(
+                      `/dashboard/paciente/profissionais/${profissional.id}/agendar`
+                    )
+                  }
+                  className="bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center"
                 >
+                  <CalendarDaysIcon className="w-5 h-5 mr-2" />
                   Agendar Consulta
                 </button>
 
-                {authToken && (
+                {authToken && profissional.user_id && (
                   <FollowButton
                     userId={profissional.user_id}
                     variant="primary"
                     size="md"
                     showLabel={true}
-                    onFollow={() => setFollowerCount((c: number) => c + 1)}
+                    onFollow={() => setFollowerCount((c) => c + 1)}
                     onUnfollow={() =>
-                      setFollowerCount((c: number) => Math.max(0, c - 1))
+                      setFollowerCount((c) => Math.max(0, c - 1))
                     }
                   />
                 )}
@@ -344,220 +354,87 @@ export default function ProfissionalDetalhePage() {
             </div>
           </div>
 
-          {/* Estatísticas */}
+          {/* Informações Adicionais */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t border-gray-200">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">
-                {profissional.consultas_realizadas}
+            <div className="flex items-center space-x-3">
+              <MapPinIcon className="w-5 h-5 text-gray-400" />
+              <div>
+                <p className="text-sm text-gray-500">Localização</p>
+                <p className="font-medium text-gray-900">
+                  {profissional.endereco_cidade}, {profissional.endereco_estado}
+                </p>
               </div>
-              <div className="text-sm text-gray-600">Consultas Realizadas</div>
             </div>
 
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">
-                {profissional.consultas_este_ano}
+            <div className="flex items-center space-x-3">
+              <CurrencyDollarIcon className="w-5 h-5 text-gray-400" />
+              <div>
+                <p className="text-sm text-gray-500">Valor da sessão</p>
+                <p className="font-medium text-gray-900">
+                  R$ {profissional.valor_sessao.toFixed(2)}
+                </p>
               </div>
-              <div className="text-sm text-gray-600">Este Ano</div>
             </div>
 
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">
-                {Object.keys(profissional.horarios_por_dia).length}
+            <div className="flex items-center space-x-3">
+              <ClockIcon className="w-5 h-5 text-gray-400" />
+              <div>
+                <p className="text-sm text-gray-500">Experiência</p>
+                <p className="font-medium text-gray-900">
+                  {profissional.experiencia_anos} anos
+                </p>
               </div>
-              <div className="text-sm text-gray-600">Dias Disponíveis</div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Coluna Principal */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Sobre */}
+        {/* Bio */}
+        {profissional.bio_profissional && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Sobre</h2>
+            <p className="text-gray-700 leading-relaxed">
+              {profissional.bio_profissional}
+            </p>
+          </div>
+        )}
+
+        {/* Formação e Abordagem */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {profissional.formacao_principal && (
             <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Sobre
-              </h2>
-              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                {profissional.bio_profissional ||
-                  "Profissional dedicado ao seu bem-estar."}
+              <div className="flex items-center space-x-2 mb-4">
+                <AcademicCapIcon className="w-6 h-6 text-blue-600" />
+                <h3 className="text-lg font-bold text-gray-900">Formação</h3>
+              </div>
+              <p className="text-gray-700">{profissional.formacao_principal}</p>
+            </div>
+          )}
+
+          {profissional.abordagem_terapeutica && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center space-x-2 mb-4">
+                <ChartBarIcon className="w-6 h-6 text-blue-600" />
+                <h3 className="text-lg font-bold text-gray-900">Abordagem</h3>
+              </div>
+              <p className="text-gray-700">
+                {profissional.abordagem_terapeutica}
               </p>
             </div>
-
-            {/* Formação e Abordagem */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Formação e Abordagem
-              </h2>
-
-              <div className="space-y-4">
-                {profissional.formacao_principal && (
-                  <div>
-                    <h3 className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                      <AcademicCapIcon className="w-4 h-4 mr-2" />
-                      Formação Principal
-                    </h3>
-                    <p className="text-gray-900">
-                      {profissional.formacao_principal}
-                    </p>
-                  </div>
-                )}
-
-                {profissional.abordagem_terapeutica && (
-                  <div>
-                    <h3 className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                      <ChartBarIcon className="w-4 h-4 mr-2" />
-                      Abordagem Terapêutica
-                    </h3>
-                    <p className="text-gray-900">
-                      {profissional.abordagem_terapeutica}
-                    </p>
-                  </div>
-                )}
-
-                {profissional.experiencia_anos && (
-                  <div>
-                    <h3 className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                      <ClockIcon className="w-4 h-4 mr-2" />
-                      Experiência
-                    </h3>
-                    <p className="text-gray-900">
-                      {profissional.experiencia_anos} anos de atuação
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Horários de Atendimento */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Horários de Atendimento
-              </h2>
-
-              <div className="space-y-3">
-                {diasSemana.map((dia, index) => {
-                  const horarios = profissional.horarios_por_dia[index];
-
-                  return (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
-                    >
-                      <span className="font-medium text-gray-700">{dia}</span>
-                      {horarios && horarios.length > 0 ? (
-                        <span className="text-sm text-emerald-600 font-medium">
-                          {horarios
-                            .map((h) => `${h.inicio} - ${h.fim}`)
-                            .join(", ")}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-gray-400">Fechado</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Próximos Horários Disponíveis */}
-            {profissional.proximos_horarios_disponiveis &&
-              profissional.proximos_horarios_disponiveis.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                    Próximos Horários
-                  </h2>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {profissional.proximos_horarios_disponiveis.map(
-                      (slot, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() =>
-                            handleAgendar(slot.data, slot.hora_inicio)
-                          }
-                          disabled={!slot.disponivel || agendandoConsulta}
-                          className={`p-3 rounded-lg text-sm font-medium transition-colors ${
-                            slot.disponivel
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
-                              : "bg-gray-50 text-gray-400 border border-gray-200"
-                          }`}
-                        >
-                          <div className="font-semibold">
-                            {new Date(slot.data).toLocaleDateString("pt-BR", {
-                              weekday: "short",
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </div>
-                          <div className="text-xs">{slot.hora_inicio}</div>
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
-          </div>
-
-          {/* Coluna Lateral */}
-          <div className="space-y-6">
-            {/* Informações de Contato */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Informações
-              </h3>
-
-              <div className="space-y-3">
-                {profissional.valor_sessao && (
-                  <div className="flex items-start space-x-3">
-                    <CurrencyDollarIcon className="w-5 h-5 text-emerald-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-600">Valor da Sessão</p>
-                      <p className="font-semibold text-gray-900">
-                        R$ {profissional.valor_sessao.toFixed(2)}/h
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {profissional.endereco_cidade && (
-                  <div className="flex items-start space-x-3">
-                    <MapPinIcon className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-600">Localização</p>
-                      <p className="font-semibold text-gray-900">
-                        {profissional.endereco_cidade},{" "}
-                        {profissional.endereco_estado}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {profissional.crp && (
-                  <div className="flex items-start space-x-3">
-                    <CheckCircleIcon className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-600">Registro</p>
-                      <p className="font-semibold text-gray-900">
-                        CRP {profissional.crp}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* NOVO: Modal de Seguidores */}
-      <FollowersModal
-        isOpen={showFollowers}
-        onClose={() => setShowFollowers(false)}
-        userId={profissional.user_id}
-        mode="followers"
-        authToken={authToken}
-        title={`Seguidores de ${profissional.nome}`}
-      />
+      {/* Modal de Seguidores */}
+      {profissional.user_id && (
+        <FollowersModal
+          isOpen={showFollowers}
+          onClose={() => setShowFollowers(false)}
+          userId={profissional.user_id}
+          mode="followers"
+          authToken={authToken}
+          title={`Seguidores de ${profissional.nome}`}
+        />
+      )}
     </PatientLayout>
   );
 }
