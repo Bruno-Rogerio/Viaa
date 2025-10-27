@@ -1,6 +1,6 @@
 // src/components/dashboard/patient/profissionais/ProfessionalCard.tsx
 // 🎯 Card do profissional com botão de seguir integrado
-// ✅ VERSÃO CORRIGIDA
+// ✅ VERSÃO CORRIGIDA FINAL
 
 "use client";
 
@@ -12,7 +12,6 @@ import {
 } from "@heroicons/react/24/solid";
 import { MapPinIcon } from "@heroicons/react/24/outline";
 import FollowButton from "@/components/dashboard/common/FollowButton";
-import { useConnections } from "@/hooks/useConnections";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 
@@ -43,9 +42,9 @@ export default function ProfessionalCard({
 
   // Log para debug
   console.log("🔎 ProfessionalCard renderizado com:", {
-    profissionalId: profissional.id,
-    userId: profissional.user_id,
-    temUserId: !!profissional.user_id,
+    profissionalId: profissional?.id,
+    userId: profissional?.user_id,
+    temUserId: !!profissional?.user_id,
   });
 
   // Obter token
@@ -57,6 +56,7 @@ export default function ProfessionalCard({
         } = await supabase.auth.getSession();
 
         if (session?.access_token) {
+          console.log("✅ Token obtido no ProfessionalCard");
           setAuthToken(session.access_token);
         }
       } catch (error) {
@@ -67,26 +67,36 @@ export default function ProfessionalCard({
     getToken();
   }, []);
 
-  // Obter contagem de followers
+  // Obter contagem de followers quando tivermos o userId e o token
   useEffect(() => {
     const getFollowerCount = async () => {
-      if (!profissional.user_id) return;
+      if (!profissional?.user_id) {
+        console.log("⚠️ Sem user_id para buscar contagem de seguidores");
+        return;
+      }
 
       try {
-        const { followerCount: count } = useConnections(
-          profissional.user_id,
-          authToken
+        const response = await fetch(
+          `/api/connections/count-followers?user_id=${profissional.user_id}`
         );
-        setFollowerCount(count);
+
+        if (!response.ok) {
+          throw new Error(`Erro ao buscar seguidores: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+          setFollowerCount(data.follower_count || 0);
+          console.log("✅ Contagem de seguidores obtida:", data.follower_count);
+        }
       } catch (error) {
-        console.error("Erro ao obter contagem de seguidores:", error);
+        console.error("Erro ao buscar contagem de seguidores:", error);
       }
     };
 
-    if (authToken) {
-      getFollowerCount();
-    }
-  }, [profissional.user_id, authToken]);
+    getFollowerCount();
+  }, [profissional?.user_id]);
 
   // Renderizar estrelas
   const renderStars = (rating: number = 5) => {
@@ -191,16 +201,16 @@ export default function ProfessionalCard({
           </Link>
 
           {/* Botão de Seguir - CORRIGIDO */}
-          <div className="flex-shrink-0">
-            {authToken && profissional.user_id && (
+          {authToken && profissional?.user_id && (
+            <div className="flex-shrink-0">
               <FollowButton
                 userId={profissional.user_id}
                 variant="secondary"
                 size="sm"
                 showLabel={false}
               />
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
