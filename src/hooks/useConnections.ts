@@ -1,5 +1,6 @@
 // src/hooks/useConnections.ts
 // 🔗 Hook para gerenciar o estado de seguir/deixar de seguir
+// ✅ VERSÃO CORRIGIDA
 
 import { useState, useCallback, useEffect } from "react";
 
@@ -63,8 +64,14 @@ interface UseConnectionsReturn {
 // 🪝 HOOK
 // ============================================================
 
+/**
+ * Hook para gerenciar conexões (follow/unfollow)
+ *
+ * @param targetUserId - ID do usuário ALVO (quem você quer seguir/deixar de seguir)
+ * @param authToken - Token JWT do usuário autenticado
+ */
 export function useConnections(
-  userId: string,
+  targetUserId: string,
   authToken: string | null
 ): UseConnectionsReturn {
   const [isFollowing, setIsFollowing] = useState(false);
@@ -97,13 +104,16 @@ export function useConnections(
       setIsLoading(true);
       setError(null);
 
+      console.log("🔗 Seguindo usuário:", targetUserId);
+
       const response = await fetch("/api/connections/follow", {
         method: "POST",
         headers: getAuthHeader(),
-        body: JSON.stringify({ following_id: userId }),
+        body: JSON.stringify({ following_id: targetUserId }), // ✅ CORREÇÃO: usar targetUserId
       });
 
       const data = await response.json();
+      console.log("📦 Resposta da API:", data);
 
       if (!response.ok) {
         throw new Error(data.error || "Erro ao seguir");
@@ -111,13 +121,14 @@ export function useConnections(
 
       setIsFollowing(true);
       setFollowerCount((prev) => prev + 1);
+      console.log("✅ Seguindo com sucesso!");
     } catch (err: any) {
       setError(err.message);
-      console.error("Erro ao seguir:", err);
+      console.error("❌ Erro ao seguir:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [userId, getAuthHeader]);
+  }, [targetUserId, getAuthHeader]);
 
   // ========== UNFOLLOW ==========
 
@@ -126,10 +137,12 @@ export function useConnections(
       setIsLoading(true);
       setError(null);
 
+      console.log("🔓 Deixando de seguir:", targetUserId);
+
       const response = await fetch("/api/connections/unfollow", {
         method: "DELETE",
         headers: getAuthHeader(),
-        body: JSON.stringify({ following_id: userId }),
+        body: JSON.stringify({ following_id: targetUserId }), // ✅ CORREÇÃO: usar targetUserId
       });
 
       const data = await response.json();
@@ -140,13 +153,14 @@ export function useConnections(
 
       setIsFollowing(false);
       setFollowerCount((prev) => Math.max(0, prev - 1));
+      console.log("✅ Unfollow realizado!");
     } catch (err: any) {
       setError(err.message);
-      console.error("Erro ao deixar de seguir:", err);
+      console.error("❌ Erro ao deixar de seguir:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [userId, getAuthHeader]);
+  }, [targetUserId, getAuthHeader]);
 
   // ========== CHECK FOLLOW STATUS ==========
 
@@ -155,7 +169,7 @@ export function useConnections(
 
     try {
       const response = await fetch(
-        `/api/connections/is-following?user_id=${userId}`,
+        `/api/connections/is-following?user_id=${targetUserId}`, // ✅ CORREÇÃO: usar targetUserId
         {
           headers: getAuthHeader(),
         }
@@ -169,14 +183,14 @@ export function useConnections(
     } catch (err) {
       console.error("Erro ao verificar status de follow:", err);
     }
-  }, [userId, authToken, getAuthHeader]);
+  }, [targetUserId, authToken, getAuthHeader]);
 
   // ========== GET FOLLOWER COUNT ==========
 
   const getFollowerCountAction = useCallback(async () => {
     try {
       const response = await fetch(
-        `/api/connections/count-followers?user_id=${userId}`
+        `/api/connections/count-followers?user_id=${targetUserId}` // ✅ CORREÇÃO: usar targetUserId
       );
 
       const data = await response.json();
@@ -187,14 +201,14 @@ export function useConnections(
     } catch (err) {
       console.error("Erro ao buscar contagem de followers:", err);
     }
-  }, [userId]);
+  }, [targetUserId]);
 
   // ========== GET FOLLOWING COUNT ==========
 
   const getFollowingCountAction = useCallback(async () => {
     try {
       const response = await fetch(
-        `/api/connections/count-following?user_id=${userId}`
+        `/api/connections/count-following?user_id=${targetUserId}` // ✅ CORREÇÃO: usar targetUserId
       );
 
       const data = await response.json();
@@ -205,7 +219,7 @@ export function useConnections(
     } catch (err) {
       console.error("Erro ao buscar contagem de following:", err);
     }
-  }, [userId]);
+  }, [targetUserId]);
 
   // ========== GET FOLLOWERS LIST ==========
 
@@ -216,7 +230,7 @@ export function useConnections(
         setFollowersError(null);
 
         const response = await fetch(
-          `/api/connections/followers?user_id=${userId}&limit=${limit}&offset=${offset}`
+          `/api/connections/followers?user_id=${targetUserId}&limit=${limit}&offset=${offset}` // ✅ CORREÇÃO: usar targetUserId
         );
 
         const data: FollowersListResponse = await response.json();
@@ -233,7 +247,7 @@ export function useConnections(
         setFollowersLoading(false);
       }
     },
-    [userId]
+    [targetUserId]
   );
 
   // ========== GET FOLLOWING LIST ==========
@@ -245,7 +259,7 @@ export function useConnections(
         setFollowersError(null);
 
         const response = await fetch(
-          `/api/connections/following?user_id=${userId}&limit=${limit}&offset=${offset}`
+          `/api/connections/following?user_id=${targetUserId}&limit=${limit}&offset=${offset}` // ✅ CORREÇÃO: usar targetUserId
         );
 
         const data: FollowingListResponse = await response.json();
@@ -262,20 +276,20 @@ export function useConnections(
         setFollowersLoading(false);
       }
     },
-    [userId]
+    [targetUserId]
   );
 
   // ========== AUTO-LOAD ON MOUNT ==========
 
   useEffect(() => {
-    if (userId) {
+    if (targetUserId) {
       getFollowerCountAction();
       getFollowingCountAction();
       if (authToken) {
         checkFollowStatus();
       }
     }
-  }, [userId, authToken]);
+  }, [targetUserId, authToken]); // ✅ CORREÇÃO: remover funções das dependências
 
   return {
     isFollowing,
