@@ -1,6 +1,5 @@
 // src/components/dashboard/patient/profissionais/ProfessionalCard.tsx
-// 🎯 Card do profissional com botão de seguir integrado
-// ✅ VERSÃO CORRIGIDA FINAL
+// 🎯 VERSÃO FINAL CORRIGIDA COMPLETA
 
 "use client";
 
@@ -18,7 +17,7 @@ import { supabase } from "@/lib/supabase/client";
 interface ProfessionalCardProps {
   profissional: {
     id: string;
-    user_id: string;
+    user_id?: string; // Agora opcional, pois vamos garantir no componente
     nome: string;
     sobrenome: string;
     especialidades?: string;
@@ -39,15 +38,27 @@ export default function ProfessionalCard({
 }: ProfessionalCardProps) {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [followerCount, setFollowerCount] = useState(0);
+  // Estado para armazenar o userId efetivo, usando id como fallback
+  const [userId, setUserId] = useState<string | null>(null);
 
-  // Log para debug
-  console.log("🔎 ProfessionalCard renderizado com:", {
-    profissionalId: profissional?.id,
-    userId: profissional?.user_id,
-    temUserId: !!profissional?.user_id,
+  // Log inicial com dados do profissional para diagnóstico
+  console.log("🔍 ProfessionalCard recebeu:", {
+    profId: profissional.id,
+    temUserId: !!profissional.user_id,
+    valorUserId: profissional.user_id || "AUSENTE",
   });
 
-  // Obter token
+  // Inicializar o userId ao montar o componente
+  useEffect(() => {
+    // Usar user_id se existir, senão usar o id como fallback
+    const effectiveUserId = profissional.user_id || profissional.id;
+    console.log(
+      `🔄 ProfessionalCard: Usando user_id efetivo "${effectiveUserId}" para profissional "${profissional.id}"`
+    );
+    setUserId(effectiveUserId);
+  }, [profissional]);
+
+  // Obter token de autenticação
   useEffect(() => {
     const getToken = async () => {
       try {
@@ -55,29 +66,41 @@ export default function ProfessionalCard({
           data: { session },
         } = await supabase.auth.getSession();
 
+        console.log("🔑 Verificando sessão:", {
+          temSession: !!session,
+          temToken: !!session?.access_token,
+          userId: session?.user?.id,
+        });
+
         if (session?.access_token) {
           console.log("✅ Token obtido no ProfessionalCard");
           setAuthToken(session.access_token);
+        } else {
+          console.log("⚠️ Sem token de autenticação na sessão");
         }
       } catch (error) {
-        console.error("Erro ao obter token:", error);
+        console.error("❌ Erro ao obter token:", error);
       }
     };
 
     getToken();
   }, []);
 
-  // Obter contagem de followers quando tivermos o userId e o token
+  // Obter contagem de followers quando tivermos o userId
   useEffect(() => {
     const getFollowerCount = async () => {
-      if (!profissional?.user_id) {
-        console.log("⚠️ Sem user_id para buscar contagem de seguidores");
+      if (!userId) {
+        console.log(
+          "⚠️ Sem user_id efetivo para buscar contagem de seguidores"
+        );
         return;
       }
 
+      console.log(`🔍 Buscando contagem de seguidores para userId: ${userId}`);
+
       try {
         const response = await fetch(
-          `/api/connections/count-followers?user_id=${profissional.user_id}`
+          `/api/connections/count-followers?user_id=${userId}`
         );
 
         if (!response.ok) {
@@ -85,20 +108,30 @@ export default function ProfessionalCard({
         }
 
         const data = await response.json();
+        console.log("📊 Resposta da API de seguidores:", data);
 
         if (data.success) {
           setFollowerCount(data.follower_count || 0);
           console.log("✅ Contagem de seguidores obtida:", data.follower_count);
         }
       } catch (error) {
-        console.error("Erro ao buscar contagem de seguidores:", error);
+        console.error("❌ Erro ao buscar contagem de seguidores:", error);
       }
     };
 
     getFollowerCount();
-  }, [profissional?.user_id]);
+  }, [userId]);
 
-  // Renderizar estrelas
+  // Log para debugging dos estados que afetam a renderização do botão
+  useEffect(() => {
+    console.log("🔍 Estados para renderizar botão:", {
+      temAuthToken: !!authToken,
+      temUserId: !!userId,
+      mostrarBotao: !!(authToken && userId),
+    });
+  }, [authToken, userId]);
+
+  // Renderizar estrelas de avaliação
   const renderStars = (rating: number = 5) => {
     return Array.from({ length: 5 }).map((_, i) => (
       <StarIcon
@@ -113,6 +146,8 @@ export default function ProfessionalCard({
   return (
     <div
       className={`bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 ${className}`}
+      data-has-userid={!!userId}
+      data-has-authtoken={!!authToken}
     >
       {/* Imagem/Avatar */}
       <div className="relative h-32 bg-gradient-to-r from-blue-400 to-emerald-400 overflow-hidden">
@@ -192,7 +227,7 @@ export default function ProfessionalCard({
 
         {/* Botões de ação */}
         <div className="flex gap-2 pt-2">
-          {/* Botão de Agendar */}
+          {/* Botão de Ver Perfil */}
           <Link
             href={`/dashboard/paciente/profissionais/${profissional.id}`}
             className="flex-1 bg-blue-600 text-white py-2 px-3 rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm text-center"
@@ -200,15 +235,22 @@ export default function ProfessionalCard({
             Ver Perfil
           </Link>
 
-          {/* Botão de Seguir - CORRIGIDO */}
-          {authToken && profissional?.user_id && (
+          {/* Botão de Seguir com userId garantido */}
+          {authToken && userId ? (
             <div className="flex-shrink-0">
               <FollowButton
-                userId={profissional.user_id}
+                userId={userId}
                 variant="secondary"
                 size="sm"
                 showLabel={false}
               />
+            </div>
+          ) : (
+            // Mostrar indicador visual de que falta algo para o botão
+            <div className="flex-shrink-0 bg-gray-100 p-2 rounded-lg">
+              <div className="w-5 h-5 flex items-center justify-center text-xs text-gray-400">
+                {!authToken ? "?" : !userId ? "ID" : "?"}
+              </div>
             </div>
           )}
         </div>
