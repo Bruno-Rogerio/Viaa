@@ -1,5 +1,5 @@
-// src/app/api/connections/unfollow/route.ts
-// ✅ ROTA FIXA - DEIXAR DE SEGUIR
+// src/app/api/connections/is-following/route.ts
+// ✅ ROTA FIXA - VERIFICAR SE ESTÁ SEGUINDO
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -27,59 +27,51 @@ async function getUserId(req: NextRequest): Promise<string | null> {
   }
 }
 
-export async function DELETE(req: NextRequest) {
-  console.log("🗑️ DELETE /api/connections/unfollow recebido!");
+export async function GET(req: NextRequest) {
+  console.log("🔍 GET /api/connections/is-following recebido!");
 
   try {
     // Autenticação
     const userId = await getUserId(req);
     if (!userId) {
-      console.log("❌ Não autenticado");
       return NextResponse.json(
         { success: false, error: "Não autenticado" },
         { status: 401 }
       );
     }
 
-    console.log("✅ User autenticado:", userId);
+    // Obter user_id da query string
+    const { searchParams } = new URL(req.url);
+    const targetUserId = searchParams.get("user_id");
 
-    // Parse body
-    const body = await req.json().catch(() => ({}));
-    const { following_id } = body;
-
-    if (!following_id) {
-      console.log("❌ following_id não fornecido");
+    if (!targetUserId) {
       return NextResponse.json(
-        { success: false, error: "following_id é obrigatório" },
+        { success: false, error: "user_id é obrigatório" },
         { status: 400 }
       );
     }
 
-    console.log("📝 Deixando de seguir:", following_id);
+    console.log("📝 Verificando follow:", { userId, targetUserId });
 
-    // Deletar conexão
-    const { error } = await supabase
+    // Verificar se está seguindo
+    const { data } = await supabase
       .from("connections")
-      .delete()
+      .select("id")
       .eq("follower_id", userId)
-      .eq("following_id", following_id);
+      .eq("following_id", targetUserId)
+      .single();
 
-    if (error) {
-      console.error("❌ Erro ao deletar:", error);
-      return NextResponse.json(
-        { success: false, error: "Erro ao deixar de seguir" },
-        { status: 500 }
-      );
-    }
-
-    console.log("✅ Unfollow realizado!");
+    const isFollowing = !!data;
+    console.log("✅ Resultado:", isFollowing);
 
     return NextResponse.json({
       success: true,
-      message: "Deixou de seguir com sucesso",
+      follower_id: userId,
+      following_id: targetUserId,
+      is_following: isFollowing,
     });
   } catch (error: any) {
-    console.error("💥 Erro crítico:", error);
+    console.error("💥 Erro:", error);
     return NextResponse.json(
       {
         success: false,
@@ -88,9 +80,4 @@ export async function DELETE(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-// POST também aceito para compatibilidade
-export async function POST(req: NextRequest) {
-  return DELETE(req);
 }
