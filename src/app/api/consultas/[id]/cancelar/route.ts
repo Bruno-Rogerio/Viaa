@@ -2,6 +2,11 @@
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { TipoLembrete, CriarLembreteConsulta } from "@/types/notificacao";
+import {
+  criarLembrete,
+  processarLembrete,
+} from "@/services/lembretes/lembreteService";
 
 export async function POST(
   request: NextRequest,
@@ -99,7 +104,32 @@ export async function POST(
       );
     }
 
-    // TODO: Notificar a outra parte
+    // Notificar a outra parte (paciente ou profissional)
+    try {
+      const destinatarioId = perfilPaciente
+        ? consulta.profissional_id
+        : consulta.paciente_id;
+
+      const dadosLembrete: CriarLembreteConsulta = {
+        consulta_id: consultaId,
+        tipo: TipoLembrete.CANCELAMENTO,
+        destinatario_id: destinatarioId,
+        agendado_para: new Date().toISOString(),
+        mensagem: motivo || "A consulta foi cancelada.",
+      };
+
+      const lembreteCriado = await criarLembrete(dadosLembrete);
+
+      if (lembreteCriado) {
+        await processarLembrete(lembreteCriado.id);
+      }
+    } catch (notificacaoError) {
+      console.error(
+        "Erro ao enviar notificação de cancelamento:",
+        notificacaoError
+      );
+      // Não falha o cancelamento por causa da notificação
+    }
 
     return NextResponse.json({
       success: true,
