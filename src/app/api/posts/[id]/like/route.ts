@@ -8,7 +8,7 @@ import { cookies } from "next/headers";
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
-): Promise<NextResponse> {
+) {
   try {
     console.log("📊 API de Like: Iniciando processamento POST (curtir)");
 
@@ -109,7 +109,7 @@ export async function POST(
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
-): Promise<NextResponse> {
+) {
   try {
     console.log("📊 API de Like: Iniciando processamento DELETE (descurtir)");
 

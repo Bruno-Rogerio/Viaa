@@ -1,5 +1,5 @@
 // src/app/api/profissionais/sugestoes/route.ts
-// 🎯 API para sugerir profissionais para seguir (com tipagem explícita e correta)
+// 🎯 API para sugerir profissionais para seguir (versão corrigida)
 
 import { NextRequest, NextResponse } from "next/server";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
@@ -18,8 +18,6 @@ interface ConnectionData {
 }
 
 // Formato de dados retornado pelo Supabase para perfil de profissional
-// Nota importante: o Supabase retorna connections como um array com um objeto { count: number }
-// Esta tipagem deve ser ajustada com base no formato real dos dados
 interface PerfilProfissionalDB {
   id: string;
   user_id: string;
@@ -42,8 +40,12 @@ interface PerfilProfissionalComScore extends PerfilProfissionalDB {
 
 export async function GET(req: NextRequest) {
   try {
+    console.log("📊 API de Sugestões: Iniciando processamento");
+
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "5");
+
+    console.log("📊 API de Sugestões: Parâmetros", { limit });
 
     // Validação básica
     if (limit < 1 || limit > 20) {
@@ -53,17 +55,26 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Obter usuário autenticado
+    // Obter usuário autenticado - correção na forma de passar cookies
     const supabase = createRouteHandlerClient({ cookies });
     const {
       data: { session },
     } = await supabase.auth.getSession();
 
+    console.log(
+      "📊 API de Sugestões: Status da sessão",
+      session ? "Autenticado" : "Não autenticado"
+    );
+
     if (!session?.user) {
+      console.error(
+        "❌ API de Sugestões: Erro de autenticação - Usuário não encontrado"
+      );
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const userId = session.user.id;
+    console.log("📊 API de Sugestões: Usuário", userId);
 
     // 1. Verificar se o usuário é paciente
     const { data: perfilPaciente } = await supabase
@@ -73,11 +84,18 @@ export async function GET(req: NextRequest) {
       .single();
 
     if (!perfilPaciente) {
+      console.error("❌ API de Sugestões: Perfil de paciente não encontrado");
       return NextResponse.json(
         { error: "Perfil de paciente não encontrado" },
         { status: 404 }
       );
     }
+
+    console.log("📊 API de Sugestões: Perfil encontrado", {
+      cidade: perfilPaciente.cidade,
+      estado: perfilPaciente.estado,
+      temInteresses: !!perfilPaciente.interesses,
+    });
 
     // 2. Obter profissionais que o usuário já segue
     const { data: seguindo } = await supabase
@@ -89,7 +107,13 @@ export async function GET(req: NextRequest) {
       (s: ConnectionData) => s.following_id
     );
 
+    console.log(
+      `📊 API de Sugestões: Usuário segue ${seguindoIds.length} profissionais`
+    );
+
     // 3. Obter profissionais verificados que o usuário não segue
+    console.log("📊 API de Sugestões: Buscando profissionais verificados");
+
     let query = supabase
       .from("perfis_profissionais")
       .select(
@@ -115,6 +139,8 @@ export async function GET(req: NextRequest) {
     }
 
     // 4. Implementar algoritmo de relevância
+    console.log("📊 API de Sugestões: Aplicando filtros de relevância");
+
     // a. Filtrar por localização se disponível
     if (perfilPaciente.cidade) {
       query = query.eq("endereco_cidade", perfilPaciente.cidade);
@@ -129,21 +155,28 @@ export async function GET(req: NextRequest) {
     query = query.limit(limit * 3); // Buscar mais para depois filtrar
 
     // Executar a query
+    console.log("📊 API de Sugestões: Executando query");
     const { data: profissionaisData, error } = await query;
 
     if (error) {
-      console.error("Erro ao buscar sugestões:", error);
+      console.error("❌ API de Sugestões: Erro ao buscar sugestões:", error);
       return NextResponse.json(
-        { error: "Erro ao buscar sugestões de profissionais" },
+        {
+          error: "Erro ao buscar sugestões de profissionais",
+          details: error.message,
+        },
         { status: 500 }
       );
     }
 
     // Garantir que temos um array (mesmo vazio) para trabalhar
     const profissionaisBrutos = profissionaisData || [];
+    console.log(
+      `📊 API de Sugestões: Encontrados ${profissionaisBrutos.length} profissionais`
+    );
 
     // 5. Algoritmo de ranking (pontuação)
-    // Implementação mais explícita para evitar problemas de tipagem
+    console.log("📊 API de Sugestões: Aplicando algoritmo de ranking");
 
     // Processar interesses do paciente para comparação
     const interessesArray: string[] = [];
@@ -156,6 +189,10 @@ export async function GET(req: NextRequest) {
         }
       }
     }
+
+    console.log(
+      `📊 API de Sugestões: Paciente tem ${interessesArray.length} interesses`
+    );
 
     // Calcular score para cada profissional
     const profissionaisComScore: PerfilProfissionalComScore[] = [];
@@ -230,6 +267,7 @@ export async function GET(req: NextRequest) {
           if (
             prof.connections[0] &&
             typeof prof.connections[0] === "object" &&
+            prof.connections[0] !== null &&
             "count" in prof.connections[0]
           ) {
             connectionsCount = Number(prof.connections[0].count) || 0;
@@ -263,6 +301,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 6. Ordenar por score e pegar os primeiros `limit`
+    console.log("📊 API de Sugestões: Ordenando por relevância");
     profissionaisComScore.sort((a, b) => b.score - a.score);
     const sugestoes = profissionaisComScore.slice(0, limit);
 
@@ -273,14 +312,18 @@ export async function GET(req: NextRequest) {
       return restoDados;
     });
 
+    console.log(
+      `📊 API de Sugestões: Retornando ${resultado.length} sugestões`
+    );
+
     return NextResponse.json({
       profissionais: resultado,
       total: resultado.length,
     });
   } catch (error: any) {
-    console.error("Erro na API de sugestões:", error);
+    console.error("❌ API de Sugestões: Erro inesperado:", error);
     return NextResponse.json(
-      { error: "Erro interno do servidor" },
+      { error: "Erro interno do servidor", details: error.message },
       { status: 500 }
     );
   }
