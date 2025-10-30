@@ -1,395 +1,195 @@
 // src/hooks/dashboard/useFeed.ts
-// 🔧 VERSÃO CORRIGIDA - Consulta de posts e curtidas
+// 🎯 Hook para gerenciar o feed personalizado com filtros
 
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import type {
-  Post,
-  CreatePostData,
-  FeedFilters,
-  FeedPagination,
-} from "@/types/feed";
+import { Post, FeedPagination } from "@/types/feed";
 
-interface UseFeedReturn {
-  posts: Post[];
-  loading: boolean;
-  error: string | null;
-  pagination: FeedPagination;
-  createPost: (data: CreatePostData) => Promise<boolean>;
-  togglePostLike: (postId: string) => Promise<boolean>;
-  loadMore: () => Promise<void>;
-  refresh: () => Promise<void>;
-  setFilters: (filters: Partial<FeedFilters>) => void;
+/**
+ * Tipos de filtro para o feed
+ */
+export type FeedFilterType = "seguindo" | "para-voce" | "recentes";
+
+/**
+ * Interface para as opções do feed
+ */
+interface FeedOptions {
+  initialFilter?: FeedFilterType;
+  pageSize?: number;
+  autoLoad?: boolean;
 }
 
-export const useFeed = (
-  initialFilters: FeedFilters = { type: "all" }
-): UseFeedReturn => {
-  const { user } = useAuth();
+/**
+ * Hook para gerenciar o feed de posts
+ */
+export function useFeed(options: FeedOptions = {}) {
+  const {
+    initialFilter = "seguindo",
+    pageSize = 10,
+    autoLoad = true,
+  } = options;
+
+  const { user, profile } = useAuth();
+
+  // Estado para os posts e metadados
   const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFiltersState] = useState<FeedFilters>(initialFilters);
+  const [filter, setFilter] = useState<FeedFilterType>(initialFilter);
   const [pagination, setPagination] = useState<FeedPagination>({
     page: 1,
-    limit: 10,
+    limit: pageSize,
     total: 0,
-    has_more: true,
+    has_more: false,
   });
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // 🔧 CONSULTA CORRIGIDA - SEM FILTRAR CURTIDAS NA QUERY
-  const buildPostsQuery = useCallback(
-    (page: number = 1, limit: number = 10) => {
-      let query = supabase
-        .from("posts")
-        .select(
-          `
-        *,
-        author:perfis_profissionais!posts_profissional_id_fkey (
-          id,
-          nome,
-          sobrenome,
-          especialidades,
-          foto_perfil_url,
-          verificado
-        )
-      `,
-          { count: "exact" }
-        )
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .range((page - 1) * limit, page * limit - 1);
-
-      // Aplicar filtros de conteúdo
-      if (filters.author_id) {
-        query = query.eq("profissional_id", filters.author_id);
-      }
-
-      if (filters.search) {
-        query = query.textSearch("content", filters.search);
-      }
-
-      return query;
-    },
-    [filters]
-  );
-
-  // 🔧 BUSCAR CURTIDAS DO USUÁRIO SEPARADAMENTE
-  const loadUserLikes = useCallback(
-    async (postIds: string[]) => {
-      if (!user || postIds.length === 0) return new Set<string>();
-
-      try {
-        const { data, error } = await supabase
-          .from("post_likes")
-          .select("post_id")
-          .eq("profissional_id", user.id)
-          .in("post_id", postIds);
-
-        if (error) throw error;
-
-        return new Set(data?.map((like) => like.post_id) || []);
-      } catch (err) {
-        console.error("❌ Erro ao carregar curtidas:", err);
-        return new Set<string>();
-      }
-    },
-    [user]
-  );
-
-  // 🔧 FUNÇÃO DE VALIDAÇÃO DE DADOS (MELHORADA)
-  const validateAndTransformPost = useCallback((item: any): Post | null => {
-    try {
-      // Verificar se author existe
-      if (!item.author) {
-        console.warn(`⚠️ Post ${item.id} sem author - ignorando`);
-        return null;
-      }
-
-      // Verificar campos obrigatórios do author
-      if (!item.author.id || !item.author.nome) {
-        console.warn(`⚠️ Post ${item.id} com author inválido:`, item.author);
-        return null;
-      }
-
-      // Transformação segura
-      return {
-        id: item.id,
-        profissional_id: item.profissional_id,
-        content: item.content || "",
-        image_url: item.image_url,
-        video_url: item.video_url,
-        type: item.type || "text",
-        likes_count: item.likes_count || 0,
-        comments_count: item.comments_count || 0,
-        shares_count: item.shares_count || 0,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        is_active: item.is_active,
-        author: {
-          id: item.author.id,
-          nome: item.author.nome,
-          sobrenome: item.author.sobrenome || "",
-          especialidades: item.author.especialidades || "Profissional",
-          foto_perfil_url: item.author.foto_perfil_url,
-          verificado: item.author.verificado || false,
-        },
-        is_liked: false, // Será atualizado depois
-        user_like_id: undefined,
-      };
-    } catch (err) {
-      console.error(`❌ Erro ao transformar post ${item.id}:`, err);
-      return null;
-    }
-  }, []);
-
-  // 🔧 CARREGAR POSTS (CORRIGIDO)
+  // Carregar posts do feed
   const loadPosts = useCallback(
-    async (page: number = 1, reset: boolean = true) => {
+    async (page: number = 1, replace: boolean = true) => {
+      if (!user?.id) return false;
+
       try {
         setLoading(true);
         setError(null);
 
-        console.log(`🔍 Carregando posts - Página ${page}`);
+        // Construir a URL com os parâmetros de filtro e paginação
+        const params = new URLSearchParams({
+          filter: filter,
+          page: page.toString(),
+          limit: pageSize.toString(),
+        });
 
-        const {
-          data,
-          error: queryError,
-          count,
-        } = await buildPostsQuery(page, pagination.limit);
+        // Usar fetch com autenticação - o token JWT está nos cookies
+        const response = await fetch(`/api/posts?${params.toString()}`);
 
-        if (queryError) throw queryError;
-
-        if (!data) {
-          setPosts([]);
-          return;
+        if (!response.ok) {
+          throw new Error("Erro ao carregar feed");
         }
 
-        console.log(`📊 Posts recebidos do Supabase: ${data.length}`);
+        const data = await response.json();
 
-        // Transformar posts
-        const transformedPosts: Post[] = data
-          .map(validateAndTransformPost)
-          .filter((post): post is Post => post !== null);
+        // Atualizar os posts (substituir ou concatenar)
+        setPosts((prev) => {
+          if (replace) return data.posts || [];
+          return [...prev, ...(data.posts || [])];
+        });
 
-        console.log(
-          `✅ Posts válidos transformados: ${transformedPosts.length}`
-        );
+        // Atualizar metadados de paginação
+        setPagination({
+          page: page,
+          limit: pageSize,
+          total: data.total || 0,
+          has_more: data.has_more || false,
+        });
 
-        // Carregar curtidas do usuário para esses posts
-        const postIds = transformedPosts.map((p) => p.id);
-        const userLikes = await loadUserLikes(postIds);
-
-        // Aplicar curtidas aos posts
-        const postsWithLikes = transformedPosts.map((post) => ({
-          ...post,
-          is_liked: userLikes.has(post.id),
-        }));
-
-        // Atualizar estado
-        if (reset) {
-          setPosts(postsWithLikes);
-        } else {
-          setPosts((prev) => [...prev, ...postsWithLikes]);
-        }
-
-        setPagination((prev) => ({
-          ...prev,
-          page,
-          total: count || 0,
-          has_more: transformedPosts.length === pagination.limit,
-        }));
-
-        // Log de posts inválidos para debug
-        if (data.length !== transformedPosts.length) {
-          console.warn(
-            `⚠️ ${
-              data.length - transformedPosts.length
-            } posts foram ignorados por dados inválidos`
-          );
-        }
+        return true;
       } catch (err: any) {
-        console.error("❌ Erro ao carregar posts:", err);
-        setError(err.message || "Erro ao carregar posts");
+        console.error("Erro ao carregar feed:", err);
+        setError(err.message || "Erro ao carregar feed");
+        return false;
       } finally {
         setLoading(false);
       }
     },
-    [buildPostsQuery, pagination.limit, validateAndTransformPost, loadUserLikes]
+    [user?.id, filter, pageSize]
   );
 
-  // 🔧 CRIAR NOVO POST
-  const createPost = useCallback(
-    async (data: CreatePostData): Promise<boolean> => {
-      if (!user) {
-        setError("Usuário não autenticado");
-        return false;
-      }
-
-      try {
-        setError(null);
-
-        const { data: newPost, error: insertError } = await supabase
-          .from("posts")
-          .insert([
-            {
-              profissional_id: user.id,
-              content: data.content,
-              image_url: data.image_url,
-              video_url: data.video_url,
-              type: data.type || "text",
-            },
-          ])
-          .select(
-            `
-          *,
-          author:perfis_profissionais!posts_profissional_id_fkey (
-            id,
-            nome,
-            sobrenome,
-            especialidades,
-            foto_perfil_url,
-            verificado
-          )
-        `
-          )
-          .single();
-
-        if (insertError) throw insertError;
-        if (!newPost) throw new Error("Erro ao criar post");
-
-        // Transformar e validar novo post
-        const transformedPost = validateAndTransformPost(newPost);
-        if (!transformedPost)
-          throw new Error("Post criado com dados inválidos");
-
-        console.log("✅ Novo post criado e adicionado ao feed");
-        setPosts((prev) => [transformedPost, ...prev]);
-        return true;
-      } catch (err: any) {
-        console.error("❌ Erro ao criar post:", err);
-        setError(err.message || "Erro ao criar post");
-        return false;
-      }
-    },
-    [user, validateAndTransformPost]
-  );
-
-  // 🔧 TOGGLE CURTIDA DE POST (IMPLEMENTADO)
-  const togglePostLike = useCallback(
-    async (postId: string): Promise<boolean> => {
-      if (!user) {
-        setError("Usuário não autenticado");
-        return false;
-      }
-
-      try {
-        setError(null);
-
-        // Encontrar post atual
-        const currentPost = posts.find((p) => p.id === postId);
-        if (!currentPost) return false;
-
-        const isCurrentlyLiked = currentPost.is_liked;
-
-        // Optimistic update
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === postId
-              ? {
-                  ...post,
-                  is_liked: !isCurrentlyLiked,
-                  likes_count: post.likes_count + (isCurrentlyLiked ? -1 : 1),
-                }
-              : post
-          )
-        );
-
-        console.log(
-          `${isCurrentlyLiked ? "💔" : "❤️"} Toggle curtida post:`,
-          postId
-        );
-
-        if (isCurrentlyLiked) {
-          // Remover curtida
-          const { error } = await supabase
-            .from("post_likes")
-            .delete()
-            .eq("post_id", postId)
-            .eq("profissional_id", user.id);
-
-          if (error) throw error;
-        } else {
-          // Adicionar curtida
-          const { error } = await supabase.from("post_likes").insert([
-            {
-              post_id: postId,
-              profissional_id: user.id,
-            },
-          ]);
-
-          if (error) throw error;
-        }
-
-        console.log("✅ Curtida de post processada com sucesso");
-        return true;
-      } catch (err: any) {
-        console.error("❌ Erro ao curtir post:", err);
-
-        // Reverter optimistic update
-        const currentPost = posts.find((p) => p.id === postId);
-        if (currentPost) {
-          setPosts((prev) =>
-            prev.map((post) =>
-              post.id === postId
-                ? {
-                    ...post,
-                    is_liked: currentPost.is_liked,
-                    likes_count: currentPost.likes_count,
-                  }
-                : post
-            )
-          );
-        }
-
-        setError(err.message || "Erro ao curtir post");
-        return false;
-      }
-    },
-    [user, posts]
-  );
+  // Atualizar o filtro
+  const updateFilter = useCallback((newFilter: FeedFilterType) => {
+    setFilter(newFilter);
+    // Resetar para a página 1 ao mudar o filtro
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  }, []);
 
   // Carregar mais posts (paginação)
   const loadMore = useCallback(async () => {
-    if (!pagination.has_more || loading) return;
-    await loadPosts(pagination.page + 1, false);
-  }, [pagination.has_more, pagination.page, loading, loadPosts]);
+    if (loading || !pagination.has_more) return false;
+    return await loadPosts(pagination.page + 1, false);
+  }, [loading, pagination.has_more, pagination.page, loadPosts]);
 
-  // Atualizar feed
-  const refresh = useCallback(async () => {
-    await loadPosts(1, true);
-  }, [loadPosts]);
+  // Curtir/descurtir post
+  const togglePostLike = useCallback(
+    async (postId: string) => {
+      if (!user?.id) return false;
 
-  // Atualizar filtros
-  const setFilters = useCallback((newFilters: Partial<FeedFilters>) => {
-    setFiltersState((prev) => ({ ...prev, ...newFilters }));
+      try {
+        // Encontrar o post e verificar se já está curtido
+        const post = posts.find((p) => p.id === postId);
+        if (!post) return false;
+
+        const isLiked = post.is_liked || false;
+
+        // Atualizar estado local imediatamente (otimista)
+        setPosts((prevPosts) =>
+          prevPosts.map((p) =>
+            p.id === postId
+              ? {
+                  ...p,
+                  is_liked: !isLiked,
+                  likes_count: isLiked ? p.likes_count - 1 : p.likes_count + 1,
+                }
+              : p
+          )
+        );
+
+        // Fazer requisição para a API
+        const method = isLiked ? "DELETE" : "POST";
+        const response = await fetch(`/api/posts/${postId}/like`, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          // Reverter estado local em caso de erro
+          setPosts((prevPosts) =>
+            prevPosts.map((p) =>
+              p.id === postId
+                ? {
+                    ...p,
+                    is_liked: isLiked,
+                    likes_count: isLiked
+                      ? p.likes_count + 1
+                      : p.likes_count - 1,
+                  }
+                : p
+            )
+          );
+          throw new Error("Erro ao curtir/descurtir post");
+        }
+
+        return true;
+      } catch (err: any) {
+        console.error("Erro ao curtir/descurtir post:", err);
+        return false;
+      }
+    },
+    [posts, user?.id]
+  );
+
+  // Atualizar feed (refresh)
+  const refresh = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
   }, []);
 
-  // Carregar posts inicial e quando filtros mudarem
+  // Efeito para carregar posts iniciais
   useEffect(() => {
-    loadPosts(1, true);
-  }, [filters]); // Removi loadPosts das dependências para evitar loop
+    if (autoLoad && user?.id) {
+      loadPosts(1, true);
+    }
+  }, [user?.id, filter, refreshKey, autoLoad, loadPosts]);
 
   return {
     posts,
     loading,
     error,
+    filter,
     pagination,
-    createPost,
-    togglePostLike, // Mudança: função unificada
+    setFilter: updateFilter,
     loadMore,
+    togglePostLike,
     refresh,
-    setFilters,
   };
-};
+}

@@ -1,204 +1,258 @@
 // src/components/dashboard/patient/feed/PatientFeedContainer.tsx
-// 🎯 INTEGRADO COM FOLLOW - Prioridade Alta #1
+// 🎯 Feed Container do Paciente - Implementação completa
 
-"use client";
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase/client";
-import { PostCard } from "../../shared/feed";
-import PostFilters from "../../professional/feed/PostFilters";
-import FollowButton from "../../common/FollowButton";
-import { LoadingSpinner } from "../../common";
-import { useFeed } from "@/hooks/dashboard/useFeed";
-import { UserGroupIcon, CheckBadgeIcon } from "@heroicons/react/24/outline";
+import PostFilters from "@/components/dashboard/shared/feed/PostFilters";
+import { PostCard } from "@/components/dashboard/shared/feed";
+import SuggestedProfessionals from "./SuggestedProfessionals";
+import FollowButton from "@/components/dashboard/common/FollowButton";
+import { LoadingSpinner } from "@/components/dashboard/common";
+import { useFeed, FeedFilterType } from "@/hooks/dashboard/useFeed";
+import {
+  UserGroupIcon,
+  SparklesIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/outline";
 
 export default function PatientFeedContainer() {
-  const { user } = useAuth();
-  const [filter, setFilter] = useState("all");
-  const [authToken, setAuthToken] = useState<string | null>(null);
+  const { user, profile } = useAuth();
 
-  // Obter token
-  useEffect(() => {
-    const getToken = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          setAuthToken(session.access_token);
-        }
-      } catch (error) {
-        console.error("Erro ao obter token:", error);
-      }
-    };
-    getToken();
-  }, []);
+  const {
+    posts,
+    loading,
+    error,
+    filter,
+    pagination,
+    setFilter,
+    loadMore,
+    togglePostLike,
+    refresh,
+  } = useFeed({
+    initialFilter: "seguindo",
+    autoLoad: true,
+  });
 
-  const { posts, loading, error, pagination, loadMore, refresh, setFilters } =
-    useFeed();
+  // Handler para mudar o filtro
+  const handleFilterChange = useCallback(
+    (newFilter: FeedFilterType) => {
+      setFilter(newFilter);
+    },
+    [setFilter]
+  );
 
-  const handleFilterChange = (newFilter: string) => {
-    setFilter(newFilter);
-    setFilters({ type: newFilter as any });
-  };
-
-  const handleLoadMore = async () => {
-    if (!loading && pagination.has_more) {
-      await loadMore();
-    }
-  };
+  // Handler para carregar mais posts
+  const handleLoadMore = useCallback(async () => {
+    if (loading || !pagination.has_more) return;
+    await loadMore();
+  }, [loading, pagination.has_more, loadMore]);
 
   return (
     <div className="space-y-6">
-      {/* Header específico para pacientes */}
+      {/* Header */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Conteúdos dos Profissionais 📚
-        </h1>
-        <p className="text-gray-600">
-          Acompanhe conteúdos exclusivos e agende consultas com profissionais
-          verificados.
+        <h1 className="text-2xl font-bold text-gray-900">Feed de Bem-Estar</h1>
+        <p className="text-gray-600 mt-1">
+          Conteúdo terapêutico personalizado da sua Biblioteca Viva
         </p>
       </div>
 
-      {/* Filtros */}
-      <PostFilters currentFilter={filter} onFilterChange={handleFilterChange} />
+      {/* Layout de 2 colunas */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Coluna principal - Posts */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Filtros */}
+          <PostFilters
+            currentFilter={filter}
+            onFilterChange={handleFilterChange}
+          />
 
-      {/* Error State */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <p className="text-red-800 font-medium">Erro ao carregar posts</p>
-          <button
-            onClick={refresh}
-            className="mt-3 bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700"
-          >
-            Tentar novamente
-          </button>
-        </div>
-      )}
+          {/* Estado de erro */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <p className="text-red-800 font-medium">Erro ao carregar posts</p>
+              <button
+                onClick={refresh}
+                className="mt-3 bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 flex items-center"
+              >
+                <ArrowPathIcon className="w-4 h-4 mr-2" />
+                Tentar novamente
+              </button>
+            </div>
+          )}
 
-      {/* Loading State */}
-      {loading && posts.length === 0 && (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <LoadingSpinner size="lg" />
-            <p className="mt-4 text-gray-600">Carregando conteúdos...</p>
-          </div>
-        </div>
-      )}
+          {/* Estado vazio - Filtro "Seguindo" sem seguir ninguém */}
+          {!loading && posts.length === 0 && filter === "seguindo" && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
+              <UserGroupIcon className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Você ainda não segue nenhum profissional
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Siga profissionais para ver o conteúdo deles no seu feed
+              </p>
+              <button
+                onClick={() => setFilter("para-voce")}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 inline-flex items-center"
+              >
+                <SparklesIcon className="w-4 h-4 mr-2" />
+                Ver conteúdo recomendado
+              </button>
+            </div>
+          )}
 
-      {/* Posts com Follow integrado */}
-      {posts.length > 0 && (
-        <div className="space-y-6">
-          {posts.map((post) => (
-            <div key={post.id} className="space-y-3">
-              {/* Header do Post com Follow Button */}
-              <div className="flex items-center justify-between px-4 py-2 bg-white rounded-t-xl border border-b-0 border-gray-200">
-                <div className="flex items-center space-x-3 flex-1 min-w-0">
-                  {/* Avatar */}
-                  <div className="flex-shrink-0">
-                    {post.author?.foto_perfil_url ? (
-                      <img
-                        src={post.author.foto_perfil_url}
-                        alt={post.author.nome}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-emerald-400 flex items-center justify-center text-white font-semibold text-sm">
-                        {post.author?.nome?.charAt(0)}
-                        {post.author?.sobrenome?.charAt(0)}
+          {/* Estado vazio - Filtro "Para Você" sem recomendações */}
+          {!loading && posts.length === 0 && filter === "para-voce" && (
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6 text-center">
+              <SparklesIcon className="w-12 h-12 text-purple-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Recomendações personalizadas
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Conforme você interagir com mais profissionais, mostraremos
+                recomendações baseadas nos seus interesses
+              </p>
+              <button
+                onClick={() => setFilter("recentes")}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700"
+              >
+                Ver posts recentes
+              </button>
+            </div>
+          )}
+
+          {/* Loading state */}
+          {loading && posts.length === 0 && (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <LoadingSpinner size="lg" />
+                <p className="mt-4 text-gray-600">Carregando conteúdos...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Lista de posts */}
+          {posts.length > 0 && (
+            <div className="space-y-6">
+              {posts.map((post) => (
+                <div key={post.id} className="space-y-2">
+                  {/* Header do post com botão de seguir */}
+                  <div className="flex items-center justify-between px-4 py-3 bg-white rounded-t-xl border border-b-0 border-gray-200">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      {/* Avatar */}
+                      <div className="flex-shrink-0">
+                        {post.author?.foto_perfil_url ? (
+                          <img
+                            src={post.author.foto_perfil_url}
+                            alt={post.author.nome}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-emerald-400 flex items-center justify-center text-white font-semibold text-sm">
+                            {post.author?.nome?.charAt(0)}
+                            {post.author?.sobrenome?.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info do autor */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">
+                          {post.author?.nome} {post.author?.sobrenome}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {post.author?.especialidades || "Profissional"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Botão de seguir */}
+                    {user?.id && post.author?.id && (
+                      <div className="flex-shrink-0 ml-2">
+                        <FollowButton
+                          userId={post.author.id}
+                          variant="secondary"
+                          size="sm"
+                          showLabel={false}
+                        />
                       </div>
                     )}
                   </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">
-                      {post.author?.nome} {post.author?.sobrenome}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      {post.author?.especialidades || "Profissional"}
-                    </p>
-                  </div>
+                  {/* Conteúdo do post */}
+                  <PostCard
+                    post={post}
+                    onLike={() => togglePostLike(post.id)}
+                    showComments={false}
+                    linkToDetail={true}
+                  />
                 </div>
+              ))}
 
-                {/* Botão Follow */}
-                {authToken && post.author?.id && (
-                  <div className="flex-shrink-0 ml-2">
-                    <FollowButton
-                      userId={post.author.id}
-                      variant="secondary"
-                      size="sm"
-                      showLabel={false}
-                    />
-                  </div>
-                )}
+              {/* Botão "Carregar Mais" */}
+              {pagination.has_more && (
+                <div className="flex justify-center pt-4">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loading}
+                    className={`
+                      px-4 py-2 text-sm font-medium rounded-lg
+                      ${
+                        loading
+                          ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          : "bg-emerald-600 text-white hover:bg-emerald-700"
+                      }
+                    `}
+                  >
+                    {loading ? (
+                      <span className="flex items-center">
+                        <LoadingSpinner size="sm" className="mr-2" />
+                        Carregando...
+                      </span>
+                    ) : (
+                      "Carregar mais posts"
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Coluna lateral - Sugestões e stats */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Sugestões de profissionais */}
+          <SuggestedProfessionals limit={5} />
+
+          {/* Card explicativo do Feed */}
+          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 p-4">
+            <h3 className="text-lg font-semibold text-emerald-900 mb-2">
+              Sua Biblioteca Viva
+            </h3>
+            <p className="text-sm text-emerald-800 mb-4">
+              Aqui você encontra conteúdo exclusivo dos profissionais que você
+              segue. Quanto mais profissionais você seguir, mais rica será sua
+              biblioteca.
+            </p>
+            <div className="space-y-2 text-xs text-emerald-700">
+              <div className="flex items-center">
+                <UserGroupIcon className="w-4 h-4 mr-2 text-emerald-600" />
+                <span>
+                  <strong>Seguindo:</strong> Veja posts apenas dos profissionais
+                  que você segue
+                </span>
               </div>
-
-              {/* Post Card */}
-              <div className="border-t-0 border border-gray-200 rounded-b-xl overflow-hidden">
-                <PostCard
-                  post={{
-                    id: post.id,
-                    author: {
-                      id: post.author?.id || "",
-                      name: `${post.author?.nome} ${post.author?.sobrenome}`,
-                      specialization:
-                        post.author?.especialidades || "Profissional",
-                      avatar: post.author?.foto_perfil_url,
-                      verified: post.author?.verificado || false,
-                    },
-                    content: post.content || "",
-                    image: post.image_url,
-                    createdAt: post.created_at,
-                    likes: post.likes_count || 0,
-                    comments: post.comments_count || 0,
-                    shares: post.shares_count || 0,
-                    isLiked: post.is_liked || false,
-                    type: post.type || "text",
-                  }}
-                  canInteract={false}
-                  canComment={false}
-                  showScheduleButton={true}
-                />
-              </div>
-
-              {/* Estatísticas de Seguidor */}
-              <div className="flex items-center space-x-4 px-4 py-2 bg-gray-50 rounded-b-xl border border-t-0 border-gray-200 text-xs text-gray-600">
-                <button className="flex items-center space-x-1 hover:text-gray-900 cursor-pointer">
-                  <UserGroupIcon className="w-4 h-4" />
-                  <span>Ver seguidores</span>
-                </button>
+              <div className="flex items-center">
+                <SparklesIcon className="w-4 h-4 mr-2 text-emerald-600" />
+                <span>
+                  <strong>Para Você:</strong> Conteúdo personalizado baseado nos
+                  seus interesses
+                </span>
               </div>
             </div>
-          ))}
+          </div>
         </div>
-      )}
-
-      {/* Load More Button */}
-      {pagination.has_more && !loading && posts.length > 0 && (
-        <div className="text-center">
-          <button
-            onClick={handleLoadMore}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Carregar mais posts
-          </button>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!loading && posts.length === 0 && !error && (
-        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <div className="text-6xl mb-4">📝</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            Nenhum post ainda
-          </h3>
-          <p className="text-gray-600">
-            Siga profissionais para ver seus conteúdos aqui!
-          </p>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
