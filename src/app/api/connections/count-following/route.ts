@@ -1,5 +1,5 @@
 // src/app/api/connections/count-following/route.ts
-// ✅ ROTA FIXA - CONTAR SEGUINDO
+// API para contar quantos usuários a pessoa está seguindo
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
     console.log("📝 Contando following de:", userId);
 
-    // Contar seguindo
+    // Contar quantos está seguindo
     const { count, error } = await supabase
       .from("connections")
       .select("*", { count: "exact", head: true })
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.log("✅ Total de following:", count);
+    console.log("✅ Total seguindo:", count);
 
     return NextResponse.json({
       success: true,
