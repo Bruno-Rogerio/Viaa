@@ -1,193 +1,236 @@
-// src/app/api/posts/[id]/like/route.ts
-// 🎯 API para curtir/descurtir posts
+// src/app/api/posts/route.ts
+// 📝 API de Posts - Lista e criação de posts
 
 import { NextRequest, NextResponse } from "next/server";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { createClient } from "@supabase/supabase-js";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-): Promise<NextResponse> {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// GET - Listar posts
+export async function GET(req: NextRequest) {
+  console.log("📋 GET /api/posts");
+
   try {
-    console.log("📊 API de Like: Iniciando processamento POST (curtir)");
+    const { searchParams } = new URL(req.url);
+    const filter = searchParams.get("filter") || "recentes";
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const authorId = searchParams.get("author_id");
 
-    const postId = params.id;
-    console.log("📊 API de Like: Post ID", postId);
+    // Token de autenticação
+    const authHeader = req.headers.get("authorization");
+    const token = authHeader?.replace("Bearer ", "");
 
-    // Obter usuário autenticado
-    const supabase = createRouteHandlerClient({ cookies });
+    if (!token) {
+      return NextResponse.json(
+        { error: "Token não fornecido" },
+        { status: 401 }
+      );
+    }
+
+    // Buscar dados do usuário autenticado
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
 
-    console.log(
-      "📊 API de Like: Status da sessão",
-      session ? "Autenticado" : "Não autenticado"
-    );
-
-    if (!session?.user) {
-      console.error(
-        "❌ API de Like: Erro de autenticação - Usuário não encontrado"
-      );
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    if (authError || !user) {
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 });
     }
 
-    const userId = session.user.id;
-    console.log("📊 API de Like: Usuário", userId);
-
-    // Verificar se o post existe
-    const { data: post, error: postError } = await supabase
+    let query = supabase
       .from("posts")
-      .select("id")
-      .eq("id", postId)
-      .single();
+      .select(
+        `
+        *,
+        author:perfis_profissionais!posts_profissional_id_fkey (
+          id,
+          user_id,
+          nome,
+          sobrenome,
+          especialidades,
+          foto_perfil_url,
+          verificado,
+          endereco_cidade,
+          endereco_estado
+        )
+      `,
+        { count: "exact" }
+      )
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .range((page - 1) * limit, page * limit - 1);
 
-    if (postError || !post) {
-      console.error("❌ API de Like: Post não encontrado", postError);
-      return NextResponse.json(
-        { error: "Post não encontrado" },
-        { status: 404 }
-      );
+    // Aplicar filtros
+    if (filter === "seguindo") {
+      // Buscar IDs dos profissionais que o usuário segue
+      const { data: connections } = await supabase
+        .from("connections")
+        .select("following_id")
+        .eq("follower_id", user.id);
+
+      if (connections && connections.length > 0) {
+        const followingIds = connections.map((c) => c.following_id);
+        query = query.in("profissional_id", followingIds);
+      } else {
+        // Se não segue ninguém, retornar vazio
+        return NextResponse.json({
+          posts: [],
+          total: 0,
+          page,
+          limit,
+          has_more: false,
+        });
+      }
+    } else if (filter === "para-voce") {
+      // Por enquanto, retornar posts com mais engajamento
+      query = query.order("likes_count", { ascending: false });
     }
 
-    // Verificar se já curtiu
-    const { data: existingLike } = await supabase
-      .from("post_likes")
-      .select("id")
-      .eq("post_id", postId)
-      .eq("user_id", userId)
-      .single();
-
-    if (existingLike) {
-      console.log("📊 API de Like: Já curtiu este post, nada a fazer");
-      return NextResponse.json({
-        success: true,
-        message: "Post já curtido anteriormente",
-      });
+    if (authorId) {
+      query = query.eq("profissional_id", authorId);
     }
 
-    // Adicionar curtida
-    const { error: likeError } = await supabase.from("post_likes").insert({
-      post_id: postId,
-      user_id: userId,
-    });
+    const { data: posts, error, count } = await query;
 
-    if (likeError) {
-      console.error("❌ API de Like: Erro ao curtir post", likeError);
+    if (error) {
+      console.error("❌ Erro ao buscar posts:", error);
       return NextResponse.json(
-        { error: "Erro ao curtir post", details: likeError.message },
+        { error: "Erro ao buscar posts" },
         { status: 500 }
       );
     }
 
-    // Atualizar contador de likes do post
-    const { error: updateError } = await supabase.rpc("increment_post_likes", {
-      post_id: postId,
-    });
+    // Buscar curtidas do usuário para esses posts
+    const postIds = posts?.map((p) => p.id) || [];
+    const { data: userLikes } = await supabase
+      .from("post_likes")
+      .select("post_id")
+      .eq("user_id", user.id)
+      .in("post_id", postIds);
 
-    if (updateError) {
-      console.error("❌ API de Like: Erro ao atualizar contador", updateError);
-      // Não falhar a requisição por isso, apenas logar
-    }
+    const likedPostIds = new Set(userLikes?.map((l) => l.post_id) || []);
 
-    console.log("📊 API de Like: Post curtido com sucesso");
+    // Adicionar flag is_liked aos posts
+    const postsWithLikes =
+      posts?.map((post) => ({
+        ...post,
+        is_liked: likedPostIds.has(post.id),
+      })) || [];
+
+    console.log(`✅ ${postsWithLikes.length} posts retornados`);
 
     return NextResponse.json({
-      success: true,
-      message: "Post curtido com sucesso",
+      posts: postsWithLikes,
+      total: count || 0,
+      page,
+      limit,
+      has_more: (count || 0) > page * limit,
     });
   } catch (error: any) {
-    console.error("❌ API de Like: Erro inesperado:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor", details: error.message },
-      { status: 500 }
-    );
+    console.error("💥 Erro:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-): Promise<NextResponse> {
+// POST - Criar novo post
+export async function POST(req: NextRequest) {
+  console.log("✍️ POST /api/posts");
+
   try {
-    console.log("📊 API de Like: Iniciando processamento DELETE (descurtir)");
+    const authHeader = req.headers.get("authorization");
+    const token = authHeader?.replace("Bearer ", "");
 
-    const postId = params.id;
-    console.log("📊 API de Like: Post ID", postId);
-
-    // Obter usuário autenticado
-    const supabase = createRouteHandlerClient({ cookies });
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    console.log(
-      "📊 API de Like: Status da sessão",
-      session ? "Autenticado" : "Não autenticado"
-    );
-
-    if (!session?.user) {
-      console.error(
-        "❌ API de Like: Erro de autenticação - Usuário não encontrado"
+    if (!token) {
+      return NextResponse.json(
+        { error: "Token não fornecido" },
+        { status: 401 }
       );
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const userId = session.user.id;
-    console.log("📊 API de Like: Usuário", userId);
+    // Buscar dados do usuário autenticado
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
 
-    // Verificar se o post existe
-    const { data: post, error: postError } = await supabase
-      .from("posts")
+    if (authError || !user) {
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 });
+    }
+
+    // Verificar se é profissional
+    const { data: profile } = await supabase
+      .from("perfis_profissionais")
       .select("id")
-      .eq("id", postId)
+      .eq("user_id", user.id)
       .single();
 
-    if (postError || !post) {
-      console.error("❌ API de Like: Post não encontrado", postError);
+    if (!profile) {
       return NextResponse.json(
-        { error: "Post não encontrado" },
-        { status: 404 }
+        { error: "Apenas profissionais podem criar posts" },
+        { status: 403 }
       );
     }
 
-    // Remover curtida
-    const { error: unlikeError } = await supabase
-      .from("post_likes")
-      .delete()
-      .eq("post_id", postId)
-      .eq("user_id", userId);
+    const body = await req.json();
+    const { content, type = "text", image_url, video_url } = body;
 
-    if (unlikeError) {
-      console.error("❌ API de Like: Erro ao descurtir post", unlikeError);
+    if (!content) {
       return NextResponse.json(
-        { error: "Erro ao descurtir post", details: unlikeError.message },
+        { error: "Conteúdo é obrigatório" },
+        { status: 400 }
+      );
+    }
+
+    // Criar post
+    const { data: post, error } = await supabase
+      .from("posts")
+      .insert({
+        profissional_id: profile.id,
+        content,
+        type,
+        image_url,
+        video_url,
+        is_active: true,
+        likes_count: 0,
+        comments_count: 0,
+        shares_count: 0,
+      })
+      .select(
+        `
+        *,
+        author:perfis_profissionais!posts_profissional_id_fkey (
+          id,
+          user_id,
+          nome,
+          sobrenome,
+          especialidades,
+          foto_perfil_url,
+          verificado
+        )
+      `
+      )
+      .single();
+
+    if (error) {
+      console.error("❌ Erro ao criar post:", error);
+      return NextResponse.json(
+        { error: "Erro ao criar post" },
         { status: 500 }
       );
     }
 
-    // Atualizar contador de likes do post
-    const { error: updateError } = await supabase.rpc("decrement_post_likes", {
-      post_id: postId,
-    });
-
-    if (updateError) {
-      console.error("❌ API de Like: Erro ao atualizar contador", updateError);
-      // Não falhar a requisição por isso, apenas logar
-    }
-
-    console.log("📊 API de Like: Post descurtido com sucesso");
+    console.log("✅ Post criado:", post.id);
 
     return NextResponse.json({
       success: true,
-      message: "Post descurtido com sucesso",
+      post,
     });
   } catch (error: any) {
-    console.error("❌ API de Like: Erro inesperado:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor", details: error.message },
-      { status: 500 }
-    );
+    console.error("💥 Erro:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

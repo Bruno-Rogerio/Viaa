@@ -1,170 +1,104 @@
 // src/app/api/connections/follow/route.ts
-// API para criar uma conexão (seguir usuário)
+// 👥 API de Conexões - Seguir usuário
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Cliente Supabase com service role para bypass RLS
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Função para obter o ID do usuário autenticado
-async function getUserId(req: NextRequest): Promise<string | null> {
-  try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return null;
-
-    const token = authHeader.substring(7);
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(token);
-
-    if (error || !user) return null;
-    return user.id;
-  } catch {
-    return null;
-  }
-}
-
-// Função para obter o tipo de perfil do usuário
-async function getUserProfileType(
-  userId: string
-): Promise<"profissional" | "paciente" | null> {
-  // Verificar primeiro em perfis_profissionais
-  const { data: profissional } = await supabase
-    .from("perfis_profissionais")
-    .select("id")
-    .eq("user_id", userId)
-    .single();
-
-  if (profissional) return "profissional";
-
-  // Se não for profissional, verificar em perfis_pacientes
-  const { data: paciente } = await supabase
-    .from("perfis_pacientes")
-    .select("id")
-    .eq("user_id", userId)
-    .single();
-
-  if (paciente) return "paciente";
-
-  return null;
-}
-
 export async function POST(req: NextRequest) {
-  console.log("🔗 POST /api/connections/follow recebido!");
+  console.log("➕ POST /api/connections/follow");
 
   try {
-    // 1. Autenticação
-    const followerId = await getUserId(req);
-    if (!followerId) {
-      console.log("❌ Não autenticado");
+    const authHeader = req.headers.get("authorization");
+    const token = authHeader?.replace("Bearer ", "");
+
+    if (!token) {
       return NextResponse.json(
-        { success: false, error: "Não autenticado" },
+        { success: false, error: "Token não fornecido" },
         { status: 401 }
       );
     }
 
-    console.log("✅ User autenticado:", followerId);
+    // Buscar dados do usuário autenticado
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
 
-    // 2. Parse body
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: "Token inválido" },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { following_id } = body;
 
     if (!following_id) {
-      console.log("❌ following_id não fornecido");
       return NextResponse.json(
         { success: false, error: "following_id é obrigatório" },
         { status: 400 }
       );
     }
 
-    console.log("📝 Tentando seguir:", following_id);
-
-    // 3. Validação: Não pode seguir a si mesmo
-    if (followerId === following_id) {
+    // Não pode seguir a si mesmo
+    if (user.id === following_id) {
       return NextResponse.json(
-        { success: false, error: "Você não pode seguir a si mesmo" },
+        { success: false, error: "Não pode seguir a si mesmo" },
         { status: 400 }
       );
     }
 
-    // 4. Obter tipos de perfil
-    const [followerType, followingType] = await Promise.all([
-      getUserProfileType(followerId),
-      getUserProfileType(following_id),
-    ]);
+    console.log(`📝 ${user.id} seguindo ${following_id}`);
 
-    console.log("📊 Tipos de perfil:", { followerType, followingType });
-
-    // 5. Validação de regras de negócio
-    // REGRA: Profissional NÃO pode seguir paciente
-    if (followerType === "profissional" && followingType === "paciente") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Profissionais não podem seguir pacientes",
-        },
-        { status: 403 }
-      );
-    }
-
-    // 6. Verificar se já está seguindo
-    const { data: existingConnection } = await supabase
+    // Verificar se já segue
+    const { data: existing } = await supabase
       .from("connections")
       .select("id")
-      .eq("follower_id", followerId)
+      .eq("follower_id", user.id)
       .eq("following_id", following_id)
       .single();
 
-    if (existingConnection) {
+    if (existing) {
       return NextResponse.json(
-        { success: false, error: "Você já segue este usuário" },
+        { success: false, error: "Já está seguindo este usuário" },
         { status: 400 }
       );
     }
 
-    // 7. Criar conexão
-    console.log("✨ Criando conexão...");
+    // Criar conexão
     const { data, error } = await supabase
       .from("connections")
-      .insert([
-        {
-          follower_id: followerId,
-          following_id: following_id,
-        },
-      ])
+      .insert({
+        follower_id: user.id,
+        following_id: following_id,
+      })
       .select()
       .single();
 
     if (error) {
-      console.error("❌ Erro ao criar conexão:", error);
+      console.error("❌ Erro ao seguir:", error);
       return NextResponse.json(
         { success: false, error: "Erro ao seguir usuário" },
         { status: 500 }
       );
     }
 
-    console.log("✅ Conexão criada:", data);
+    console.log("✅ Conexão criada:", data.id);
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Seguindo com sucesso",
-        data,
-      },
-      { status: 201 }
-    );
+    return NextResponse.json({
+      success: true,
+      connection: data,
+    });
   } catch (error: any) {
-    console.error("💥 Erro crítico:", error);
+    console.error("💥 Erro:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: error.message || "Erro interno do servidor",
-      },
+      { success: false, error: error.message },
       { status: 500 }
     );
   }

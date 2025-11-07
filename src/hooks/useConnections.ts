@@ -1,8 +1,9 @@
 // src/hooks/useConnections.ts
 // 🔗 Hook para gerenciar o estado de seguir/deixar de seguir
-// ✅ VERSÃO CORRIGIDA
+// ✅ VERSÃO COMPLETA COM TOKEN SUPABASE
 
 import { useState, useCallback, useEffect } from "react";
+import { supabase } from "@/lib/supabase/client";
 
 // ============================================================
 // 📋 TIPOS
@@ -37,12 +38,12 @@ interface FollowingListResponse {
 }
 
 // ============================================================
-// 📊 HOOK
+// 📊 HOOK - Versão com parâmetro opcional para compatibilidade
 // ============================================================
 
 export function useConnections(
-  userId: string | undefined,
-  authToken: string | null
+  userId?: string,
+  legacyAuthToken?: string | null
 ) {
   // ========== ESTADOS ==========
   const [isFollowing, setIsFollowing] = useState(false);
@@ -54,10 +55,43 @@ export function useConnections(
   const [followingList, setFollowingList] = useState<UserProfile[]>([]);
   const [followersLoading, setFollowersLoading] = useState(false);
   const [followersError, setFollowersError] = useState<string | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+
+  // ========== OBTER TOKEN DO SUPABASE ==========
+  useEffect(() => {
+    const getToken = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          setAuthToken(session.access_token);
+          console.log("✅ Token obtido do Supabase");
+        }
+      } catch (error) {
+        console.error("❌ Erro ao obter token:", error);
+        setError("Erro de autenticação");
+      }
+    };
+    
+    // Se não foi passado um token legacy, buscar do Supabase
+    if (!legacyAuthToken) {
+      getToken();
+    } else {
+      setAuthToken(legacyAuthToken);
+    }
+
+    // Escutar mudanças na sessão
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.access_token && !legacyAuthToken) {
+        setAuthToken(session.access_token);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [legacyAuthToken]);
 
   // ========== VALIDAÇÕES INICIAIS ==========
-
-  // Verificar se temos dados válidos para trabalhar
   const canPerformActions = useCallback(() => {
     if (!userId) {
       console.error("🚫 useConnections: userId não fornecido");
@@ -72,20 +106,70 @@ export function useConnections(
     return true;
   }, [userId, authToken]);
 
-  // ========== EFEITOS ==========
+  // ========== CONTAR SEGUIDORES (movido para cima para resolver erro de declaração) ==========
+  const getFollowerCount = useCallback(async () => {
+    if (!userId) return;
 
-  // Verificar status inicial quando temos userId e token
+    console.log("🔢 useConnections.getFollowerCount() para userId:", userId);
+
+    try {
+      const response = await fetch(
+        `/api/connections/count-followers?user_id=${userId}`
+      );
+
+      console.log("📥 Status da resposta:", response.status);
+      const data = await response.json();
+      console.log("📦 Dados da resposta:", data);
+
+      if (data.success) {
+        setFollowerCount(data.follower_count || 0);
+        console.log("✅ Contagem de seguidores:", data.follower_count);
+      } else {
+        console.error("❌ Erro ao contar seguidores:", data.error);
+      }
+    } catch (err: any) {
+      console.error("❌ Erro ao contar seguidores:", err);
+    }
+  }, [userId]);
+
+  // ========== CONTAR SEGUINDO (movido para cima para resolver erro de declaração) ==========
+  const getFollowingCount = useCallback(async () => {
+    if (!userId) return;
+
+    console.log("🔢 useConnections.getFollowingCount() para userId:", userId);
+
+    try {
+      const response = await fetch(
+        `/api/connections/count-following?user_id=${userId}`
+      );
+
+      console.log("📥 Status da resposta:", response.status);
+      const data = await response.json();
+      console.log("📦 Dados da resposta:", data);
+
+      if (data.success) {
+        setFollowingCount(data.following_count || 0);
+        console.log("✅ Contagem de seguindo:", data.following_count);
+      } else {
+        console.error("❌ Erro ao contar seguindo:", data.error);
+      }
+    } catch (err: any) {
+      console.error("❌ Erro ao contar seguindo:", err);
+    }
+  }, [userId]);
+
+  // ========== EFEITOS ==========
   useEffect(() => {
     if (canPerformActions()) {
       checkFollowStatus();
       getFollowerCount();
       getFollowingCount();
     }
-  }, [userId, authToken, canPerformActions]);
+  }, [userId, authToken]);
 
   // ========== SEGUIR USUÁRIO ==========
   const follow = useCallback(async () => {
-    if (!canPerformActions()) return;
+    if (!canPerformActions()) return false;
 
     console.log("🔗 useConnections.follow() iniciado para userId:", userId);
 
@@ -93,14 +177,12 @@ export function useConnections(
       setIsLoading(true);
       setError(null);
 
-      // Preparar os dados para a requisição
       const requestBody = {
         following_id: userId,
       };
 
       console.log("📤 Dados sendo enviados:", requestBody);
 
-      // Fazer a chamada para a API
       const response = await fetch("/api/connections/follow", {
         method: "POST",
         headers: {
@@ -110,9 +192,7 @@ export function useConnections(
         body: JSON.stringify(requestBody),
       });
 
-      // Verificar o status e parsear o JSON
       console.log("📥 Status da resposta:", response.status);
-
       const data = await response.json();
       console.log("📦 Dados da resposta:", data);
 
@@ -120,23 +200,24 @@ export function useConnections(
         setIsFollowing(true);
         getFollowerCount(); // Atualizar contagem
         console.log("✅ Seguiu com sucesso");
+        return true;
       } else {
         console.error("❌ Erro ao seguir:", data.error);
         setError(data.error || "Erro ao seguir");
-        throw new Error(data.error || "Erro ao seguir");
+        return false;
       }
     } catch (err: any) {
       console.error("❌ Erro ao seguir:", err);
       setError(err.message || "Erro ao seguir");
-      throw err;
+      return false;
     } finally {
       setIsLoading(false);
     }
-  }, [userId, authToken, canPerformActions]);
+  }, [userId, authToken, canPerformActions, getFollowerCount]);
 
   // ========== DEIXAR DE SEGUIR USUÁRIO ==========
   const unfollow = useCallback(async () => {
-    if (!canPerformActions()) return;
+    if (!canPerformActions()) return false;
 
     console.log("🔗 useConnections.unfollow() iniciado para userId:", userId);
 
@@ -144,14 +225,12 @@ export function useConnections(
       setIsLoading(true);
       setError(null);
 
-      // Preparar os dados para a requisição
       const requestBody = {
         following_id: userId,
       };
 
       console.log("📤 Dados sendo enviados:", requestBody);
 
-      // Fazer a chamada para a API
       const response = await fetch(`/api/connections/unfollow`, {
         method: "DELETE",
         headers: {
@@ -161,9 +240,7 @@ export function useConnections(
         body: JSON.stringify(requestBody),
       });
 
-      // Verificar o status e parsear o JSON
       console.log("📥 Status da resposta:", response.status);
-
       const data = await response.json();
       console.log("📦 Dados da resposta:", data);
 
@@ -171,19 +248,20 @@ export function useConnections(
         setIsFollowing(false);
         getFollowerCount(); // Atualizar contagem
         console.log("✅ Deixou de seguir com sucesso");
+        return true;
       } else {
         console.error("❌ Erro ao deixar de seguir:", data.error);
         setError(data.error || "Erro ao deixar de seguir");
-        throw new Error(data.error || "Erro ao deixar de seguir");
+        return false;
       }
     } catch (err: any) {
       console.error("❌ Erro ao deixar de seguir:", err);
       setError(err.message || "Erro ao deixar de seguir");
-      throw err;
+      return false;
     } finally {
       setIsLoading(false);
     }
-  }, [userId, authToken, canPerformActions]);
+  }, [userId, authToken, canPerformActions, getFollowerCount]);
 
   // ========== VERIFICAR STATUS ==========
   const checkFollowStatus = useCallback(async () => {
@@ -195,7 +273,6 @@ export function useConnections(
       setIsLoading(true);
       setError(null);
 
-      // Fazer a chamada para a API
       const response = await fetch(
         `/api/connections/is-following?user_id=${userId}`,
         {
@@ -205,9 +282,7 @@ export function useConnections(
         }
       );
 
-      // Verificar o status e parsear o JSON
       console.log("📥 Status da resposta:", response.status);
-
       const data = await response.json();
       console.log("📦 Dados da resposta:", data);
 
@@ -229,66 +304,7 @@ export function useConnections(
     }
   }, [userId, authToken, canPerformActions]);
 
-  // ========== CONTAR SEGUIDORES ==========
-  const getFollowerCount = useCallback(async () => {
-    if (!userId) return;
-
-    console.log("🔢 useConnections.getFollowerCount() para userId:", userId);
-
-    try {
-      // Fazer a chamada para a API
-      const response = await fetch(
-        `/api/connections/count-followers?user_id=${userId}`
-      );
-
-      // Verificar o status e parsear o JSON
-      console.log("📥 Status da resposta:", response.status);
-
-      const data = await response.json();
-      console.log("📦 Dados da resposta:", data);
-
-      if (data.success) {
-        setFollowerCount(data.follower_count || 0);
-        console.log("✅ Contagem de seguidores:", data.follower_count);
-      } else {
-        console.error("❌ Erro ao contar seguidores:", data.error);
-      }
-    } catch (err: any) {
-      console.error("❌ Erro ao contar seguidores:", err);
-    }
-  }, [userId]);
-
-  // ========== CONTAR SEGUINDO ==========
-  const getFollowingCount = useCallback(async () => {
-    if (!userId) return;
-
-    console.log("🔢 useConnections.getFollowingCount() para userId:", userId);
-
-    try {
-      // Fazer a chamada para a API
-      const response = await fetch(
-        `/api/connections/count-following?user_id=${userId}`
-      );
-
-      // Verificar o status e parsear o JSON
-      console.log("📥 Status da resposta:", response.status);
-
-      const data = await response.json();
-      console.log("📦 Dados da resposta:", data);
-
-      if (data.success) {
-        setFollowingCount(data.following_count || 0);
-        console.log("✅ Contagem de seguindo:", data.following_count);
-      } else {
-        console.error("❌ Erro ao contar seguindo:", data.error);
-      }
-    } catch (err: any) {
-      console.error("❌ Erro ao contar seguindo:", err);
-    }
-  }, [userId]);
-
   // ========== LISTAR SEGUIDORES ==========
-  const getFollowersList = useCallback(
     async (limit = 10, offset = 0) => {
       if (!canPerformActions()) return;
 
@@ -298,7 +314,6 @@ export function useConnections(
         setFollowersLoading(true);
         setFollowersError(null);
 
-        // Fazer a chamada para a API
         const response = await fetch(
           `/api/connections/followers?user_id=${userId}&limit=${limit}&offset=${offset}`,
           {
@@ -308,9 +323,7 @@ export function useConnections(
           }
         );
 
-        // Verificar o status e parsear o JSON
         console.log("📥 Status da resposta:", response.status);
-
         const data: FollowersListResponse = await response.json();
         console.log("📦 Dados da resposta:", data);
 
@@ -345,7 +358,6 @@ export function useConnections(
         setFollowersLoading(true);
         setFollowersError(null);
 
-        // Fazer a chamada para a API
         const response = await fetch(
           `/api/connections/following?user_id=${userId}&limit=${limit}&offset=${offset}`,
           {
@@ -355,9 +367,7 @@ export function useConnections(
           }
         );
 
-        // Verificar o status e parsear o JSON
         console.log("📥 Status da resposta:", response.status);
-
         const data: FollowingListResponse = await response.json();
         console.log("📦 Dados da resposta:", data);
 

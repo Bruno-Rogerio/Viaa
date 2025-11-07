@@ -1,5 +1,5 @@
 // src/app/api/connections/following/route.ts
-// API para listar quem o usuário está seguindo
+// 👥 API de Conexões - Listar seguindo
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -10,90 +10,106 @@ const supabase = createClient(
 );
 
 export async function GET(req: NextRequest) {
-  console.log("👥 GET /api/connections/following");
+  console.log("📋 GET /api/connections/following");
 
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("user_id");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const limit = parseInt(searchParams.get("limit") || "10");
     const offset = parseInt(searchParams.get("offset") || "0");
 
     if (!userId) {
       return NextResponse.json(
-        { success: false, error: "user_id é obrigatório" },
+        {
+          error: "user_id é obrigatório",
+          following: [],
+          total: 0,
+          count: 0,
+          limit,
+          offset,
+        },
         { status: 400 }
       );
     }
 
-    console.log("📝 Listando quem o usuário segue:", userId);
+    console.log(`📝 Listando quem ${userId} está seguindo`);
 
-    // Primeiro buscar as conexões
+    // Buscar conexões onde o usuário é seguidor
     const {
       data: connections,
       error: connectionsError,
       count,
     } = await supabase
       .from("connections")
-      .select("following_id, created_at", { count: "exact" })
+      .select("following_id", { count: "exact" })
       .eq("follower_id", userId)
-      .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (connectionsError || !connections) {
+    if (connectionsError) {
       console.error("❌ Erro ao buscar conexões:", connectionsError);
       return NextResponse.json(
-        { success: false, error: "Erro ao buscar seguindo" },
+        {
+          error: "Erro ao buscar seguindo",
+          following: [],
+          total: 0,
+          count: 0,
+          limit,
+          offset,
+        },
         { status: 500 }
       );
     }
 
-    // Buscar perfis que está seguindo
+    if (!connections || connections.length === 0) {
+      return NextResponse.json({
+        following: [],
+        total: count || 0,
+        count: 0,
+        limit,
+        offset,
+      });
+    }
+
+    // Buscar dados de quem está seguindo
     const followingIds = connections.map((c) => c.following_id);
 
-    // Buscar perfis profissionais
-    const { data: professionals } = await supabase
+    // Primeiro buscar em perfis_profissionais
+    const { data: profissionais } = await supabase
       .from("perfis_profissionais")
-      .select(
-        "id, user_id, nome, sobrenome, foto_perfil_url, especialidades, verificado, bio_profissional"
-      )
+      .select("id, user_id, nome, sobrenome, especialidades, foto_perfil_url")
       .in("user_id", followingIds);
 
-    // Buscar perfis pacientes
-    const { data: patients } = await supabase
+    // Depois buscar em perfis_pacientes
+    const { data: pacientes } = await supabase
       .from("perfis_pacientes")
-      .select("id, user_id, nome, sobrenome, foto_perfil_url, bio_pessoal")
+      .select("id, user_id, nome, sobrenome, foto_perfil_url")
       .in("user_id", followingIds);
 
-    // Combinar dados
-    const following = connections
-      .map((conn) => {
-        const professional = professionals?.find(
-          (p) => p.user_id === conn.following_id
-        );
-        const patient = patients?.find((p) => p.user_id === conn.following_id);
-        const profile = professional || patient;
+    // Combinar e formatar resultados
+    const following = [];
 
-        if (!profile) return null;
+    if (profissionais) {
+      following.push(
+        ...profissionais.map((p) => ({
+          ...p,
+          tipo: "profissional" as const,
+        }))
+      );
+    }
 
-        return {
-          id: conn.following_id,
-          user_id: profile.user_id,
-          nome: profile.nome,
-          sobrenome: profile.sobrenome,
-          foto_perfil_url: profile.foto_perfil_url,
-          tipo: professional ? "profissional" : "paciente",
-          especialidades: professional?.especialidades,
-          verificado: professional?.verificado || false,
-          bio: professional?.bio_profissional || patient?.bio_pessoal,
-          followed_at: conn.created_at,
-        };
-      })
-      .filter(Boolean);
+    if (pacientes) {
+      following.push(
+        ...pacientes.map((p) => ({
+          ...p,
+          tipo: "paciente" as const,
+          especialidades: undefined,
+        }))
+      );
+    }
 
     console.log(`✅ Seguindo ${following.length} usuários`);
 
     return NextResponse.json({
-      success: true,
       following,
       total: count || 0,
       count: following.length,
@@ -103,7 +119,14 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     console.error("💥 Erro:", error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        error: error.message,
+        following: [],
+        total: 0,
+        count: 0,
+        limit: 10,
+        offset: 0,
+      },
       { status: 500 }
     );
   }
