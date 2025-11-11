@@ -1,18 +1,8 @@
 // src/hooks/useConnections.ts
-// ✅ HOOK CORRIGIDO - Com validações de tipo de usuário
+// ✅ VERSÃO COM DEBUG COMPLETO
 
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
-
-interface UserProfile {
-  id: string;
-  user_id: string;
-  nome: string;
-  sobrenome: string;
-  tipo: "profissional" | "paciente";
-  foto_perfil_url?: string;
-  especialidades?: string;
-}
 
 interface UseConnectionsReturn {
   isFollowing: boolean;
@@ -37,19 +27,35 @@ export function useConnections(
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
 
+  // 🔍 DEBUG - Log inicial
+  useEffect(() => {
+    console.group("🔍 useConnections Init");
+    console.log("targetProfileId:", targetProfileId);
+    console.log("currentUserType:", currentUserType);
+    console.groupEnd();
+  }, [targetProfileId, currentUserType]);
+
   const getAuthToken = async (): Promise<string | null> => {
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+      console.log("🔑 Token obtido:", session?.access_token ? "✅" : "❌");
       return session?.access_token || null;
-    } catch {
+    } catch (err) {
+      console.error("❌ Erro ao obter token:", err);
       return null;
     }
   };
 
   const follow = useCallback(async () => {
+    console.group("📤 useConnections.follow()");
+    console.log("targetProfileId:", targetProfileId);
+    console.log("currentUserType:", currentUserType);
+
     if (!targetProfileId || !currentUserType) {
+      console.error("❌ Dados insuficientes");
+      console.groupEnd();
       setError("Dados insuficientes para seguir");
       return;
     }
@@ -59,7 +65,13 @@ export function useConnections(
       setError(null);
 
       const token = await getAuthToken();
-      if (!token) throw new Error("Não autenticado");
+      if (!token) {
+        console.error("❌ Token não encontrado");
+        throw new Error("Não autenticado");
+      }
+
+      console.log("📡 Enviando requisição para /api/connections/follow");
+      console.log("Body:", { following_id: targetProfileId });
 
       const response = await fetch("/api/connections/follow", {
         method: "POST",
@@ -70,12 +82,17 @@ export function useConnections(
         body: JSON.stringify({ following_id: targetProfileId }),
       });
 
+      console.log("📥 Status da resposta:", response.status);
+
       const data = await response.json();
+      console.log("📦 Dados da resposta:", data);
 
       if (!data.success) {
+        console.error("❌ API retornou erro:", data.error);
         throw new Error(data.error || "Erro ao seguir");
       }
 
+      console.log("✅ Follow bem-sucedido");
       setIsFollowing(true);
       await getFollowerCount();
     } catch (err: any) {
@@ -84,11 +101,17 @@ export function useConnections(
       throw err;
     } finally {
       setIsLoading(false);
+      console.groupEnd();
     }
   }, [targetProfileId, currentUserType]);
 
   const unfollow = useCallback(async () => {
+    console.group("📤 useConnections.unfollow()");
+    console.log("targetProfileId:", targetProfileId);
+
     if (!targetProfileId) {
+      console.error("❌ ID não fornecido");
+      console.groupEnd();
       setError("ID do usuário não fornecido");
       return;
     }
@@ -98,7 +121,12 @@ export function useConnections(
       setError(null);
 
       const token = await getAuthToken();
-      if (!token) throw new Error("Não autenticado");
+      if (!token) {
+        console.error("❌ Token não encontrado");
+        throw new Error("Não autenticado");
+      }
+
+      console.log("📡 Enviando requisição para /api/connections/unfollow");
 
       const response = await fetch("/api/connections/unfollow", {
         method: "DELETE",
@@ -109,12 +137,17 @@ export function useConnections(
         body: JSON.stringify({ following_id: targetProfileId }),
       });
 
+      console.log("📥 Status da resposta:", response.status);
+
       const data = await response.json();
+      console.log("📦 Dados da resposta:", data);
 
       if (!data.success) {
+        console.error("❌ API retornou erro:", data.error);
         throw new Error(data.error || "Erro ao deixar de seguir");
       }
 
+      console.log("✅ Unfollow bem-sucedido");
       setIsFollowing(false);
       await getFollowerCount();
     } catch (err: any) {
@@ -123,30 +156,38 @@ export function useConnections(
       throw err;
     } finally {
       setIsLoading(false);
+      console.groupEnd();
     }
   }, [targetProfileId]);
 
   const checkFollowStatus = useCallback(async () => {
     if (!targetProfileId) return;
 
+    console.log("🔍 Verificando status de follow para:", targetProfileId);
+
     try {
       setIsLoading(true);
       setError(null);
 
       const token = await getAuthToken();
-      if (!token) return;
+      if (!token) {
+        console.warn("⚠️ Sem token, pulando verificação");
+        return;
+      }
 
-      const response = await fetch(
-        `/api/connections/is-following?user_id=${targetProfileId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const url = `/api/connections/is-following?user_id=${targetProfileId}`;
+      console.log("📡 GET:", url);
+
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       const data = await response.json();
+      console.log("📦 Status de follow:", data);
 
       if (data.success) {
         setIsFollowing(data.is_following);
+        console.log("✅ isFollowing:", data.is_following);
       }
     } catch (err: any) {
       console.error("❌ Erro ao verificar status:", err);
@@ -168,6 +209,7 @@ export function useConnections(
 
       if (data.success) {
         setFollowerCount(data.follower_count || 0);
+        console.log("📊 Follower count:", data.follower_count);
       }
     } catch (err: any) {
       console.error("❌ Erro ao contar seguidores:", err);
@@ -186,6 +228,7 @@ export function useConnections(
 
       if (data.success) {
         setFollowingCount(data.following_count || 0);
+        console.log("📊 Following count:", data.following_count);
       }
     } catch (err: any) {
       console.error("❌ Erro ao contar seguindo:", err);
@@ -194,6 +237,7 @@ export function useConnections(
 
   useEffect(() => {
     if (targetProfileId && currentUserType) {
+      console.log("🔄 Carregando dados iniciais do useConnections");
       checkFollowStatus();
       getFollowerCount();
       getFollowingCount();

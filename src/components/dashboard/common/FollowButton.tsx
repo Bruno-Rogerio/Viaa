@@ -1,7 +1,8 @@
 // src/components/dashboard/common/FollowButton.tsx
-// ✅ BOTÃO DE SEGUIR CORRIGIDO
+// ✅ VERSÃO COM DEBUG COMPLETO
 
 "use client";
+import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConnections } from "@/hooks/useConnections";
 import { UserPlusIcon, UserMinusIcon } from "@heroicons/react/24/outline";
@@ -27,18 +28,39 @@ export default function FollowButton({
   const currentProfileId = getProfileId();
   const authId = getAuthId();
 
+  // 🔍 DEBUG - Verificar valores
+  useEffect(() => {
+    console.group("🔍 FollowButton Debug");
+    console.log("targetProfileId:", targetProfileId);
+    console.log("currentUserType:", currentUserType);
+    console.log("currentProfileId:", currentProfileId);
+    console.log("authId:", authId);
+    console.groupEnd();
+  }, [targetProfileId, currentUserType, currentProfileId, authId]);
+
   const { isFollowing, isLoading, error, follow, unfollow } = useConnections(
     targetProfileId,
     currentUserType
   );
 
+  // 🔍 DEBUG - Estado do hook
+  useEffect(() => {
+    console.group("🔍 useConnections State");
+    console.log("isFollowing:", isFollowing);
+    console.log("isLoading:", isLoading);
+    console.log("error:", error);
+    console.groupEnd();
+  }, [isFollowing, isLoading, error]);
+
   // Não mostrar se não está autenticado
   if (!authId || !currentUserType) {
+    console.warn("❌ FollowButton: Não autenticado ou sem tipo de usuário");
     return null;
   }
 
   // Não mostrar se for o próprio usuário
   if (currentProfileId === targetProfileId) {
+    console.log("ℹ️ FollowButton: É o próprio usuário");
     return null;
   }
 
@@ -46,16 +68,26 @@ export default function FollowButton({
     e.preventDefault();
     e.stopPropagation();
 
+    console.group("🖱️ FollowButton Click");
+    console.log("isFollowing:", isFollowing);
+    console.log("targetProfileId:", targetProfileId);
+
     try {
       if (isFollowing) {
+        console.log("📤 Chamando unfollow...");
         await unfollow();
+        console.log("✅ Unfollow concluído");
         onUnfollow?.();
       } else {
+        console.log("📤 Chamando follow...");
         await follow();
+        console.log("✅ Follow concluído");
         onFollow?.();
       }
     } catch (err) {
-      console.error("Erro ao seguir/deixar de seguir:", err);
+      console.error("❌ Erro ao seguir/deixar de seguir:", err);
+    } finally {
+      console.groupEnd();
     }
   };
 
@@ -77,6 +109,11 @@ export default function FollowButton({
       ? "text-gray-700 hover:bg-gray-100"
       : "text-emerald-700 hover:bg-emerald-50",
   };
+
+  // Mostrar erro se houver
+  if (error) {
+    console.error("❌ FollowButton Error:", error);
+  }
 
   return (
     <button
