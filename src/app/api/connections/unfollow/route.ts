@@ -1,5 +1,5 @@
 // src/app/api/connections/unfollow/route.ts
-// 👋 API de Conexões - Deixar de seguir
+// ✅ ROTA CORRIGIDA - Unfollow
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -9,29 +9,53 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function DELETE(req: NextRequest) {
-  console.log("➖ DELETE /api/connections/unfollow");
-
+async function getUserFromToken(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("authorization");
-    const token = authHeader?.replace("Bearer ", "");
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) return null;
 
-    if (!token) {
-      return NextResponse.json(
-        { success: false, error: "Token não fornecido" },
-        { status: 401 }
-      );
-    }
-
-    // Buscar dados do usuário autenticado
+    const token = authHeader.substring(7);
     const {
       data: { user },
-      error: authError,
+      error,
     } = await supabase.auth.getUser(token);
 
-    if (authError || !user) {
+    if (error || !user) return null;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+async function getUserProfileId(userId: string): Promise<string | null> {
+  const tables = [
+    "perfis_profissionais",
+    "perfis_pacientes",
+    "perfis_clinicas",
+    "perfis_empresas",
+  ];
+
+  for (const table of tables) {
+    const { data, error } = await supabase
+      .from(table)
+      .select("id")
+      .eq("user_id", userId)
+      .single();
+
+    if (!error && data) {
+      return data.id;
+    }
+  }
+
+  return null;
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await getUserFromToken(req);
+    if (!user) {
       return NextResponse.json(
-        { success: false, error: "Token inválido" },
+        { success: false, error: "Não autenticado" },
         { status: 401 }
       );
     }
@@ -46,33 +70,58 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    console.log(`📝 ${user.id} deixando de seguir ${following_id}`);
+    const followerProfileId = await getUserProfileId(user.id);
+    if (!followerProfileId) {
+      return NextResponse.json(
+        { success: false, error: "Perfil não encontrado" },
+        { status: 404 }
+      );
+    }
+
+    // Verificar se está seguindo
+    const { data: existingConnection } = await supabase
+      .from("connections")
+      .select("id")
+      .eq("follower_id", followerProfileId)
+      .eq("following_id", following_id)
+      .single();
+
+    if (!existingConnection) {
+      return NextResponse.json(
+        { success: false, error: "Você não segue este usuário" },
+        { status: 400 }
+      );
+    }
 
     // Remover conexão
     const { error } = await supabase
       .from("connections")
       .delete()
-      .eq("follower_id", user.id)
+      .eq("follower_id", followerProfileId)
       .eq("following_id", following_id);
 
     if (error) {
-      console.error("❌ Erro ao deixar de seguir:", error);
+      console.error("❌ Erro ao remover conexão:", error);
       return NextResponse.json(
-        { success: false, error: "Erro ao deixar de seguir" },
+        { success: false, error: "Erro ao deixar de seguir usuário" },
         { status: 500 }
       );
     }
 
-    console.log("✅ Deixou de seguir com sucesso");
-
-    return NextResponse.json({
-      success: true,
-      message: "Deixou de seguir com sucesso",
-    });
-  } catch (error: any) {
-    console.error("💥 Erro:", error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: true,
+        message: "Deixou de seguir com sucesso",
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    console.error("💥 Erro crítico:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message || "Erro interno do servidor",
+      },
       { status: 500 }
     );
   }

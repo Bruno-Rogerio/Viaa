@@ -1,212 +1,201 @@
 // src/components/dashboard/patient/feed/SuggestedProfessionals.tsx
-// 🎯 Componente de sugestão de profissionais para seguir
+// ✅ CORRIGIDO - Usando targetProfileId ao invés de userId
 
+"use client";
 import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import FollowButton from "@/components/dashboard/common/FollowButton";
-import { CheckBadgeIcon } from "@heroicons/react/24/solid";
-import { MapPinIcon } from "@heroicons/react/24/outline";
+import FollowButton from "../../common/FollowButton";
+import { LoadingSpinner } from "../../common";
+import { CheckBadgeIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 
-// Tipos
-interface SuggestedProfessional {
+interface Professional {
   id: string;
-  user_id: string;
   nome: string;
   sobrenome: string;
-  especialidades?: string;
+  especialidades: string;
   foto_perfil_url?: string;
-  endereco_cidade?: string;
-  endereco_estado?: string;
-  verificado?: boolean;
-  score?: number; // Campo para ranking interno
+  verificado: boolean;
 }
 
-// Propriedades do componente
 interface SuggestedProfessionalsProps {
   limit?: number;
 }
 
 export default function SuggestedProfessionals({
-  limit = 3,
+  limit = 5,
 }: SuggestedProfessionalsProps) {
-  const { user } = useAuth();
-  const [professionals, setProfessionals] = useState<SuggestedProfessional[]>(
-    []
-  );
-  const [loading, setLoading] = useState(false);
+  const { getProfileId, getUserType } = useAuth();
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
 
-  // Carregar profissionais sugeridos
+  const currentProfileId = getProfileId();
+  const currentUserType = getUserType();
+
   useEffect(() => {
-    const loadSuggestions = async () => {
-      if (!user?.id) return;
+    loadSuggestions();
+  }, [currentProfileId]);
 
+  const loadSuggestions = async () => {
+    try {
       setLoading(true);
       setError(null);
 
-      try {
-        // Endpoint específico para sugestões com algoritmo de relevância
-        const response = await fetch(
-          `/api/profissionais/sugestoes?limit=${limit}`
-        );
+      // Buscar profissionais que o usuário NÃO segue
+      const { data: connections } = await supabase
+        .from("connections")
+        .select("following_id")
+        .eq("follower_id", currentProfileId || "");
 
-        if (!response.ok) {
-          throw new Error("Erro ao carregar sugestões");
-        }
+      const followingIds = connections?.map((c) => c.following_id) || [];
 
-        const data = await response.json();
-        setProfessionals(data.profissionais || []);
-      } catch (err: any) {
-        console.error("Erro ao carregar sugestões:", err);
-        setError(err.message || "Erro ao carregar sugestões");
-      } finally {
-        setLoading(false);
+      let query = supabase
+        .from("perfis_profissionais")
+        .select(
+          "id, nome, sobrenome, especialidades, foto_perfil_url, verificado"
+        )
+        .eq("verificado", true)
+        .limit(limit);
+
+      if (followingIds.length > 0) {
+        query = query.not("id", "in", `(${followingIds.join(",")})`);
       }
-    };
 
-    loadSuggestions();
-  }, [user?.id, limit, refreshKey]);
+      if (currentProfileId) {
+        query = query.neq("id", currentProfileId);
+      }
 
-  // Callback quando usuário segue um profissional
-  const handleFollowChange = () => {
-    // Atualizar a lista de sugestões após seguir
-    setTimeout(() => setRefreshKey((prev) => prev + 1), 1000);
+      const { data, error: queryError } = await query;
+
+      if (queryError) throw queryError;
+
+      setProfessionals(data || []);
+    } catch (err: any) {
+      console.error("Erro ao carregar sugestões:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Estado de loading
-  if (loading && professionals.length === 0) {
-    return (
-      <div className="bg-white rounded-xl border border-gray-200 p-4 animate-pulse">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Sugestões para Seguir
-        </h3>
+  const handleFollowSuccess = () => {
+    loadSuggestions();
+  };
 
-        {Array.from({ length: limit }).map((_, index) => (
-          <div
-            key={index}
-            className="flex items-center mb-4 pb-4 border-b border-gray-100 last:border-b-0 last:mb-0 last:pb-0"
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-4">
+          Profissionais Sugeridos
+        </h2>
+        <div className="flex items-center justify-center py-8">
+          <LoadingSpinner size="md" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-4">
+          Profissionais Sugeridos
+        </h2>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800 text-sm">{error}</p>
+          <button
+            onClick={loadSuggestions}
+            className="mt-2 text-red-600 text-sm hover:underline"
           >
-            <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
-            <div className="ml-3 flex-1">
-              <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-              <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (professionals.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-4">
+          Profissionais Sugeridos
+        </h2>
+        <p className="text-gray-600 text-sm">
+          Nenhuma sugestão disponível no momento.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-gray-900">
+          Profissionais Sugeridos
+        </h2>
+        <Link
+          href="/dashboard/paciente/profissionais"
+          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+        >
+          Ver todos
+        </Link>
+      </div>
+
+      <div className="space-y-4">
+        {professionals.map((professional) => (
+          <div
+            key={professional.id}
+            className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Link
+              href={`/dashboard/paciente/profissionais/${professional.id}`}
+              className="flex items-center gap-3 flex-1 min-w-0"
+            >
+              {/* Avatar */}
+              {professional.foto_perfil_url ? (
+                <img
+                  src={professional.foto_perfil_url}
+                  alt={professional.nome}
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-emerald-400 flex items-center justify-center text-white font-semibold">
+                  {professional.nome.charAt(0)}
+                  {professional.sobrenome.charAt(0)}
+                </div>
+              )}
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1">
+                  <p className="font-semibold text-gray-900 truncate">
+                    {professional.nome} {professional.sobrenome}
+                  </p>
+                  {professional.verificado && (
+                    <CheckBadgeIcon className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 truncate">
+                  {professional.especialidades}
+                </p>
+              </div>
+            </Link>
+
+            {/* Follow Button - CORRIGIDO: targetProfileId */}
+            <div className="flex-shrink-0 ml-2">
+              <FollowButton
+                targetProfileId={professional.id}
+                variant="secondary"
+                size="sm"
+                onFollow={handleFollowSuccess}
+                onUnfollow={handleFollowSuccess}
+              />
             </div>
-            <div className="w-20 h-8 bg-gray-200 rounded-lg"></div>
           </div>
         ))}
       </div>
-    );
-  }
-
-  // Estado de erro
-  if (error) {
-    return (
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Sugestões para Seguir
-        </h3>
-        <p className="text-red-600 text-sm">{error}</p>
-      </div>
-    );
-  }
-
-  // Sem profissionais para sugerir
-  if (professionals.length === 0) {
-    return (
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Sugestões para Seguir
-        </h3>
-        <p className="text-gray-600 text-sm">
-          Nenhuma sugestão no momento. Explore mais profissionais na página de
-          busca.
-        </p>
-        <Link
-          href="/dashboard/paciente/profissionais"
-          className="inline-block mt-3 text-sm text-emerald-600 hover:text-emerald-700 font-medium"
-        >
-          Ver todos os profissionais
-        </Link>
-      </div>
-    );
-  }
-
-  // Renderização principal
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-        Sugestões para Seguir
-      </h3>
-
-      {professionals.map((prof) => (
-        <div
-          key={prof.id}
-          className="flex items-center mb-4 pb-4 border-b border-gray-100 last:border-b-0 last:mb-0 last:pb-0"
-        >
-          {/* Avatar */}
-          <div className="flex-shrink-0">
-            {prof.foto_perfil_url ? (
-              <img
-                src={prof.foto_perfil_url}
-                alt={prof.nome}
-                className="w-12 h-12 rounded-full object-cover border border-gray-200"
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-emerald-400 flex items-center justify-center text-white font-semibold text-sm">
-                {prof.nome.charAt(0)}
-                {prof.sobrenome.charAt(0)}
-              </div>
-            )}
-          </div>
-
-          {/* Informações */}
-          <div className="ml-3 flex-1 min-w-0">
-            <div className="flex items-center">
-              <p className="font-medium text-gray-900 truncate">
-                {prof.nome} {prof.sobrenome}
-              </p>
-              {prof.verificado && (
-                <CheckBadgeIcon className="w-4 h-4 text-blue-500 ml-1" />
-              )}
-            </div>
-
-            <p className="text-xs text-gray-600 truncate">
-              {prof.especialidades || "Profissional"}
-            </p>
-
-            {(prof.endereco_cidade || prof.endereco_estado) && (
-              <p className="text-xs text-gray-500 flex items-center mt-1">
-                <MapPinIcon className="w-3 h-3 mr-1" />
-                {prof.endereco_cidade}
-                {prof.endereco_estado && prof.endereco_cidade && ", "}
-                {prof.endereco_estado}
-              </p>
-            )}
-          </div>
-
-          {/* Botão de seguir */}
-          <div className="flex-shrink-0">
-            <FollowButton
-              userId={prof.user_id}
-              variant="secondary"
-              size="sm"
-              showLabel={false}
-              onFollow={handleFollowChange}
-              onUnfollow={handleFollowChange}
-            />
-          </div>
-        </div>
-      ))}
-
-      {/* Link para ver mais */}
-      <Link
-        href="/dashboard/paciente/profissionais"
-        className="block mt-3 text-center text-sm text-emerald-600 hover:text-emerald-700 font-medium"
-      >
-        Ver mais profissionais
-      </Link>
     </div>
   );
 }

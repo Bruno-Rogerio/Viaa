@@ -1,135 +1,105 @@
 // src/components/dashboard/common/FollowButton.tsx
-// 👥 Botão de Seguir/Deixar de Seguir - Versão Melhorada
+// ✅ BOTÃO DE SEGUIR CORRIGIDO
 
 "use client";
-import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useConnections } from "@/hooks/useConnections";
-import { UserPlusIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { UserPlusIcon, UserMinusIcon } from "@heroicons/react/24/outline";
 
 interface FollowButtonProps {
-  userId: string;
+  targetProfileId: string;
   variant?: "primary" | "secondary" | "ghost";
   size?: "sm" | "md" | "lg";
-  showLabel?: boolean;
-  className?: string;
-  onFollowChange?: (isFollowing: boolean) => void;
+  onFollow?: () => void;
+  onUnfollow?: () => void;
 }
 
 export default function FollowButton({
-  userId,
+  targetProfileId,
   variant = "primary",
   size = "md",
-  showLabel = true,
-  className = "",
-  onFollowChange,
+  onFollow,
+  onUnfollow,
 }: FollowButtonProps) {
-  const { isFollowing, isLoading, follow, unfollow, error } =
-    useConnections(userId);
-  const [localFollowing, setLocalFollowing] = useState(isFollowing);
-  const [localLoading, setLocalLoading] = useState(false);
+  const { getProfileId, getUserType, getAuthId } = useAuth();
 
-  useEffect(() => {
-    setLocalFollowing(isFollowing);
-  }, [isFollowing]);
+  const currentUserType = getUserType();
+  const currentProfileId = getProfileId();
+  const authId = getAuthId();
 
-  const handleToggle = async () => {
-    if (localLoading || isLoading) return;
+  const { isFollowing, isLoading, error, follow, unfollow } = useConnections(
+    targetProfileId,
+    currentUserType
+  );
+
+  // Não mostrar se não está autenticado
+  if (!authId || !currentUserType) {
+    return null;
+  }
+
+  // Não mostrar se for o próprio usuário
+  if (currentProfileId === targetProfileId) {
+    return null;
+  }
+
+  const handleClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
 
     try {
-      setLocalLoading(true);
-      let success = false;
-
-      if (localFollowing) {
-        success = await unfollow();
-        if (success) {
-          setLocalFollowing(false);
-          onFollowChange?.(false);
-        }
+      if (isFollowing) {
+        await unfollow();
+        onUnfollow?.();
       } else {
-        success = await follow();
-        if (success) {
-          setLocalFollowing(true);
-          onFollowChange?.(true);
-        }
+        await follow();
+        onFollow?.();
       }
-
-      if (!success && error) {
-        console.error("Erro ao alterar status de seguir:", error);
-      }
-    } catch (error) {
-      console.error("Erro ao alterar status:", error);
-    } finally {
-      setLocalLoading(false);
+    } catch (err) {
+      console.error("Erro ao seguir/deixar de seguir:", err);
     }
   };
 
-  // Classes de tamanho
+  // Estilos
   const sizeClasses = {
-    sm: "px-2 py-1 text-xs",
-    md: "px-3 py-1.5 text-sm",
-    lg: "px-4 py-2 text-base",
+    sm: "px-3 py-1.5 text-sm",
+    md: "px-4 py-2 text-base",
+    lg: "px-6 py-3 text-lg",
   };
 
-  // Classes de variante
-  const getVariantClasses = () => {
-    if (variant === "primary") {
-      return localFollowing
-        ? "bg-gray-200 text-gray-700 hover:bg-gray-300 border border-gray-300"
-        : "bg-blue-600 text-white hover:bg-blue-700 border border-blue-600";
-    }
-    if (variant === "secondary") {
-      return localFollowing
-        ? "border border-gray-300 text-gray-700 hover:bg-gray-100 bg-white"
-        : "border border-blue-600 text-blue-600 hover:bg-blue-50 bg-white";
-    }
-    // ghost
-    return localFollowing
+  const variantClasses = {
+    primary: isFollowing
+      ? "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
+      : "bg-emerald-600 text-white hover:bg-emerald-700",
+    secondary: isFollowing
+      ? "bg-gray-200 text-gray-800 hover:bg-gray-300"
+      : "bg-blue-100 text-blue-700 hover:bg-blue-200",
+    ghost: isFollowing
       ? "text-gray-700 hover:bg-gray-100"
-      : "text-blue-600 hover:bg-blue-50";
+      : "text-emerald-700 hover:bg-emerald-50",
   };
-
-  // Ícone baseado no estado
-  const Icon = localFollowing ? CheckIcon : UserPlusIcon;
-  const isDisabled = localLoading || isLoading;
 
   return (
     <button
-      onClick={handleToggle}
-      disabled={isDisabled}
+      onClick={handleClick}
+      disabled={isLoading}
       className={`
-        inline-flex items-center justify-center gap-1.5 rounded-lg font-medium
-        transition-all duration-200 
-        ${isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-        ${sizeClasses[size]}
-        ${getVariantClasses()}
-        ${className}
+        flex items-center justify-center gap-2 font-medium rounded-lg
+        transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed
+        ${sizeClasses[size]} ${variantClasses[variant]}
       `}
     >
-      {!isDisabled && (
-        <Icon
-          className={`
-          ${size === "sm" ? "w-3 h-3" : ""}
-          ${size === "md" ? "w-4 h-4" : ""}
-          ${size === "lg" ? "w-5 h-5" : ""}
-        `}
-        />
-      )}
-
-      {isDisabled && (
-        <div
-          className={`
-          animate-spin rounded-full border-b-2 border-current
-          ${size === "sm" ? "w-3 h-3" : ""}
-          ${size === "md" ? "w-4 h-4" : ""}
-          ${size === "lg" ? "w-5 h-5" : ""}
-        `}
-        />
-      )}
-
-      {showLabel && (
-        <span>
-          {isDisabled ? "..." : localFollowing ? "Seguindo" : "Seguir"}
-        </span>
+      {isLoading ? (
+        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+      ) : isFollowing ? (
+        <>
+          <UserMinusIcon className="w-5 h-5" />
+          <span>Seguindo</span>
+        </>
+      ) : (
+        <>
+          <UserPlusIcon className="w-5 h-5" />
+          <span>Seguir</span>
+        </>
       )}
     </button>
   );

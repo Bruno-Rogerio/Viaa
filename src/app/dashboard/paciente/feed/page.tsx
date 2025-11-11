@@ -1,5 +1,5 @@
 // src/app/dashboard/paciente/feed/page.tsx
-// 🎯 Página de Feed Personalizado do Paciente - "Biblioteca Viva"
+// ✅ PÁGINA DE FEED PARA PACIENTES - Simplificada
 
 "use client";
 import { PatientLayout } from "@/components/dashboard/patient/layout";
