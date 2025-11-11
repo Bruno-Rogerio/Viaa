@@ -1,5 +1,5 @@
 // src/components/dashboard/patient/feed/ImprovedPatientFeed.tsx
-// ✅ CORRIGIDO - Todos os erros de tipo resolvidos
+// ✅ CORRIGIDO - targetProfileId sendo passado corretamente
 
 "use client";
 import { useState, useEffect } from "react";
@@ -16,10 +16,6 @@ import {
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
 
-// ============================================================
-// 📋 TIPOS
-// ============================================================
-
 interface FilterTabsProps {
   currentFilter: string;
   onFilterChange: (filter: string) => void;
@@ -29,10 +25,6 @@ interface ImprovedPatientFeedProps {
   currentFilter?: string;
   onFilterChange?: (filter: string) => void;
 }
-
-// ============================================================
-// 🎯 COMPONENTE PRINCIPAL
-// ============================================================
 
 export default function ImprovedPatientFeed({
   currentFilter = "all",
@@ -91,18 +83,6 @@ export default function ImprovedPatientFeed({
     if (onFilterChange) {
       onFilterChange(newFilter);
     }
-  };
-
-  const formatRelativeTime = (date: string) => {
-    const now = new Date();
-    const postDate = new Date(date);
-    const diff = Math.floor((now.getTime() - postDate.getTime()) / 1000);
-
-    if (diff < 60) return "há poucos segundos";
-    if (diff < 3600) return `há ${Math.floor(diff / 60)}m`;
-    if (diff < 86400) return `há ${Math.floor(diff / 3600)}h`;
-    if (diff < 604800) return `há ${Math.floor(diff / 86400)}d`;
-    return postDate.toLocaleDateString("pt-BR");
   };
 
   if (loading) {
@@ -177,10 +157,6 @@ export default function ImprovedPatientFeed({
   );
 }
 
-// ============================================================
-// 🎴 COMPONENTE DE FILTROS
-// ============================================================
-
 function FilterTabs({ currentFilter, onFilterChange }: FilterTabsProps) {
   const filters = [
     { id: "all", label: "Todos", icon: "🏠" },
@@ -216,10 +192,6 @@ function FilterTabs({ currentFilter, onFilterChange }: FilterTabsProps) {
   );
 }
 
-// ============================================================
-// 🎴 COMPONENTE DE POST (APENAS LEITURA)
-// ============================================================
-
 interface PostCardReadOnlyProps {
   post: Post;
   currentProfileId: string | null;
@@ -242,6 +214,13 @@ function PostCardReadOnly({
     if (diff < 604800) return `há ${Math.floor(diff / 86400)}d`;
     return postDate.toLocaleDateString("pt-BR");
   };
+
+  // 🔍 DEBUG - Ver o que está sendo passado
+  console.log("🎯 PostCardReadOnly:", {
+    postAuthorId: post.author.id,
+    currentProfileId,
+    shouldShowButton: post.author.id !== currentProfileId,
+  });
 
   return (
     <article className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
@@ -279,9 +258,10 @@ function PostCardReadOnly({
             </div>
           </div>
 
-          {/* Botão Seguir */}
+          {/* Botão Seguir - 🔧 CORRIGIDO: Passando targetProfileId */}
           {currentProfileId &&
             currentUserType &&
+            post.author.id &&
             post.author.id !== currentProfileId && (
               <div className="flex-shrink-0 ml-2">
                 <FollowButton
